@@ -1,0 +1,97 @@
+{
+  "name": "@yobo/framework",
+  "version": "1.0.0",
+  "description": "Core infrastructure abstractions for Yobo Platform",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./db": {
+      "types": "./dist/db/index.d.ts",
+      "import": "./dist/db/index.mjs",
+      "require": "./dist/db/index.js"
+    },
+    "./permissions": {
+      "types": "./dist/permissions/index.d.ts",
+      "import": "./dist/permissions/index.mjs",
+      "require": "./dist/permissions/index.js"
+    },
+    "./auth": {
+      "types": "./dist/auth/index.d.ts",
+      "import": "./dist/auth/index.mjs",
+      "require": "./dist/auth/index.js"
+    },
+    "./router": {
+      "types": "./dist/router/index.d.ts",
+      "import": "./dist/router/index.mjs",
+      "require": "./dist/router/index.js"
+    },
+    "./audit": {
+      "types": "./dist/audit/index.d.ts",
+      "import": "./dist/audit/index.mjs",
+      "require": "./dist/audit/index.js"
+    },
+    "./cache": {
+      "types": "./dist/cache/index.d.ts",
+      "import": "./dist/cache/index.mjs",
+      "require": "./dist/cache/index.js"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry/index.d.ts",
+      "import": "./dist/telemetry/index.mjs",
+      "require": "./dist/telemetry/index.js"
+    },
+    "./events": {
+      "types": "./dist/events/index.d.ts",
+      "import": "./dist/events/index.mjs",
+      "require": "./dist/events/index.js"
+    },
+    "./patterns": {
+      "types": "./dist/patterns/index.d.ts",
+      "import": "./dist/patterns/index.mjs",
+      "require": "./dist/patterns/index.js"
+    },
+    "./nextjs": {
+      "types": "./dist/nextjs/index.d.ts",
+      "import": "./dist/nextjs/index.mjs",
+      "require": "./dist/nextjs/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "test": "vitest",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "yobo",
+    "framework",
+    "database",
+    "permissions",
+    "auth"
+  ],
+  "author": "Yobo",
+  "license": "PRIVATE",
+  "peerDependencies": {
+    "drizzle-orm": "^0.44.2",
+    "@trpc/server": "^11.1.0",
+    "next-auth": "^4.24.11",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsup": "^8.0.1",
+    "typescript": "^5",
+    "vitest": "^3.2.3"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}
