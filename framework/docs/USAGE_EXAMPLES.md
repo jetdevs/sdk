@@ -1,4 +1,4 @@
-# @yobo/framework Usage Examples
+# @yobolabs/framework Usage Examples
 
 This document shows how domains should use the framework utilities for cross-cutting concerns while maintaining their own business logic.
 
@@ -13,10 +13,10 @@ import type {
   DomainRepository,
   SearchableRepository,
   AuditableRepository
-} from '@yobo/framework/patterns';
-import { auditLog, calculateChanges } from '@yobo/framework/audit';
-import { withCache, invalidatePattern } from '@yobo/framework/cache';
-import { withTelemetry } from '@yobo/framework/telemetry';
+} from '@yobolabs/framework/patterns';
+import { auditLog, calculateChanges } from '@yobolabs/framework/audit';
+import { withCache, invalidatePattern } from '@yobolabs/framework/cache';
+import { withTelemetry } from '@yobolabs/framework/telemetry';
 
 export class ProductsRepository implements
   DomainRepository<Product>,
@@ -109,10 +109,10 @@ export class ProductsRepository implements
 ```typescript
 // src/server/api/routers/products.router.ts
 
-import { withTelemetry, trackMetric } from '@yobo/framework/telemetry';
-import { requirePermission } from '@yobo/framework/permissions';
-import { withRLSContext } from '@yobo/framework/rls';
-import { publishEvent } from '@yobo/framework/events';
+import { withTelemetry, trackMetric } from '@yobolabs/framework/telemetry';
+import { requirePermission } from '@yobolabs/framework/permissions';
+import { withRLSContext } from '@yobolabs/framework/rls';
+import { publishEvent } from '@yobolabs/framework/events';
 
 export const productsRouter = createTRPCRouter({
   create: orgProtectedProcedure
@@ -178,8 +178,8 @@ export const productsRouter = createTRPCRouter({
 ```typescript
 // src/app/products/actions.ts
 
-import { withServerAction, cachedAction } from '@yobo/framework/nextjs';
-import { withCache, invalidatePattern } from '@yobo/framework/cache';
+import { withServerAction, cachedAction } from '@yobolabs/framework/nextjs';
+import { withCache, invalidatePattern } from '@yobolabs/framework/cache';
 
 export const createProduct = withServerAction(
   'product.create',
@@ -222,8 +222,8 @@ export const getProducts = cachedAction(
 ```typescript
 // src/app/api/products/route.ts
 
-import { withRouteHandler } from '@yobo/framework/nextjs';
-import { withTelemetry } from '@yobo/framework/telemetry';
+import { withRouteHandler } from '@yobolabs/framework/nextjs';
+import { withTelemetry } from '@yobolabs/framework/telemetry';
 
 export const GET = withRouteHandler(async (request) => {
   const { searchParams } = new URL(request.url);
@@ -349,7 +349,7 @@ async create(data) {
 
 ## Summary
 
-The @yobo/framework provides the **plumbing** (cross-cutting concerns) while your domains provide the **business logic**. This separation gives you:
+The @yobolabs/framework provides the **plumbing** (cross-cutting concerns) while your domains provide the **business logic**. This separation gives you:
 
 1. **Flexibility** - Domains can have complex, custom logic
 2. **Consistency** - All domains use same infrastructure patterns

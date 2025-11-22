@@ -1,8 +1,8 @@
-# @yobo/framework Usage Guide
+# @yobolabs/framework Usage Guide
 
 ## Overview
 
-The `@yobo/framework` package provides core infrastructure abstractions that hide security-critical implementation details while enabling rapid feature development.
+The `@yobolabs/framework` package provides core infrastructure abstractions that hide security-critical implementation details while enabling rapid feature development.
 
 ## Installation
 
@@ -11,7 +11,7 @@ The package is already included in the monorepo. In `apps/merchant-portal/packag
 ```json
 {
   "dependencies": {
-    "@yobo/framework": "workspace:*"
+    "@yobolabs/framework": "workspace:*"
   }
 }
 ```
@@ -30,7 +30,7 @@ Creates type-safe repositories with automatic RLS enforcement.
 
 **What Developers Get:**
 ```typescript
-import { createRepository } from '@yobo/framework/db';
+import { createRepository } from '@yobolabs/framework/db';
 import type { Campaign } from '@/db/schema';
 
 // Create org-scoped repository
@@ -76,7 +76,7 @@ import {
   checkPermission,
   requireAnyPermission,
   requireAllPermissions
-} from '@yobo/framework/permissions';
+} from '@yobolabs/framework/permissions';
 
 // Decorator pattern - automatic permission check
 export const deleteCampaign = requirePermission(
@@ -121,7 +121,7 @@ Standardized router creation with built-in security.
 
 **What Developers Get:**
 ```typescript
-import { createRouter, createRouteGroup } from '@yobo/framework/router';
+import { createRouter, createRouteGroup } from '@yobolabs/framework/router';
 import { z } from 'zod';
 
 export const campaignRouter = createRouter({
@@ -211,7 +211,7 @@ Clean wrappers around NextAuth session management.
 
 **What Developers Get:**
 ```typescript
-import { getSession, switchOrg, requireAuth } from '@yobo/framework/auth';
+import { getSession, switchOrg, requireAuth } from '@yobolabs/framework/auth';
 
 // Get current session
 const session = await getSession();
@@ -239,8 +239,8 @@ const handler = requireAuth(async (session, request) => {
 
 ```typescript
 // apps/merchant-portal/src/campaigns/router.ts
-import { createRouter } from '@yobo/framework/router';
-import { createRepository } from '@yobo/framework/db';
+import { createRouter } from '@yobolabs/framework/router';
+import { createRepository } from '@yobolabs/framework/db';
 import { z } from 'zod';
 import type { Campaign } from '@/db/schema';
 
@@ -369,7 +369,7 @@ export const campaignRouter = createRouter({
 The framework provides full TypeScript type safety:
 
 ```typescript
-import type { Repository, Permission, Session } from '@yobo/framework';
+import type { Repository, Permission, Session } from '@yobolabs/framework';
 
 // Repository is fully typed
 const repo: Repository<Campaign> = createRepository('campaigns', {
@@ -413,8 +413,8 @@ export const campaignRouter = createTRPCRouter({
 
 ### After (Framework SDK)
 ```typescript
-import { createRouter } from '@yobo/framework/router';
-import { createRepository } from '@yobo/framework/db';
+import { createRouter } from '@yobolabs/framework/router';
+import { createRepository } from '@yobolabs/framework/db';
 
 export const campaignRouter = createRouter({
   list: {

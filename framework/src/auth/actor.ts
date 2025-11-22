@@ -157,15 +157,34 @@ export function createActor(ctx: ActorContext): Actor {
   const sessionRoles = user.roles || [];
   const roleNames = sessionRoles.map((r: any) => r.name || r).filter(Boolean);
 
-  // Check for system user status
-  const isSystemUser = roleNames.some((role: string) => isPlatformSystemRole(role));
-  const isSuperUser = roleNames.some((role: string) =>
-    role === SYSTEM_ROLES.SUPER_USER ||
-    (typeof role === 'object' && role.name === SYSTEM_ROLES.SUPER_USER)
-  );
+  // Debug logging to see what we're working with
+  console.log('🔍 [Framework SDK] createActor - Session Roles:', JSON.stringify(sessionRoles, null, 2));
 
-  // Get permissions from session - they should be loaded during auth
+  // Check for system user status
+  // BEST PRACTICE: Use permissions as source of truth, not database flags
+  // Users with any admin:* permissions get system-level access
   const permissions: string[] = user.permissions || [];
+  const hasAdminPermissions = permissions.some(p => p.startsWith('admin:'));
+
+  // Fallback: Check isSystemRole flag for backward compatibility
+  const hasSystemRoleFlag = sessionRoles.some((role: any) => {
+    if (typeof role === 'object') {
+      return role?.isSystemRole === true;
+    }
+    return false;
+  });
+
+  const isSystemUser = hasAdminPermissions || hasSystemRoleFlag;
+
+  console.log('🔍 [Framework SDK] createActor result:', {
+    isSystemUser,
+    hasAdminPermissions,
+    hasSystemRoleFlag,
+    adminPermissions: permissions.filter(p => p.startsWith('admin:'))
+  });
+
+  // Super user check: admin:full_access permission
+  const isSuperUser = permissions.includes('admin:full_access') || hasSystemRoleFlag;
 
   return {
     userId,

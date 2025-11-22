@@ -9,12 +9,22 @@ export default defineConfig({
     'router/index': 'src/router/index.ts',
   },
   format: ['cjs', 'esm'],
-  dts: false, // Skip DTS generation for now due to type issues
+  dts: {
+    resolve: true,
+    // Skip modules that have Next.js dependencies (Phase 2 - not production yet)
+    entry: {
+      index: 'src/index.ts',
+      'db/index': 'src/db/index.ts',
+      'permissions/index': 'src/permissions/index.ts',
+      'auth/index': 'src/auth/index.ts',
+      'router/index': 'src/router/index.ts',
+    },
+  },
   sourcemap: true,
   clean: true,
-  minify: true,
+  minify: false, // Disable minification to debug exports
   splitting: false,
-  treeshake: true,
+  treeshake: false, // Disable tree-shaking to ensure all exports are included
   external: [
     'drizzle-orm',
     '@trpc/server',

@@ -1,6 +1,6 @@
 # Framework SDK Architecture Review
 **Date:** 2025-11-11
-**Package:** @yobo/framework v1.0.0
+**Package:** @yobolabs/framework v1.0.0
 **Reviewer:** Architecture Analysis
 **Status:** Phase 1 Complete
 
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The `@yobo/framework` SDK successfully implements the core infrastructure abstractions outlined in the p18-sdk requirements. The implementation demonstrates **strong security foundations**, **clean API design**, and **comprehensive test coverage** (76 tests, 100% passing).
+The `@yobolabs/framework` SDK successfully implements the core infrastructure abstractions outlined in the p18-sdk requirements. The implementation demonstrates **strong security foundations**, **clean API design**, and **comprehensive test coverage** (76 tests, 100% passing).
 
 ### Overall Assessment: **STRONG** ⭐⭐⭐⭐ (4/5)
 
@@ -318,8 +318,8 @@ interface Repository<T> {
 **Evidence:**
 ```typescript
 // Required setup before using framework
-import { configureRouterFactory } from '@yobo/framework/router';
-import { configureAuth } from '@yobo/framework/auth';
+import { configureRouterFactory } from '@yobolabs/framework/router';
+import { configureAuth } from '@yobolabs/framework/auth';
 
 // Developer must remember to do this
 configureRouterFactory({ ... });
@@ -336,7 +336,7 @@ configureAuth({ ... });
 ```typescript
 // Auto-detect from environment
 // No manual configuration needed
-import { createRouter } from '@yobo/framework/router';
+import { createRouter } from '@yobolabs/framework/router';
 
 // Framework automatically finds tRPC setup
 export const router = createRouter({ ... });
@@ -645,7 +645,7 @@ if (!result) {
 throw new Error(
   'Router factory not configured. Call configureRouterFactory() during app initialization.\n' +
   'Example:\n' +
-  '  import { configureRouterFactory } from \'@yobo/framework/router\';\n' +
+  '  import { configureRouterFactory } from \'@yobolabs/framework/router\';\n' +
   '  ...'
 );
 ```
@@ -839,7 +839,7 @@ configureAuth({ ... });
 **Better:**
 ```typescript
 // Auto-detect from merchant-portal setup
-import { autoConfigureFramework } from '@yobo/framework/setup';
+import { autoConfigureFramework } from '@yobolabs/framework/setup';
 
 // In merchant-portal initialization
 autoConfigureFramework({
@@ -1060,7 +1060,7 @@ Week 4: Evaluate and plan full migration
 
 ## 10. Conclusion
 
-The @yobo/framework SDK successfully delivers on its core promise: **hiding infrastructure complexity while maintaining security**. The architecture is sound, the developer experience is excellent, and the security model is robust.
+The @yobolabs/framework SDK successfully delivers on its core promise: **hiding infrastructure complexity while maintaining security**. The architecture is sound, the developer experience is excellent, and the security model is robust.
 
 **Key Achievements:**
 - ✅ 67% code reduction (40 lines vs 120 lines)

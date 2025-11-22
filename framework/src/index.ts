@@ -38,12 +38,12 @@ export {
     type DomainEvent
 } from './events';
 
-// Caching Utilities (Next.js 15 compatible)
+// Caching Utilities (Next.js 15 compatible) - PHASE 2 - Using stubs until Next.js integration complete
 export {
     invalidateCache,
     invalidateKey,
     invalidatePattern, revalidatePath, revalidateTag, withCache, type CacheKey, type CacheOptions
-} from './cache';
+} from './cache-stub';
 
 // Telemetry & Monitoring
 export {
@@ -130,10 +130,10 @@ export type {
     VersionedRepository
 } from './patterns';
 
-// Next.js 15 Specific Utilities
-export {
-    getCachedData, withMiddleware, withRouteHandler, withServerAction, type RouteHandlerContext, type ServerActionContext
-} from './nextjs';
+// Next.js 15 Specific Utilities - PHASE 2 - Temporarily disabled for DTS generation
+// export {
+//     getCachedData, withMiddleware, withRouteHandler, withServerAction, type RouteHandlerContext, type ServerActionContext
+// } from './nextjs';
 
 // Validation Utilities - TODO: Implement
 // export {

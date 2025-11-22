@@ -5,6 +5,7 @@
  * Automatically captures who, what, when, where for compliance and debugging.
  */
 
+import { randomUUID } from 'node:crypto';
 import { getRLSContext } from '../rls';
 
 export interface AuditEntry {
@@ -72,10 +73,10 @@ export async function auditLog(context: AuditContext): Promise<void> {
   }
 
   const entry: AuditEntry = {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     timestamp: new Date(),
     orgId: rlsContext.orgId,
-    userId: rlsContext.userId || 'system',
+    userId: rlsContext.userId ? String(rlsContext.userId) : 'system',
     action: context.action,
     entityType: context.entityType,
     entityId: context.entityId,

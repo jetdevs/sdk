@@ -50,7 +50,7 @@ export async function withTelemetry<T>(
   const telemetryContext: TelemetryContext = {
     operation,
     orgId: context?.orgId || rlsContext?.orgId,
-    userId: context?.userId || rlsContext?.userId,
+    userId: context?.userId || (rlsContext?.userId ? String(rlsContext.userId) : undefined),
     metadata: context?.metadata,
   };
 

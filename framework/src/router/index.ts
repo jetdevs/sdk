@@ -32,4 +32,20 @@ export type {
     TRPCProcedureBuilder
 } from './types';
 
+// Router with Actor Context - Phase 3 Enhancement
+export {
+    configureActorAdapter,
+    createRouterWithActor,
+    defineRoute,
+    defineRouter,
+} from './with-actor';
+
+export type {
+    ActorContextAdapter,
+    HandlerContext,
+    RouteConfig,
+    RouterConfig as ActorRouterConfig,
+    ServiceContext,
+} from './with-actor';
+
 // Internal procedure creation logic is NOT exported
