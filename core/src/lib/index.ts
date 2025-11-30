@@ -7,6 +7,76 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+// =============================================================================
+// THEME MANAGER
+// =============================================================================
+
+export {
+  getStoredTheme,
+  setStoredTheme,
+  applyTheme,
+  removeTheme,
+  initializeTheme,
+  getThemePreloadScript,
+  registerGlobalApplyTheme,
+} from './theme-manager';
+
+// =============================================================================
+// FORMATTERS
+// =============================================================================
+
+export {
+  // Date formatters
+  formatDate,
+  formatISODate,
+  formatLocalDate,
+  formatLocalDateTime,
+  formatRelativeTime,
+  // Number formatters
+  formatNumber,
+  formatCurrency,
+  formatPercent,
+  formatBytes,
+  // String formatters
+  truncate,
+  toTitleCase,
+  slugToTitle,
+  toKebabCase,
+  toCamelCase,
+  pluralize,
+} from './formatters';
+
+// =============================================================================
+// ID GENERATION
+// =============================================================================
+
+export {
+  generateUniqueId,
+  generatePrefixedId,
+  generateShortId,
+  generateNanoId,
+} from './id';
+
+// =============================================================================
+// COUNTRY CODES
+// =============================================================================
+
+export {
+  countryCodes,
+  COUNTRY_CODES_LEGACY,
+  getCountryByCode,
+  getCountryByISO,
+  getDefaultCountry,
+  formatPhoneWithCountry,
+  parsePhoneNumber,
+} from './country-codes';
+
+export type { CountryCode } from './country-codes';
+
+// =============================================================================
+// CORE UTILITY FUNCTIONS
+// =============================================================================
+
 /**
  * Merge class names with Tailwind CSS conflict resolution.
  */

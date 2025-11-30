@@ -5,7 +5,8 @@
  * Provides helpers for setting and getting RLS context in database operations.
  */
 
-import { AsyncLocalStorage } from 'node:async_hooks';
+// Use non-prefixed import for better webpack/bundler compatibility
+import { AsyncLocalStorage } from 'async_hooks';
 
 export interface RLSContext {
   orgId: number;

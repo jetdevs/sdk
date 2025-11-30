@@ -14,7 +14,6 @@ import {
   uniqueIndex,
   index,
   boolean,
-  jsonb,
 } from "drizzle-orm/pg-core";
 
 // =============================================================================
@@ -27,14 +26,11 @@ export const themes = pgTable(
     id: serial("id").notNull().primaryKey(),
     uuid: uuid("uuid").unique().notNull().defaultRandom(),
     name: varchar("name", { length: 100 }).notNull().unique(),
-    displayName: varchar("display_name", { length: 150 }),
+    displayName: varchar("display_name", { length: 100 }).notNull(),
     description: text("description"),
-    colors: jsonb("colors"),
-    fonts: jsonb("fonts"),
-    spacing: jsonb("spacing"),
-    borderRadius: jsonb("border_radius"),
-    isDefault: boolean("is_default").default(false).notNull(),
+    cssFile: varchar("css_file", { length: 255 }).notNull(),
     isActive: boolean("is_active").default(true).notNull(),
+    isDefault: boolean("is_default").default(false).notNull(),
     createdAt: timestamp("created_at", {
       withTimezone: true,
       mode: "date",
@@ -52,6 +48,6 @@ export const themes = pgTable(
     index("themes_id_idx").on(table.id),
     uniqueIndex("themes_uuid_idx").on(table.uuid),
     uniqueIndex("themes_name_idx").on(table.name),
-    index("themes_is_default_idx").on(table.isDefault),
+    index("themes_is_active_idx").on(table.isActive),
   ],
 );

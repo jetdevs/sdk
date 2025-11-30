@@ -1,6 +1,6 @@
 {
   "name": "@yobolabs/framework",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Core infrastructure abstractions for Yobo Platform",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -33,6 +33,11 @@
       "types": "./dist/router/index.d.ts",
       "import": "./dist/router/index.mjs",
       "require": "./dist/router/index.js"
+    },
+    "./trpc": {
+      "types": "./dist/trpc/index.d.ts",
+      "import": "./dist/trpc/index.mjs",
+      "require": "./dist/trpc/index.js"
     },
     "./audit": {
       "types": "./dist/audit/index.d.ts",

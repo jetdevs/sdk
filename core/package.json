@@ -17,21 +17,77 @@
       "types": "./dist/db/schema/index.d.ts",
       "import": "./dist/db/schema/index.js"
     },
+    "./db/seeds": {
+      "types": "./dist/db/seeds/index.d.ts",
+      "import": "./dist/db/seeds/index.js"
+    },
     "./auth": {
       "types": "./dist/auth/index.d.ts",
       "import": "./dist/auth/index.js"
+    },
+    "./auth/providers": {
+      "types": "./dist/auth/providers/index.d.ts",
+      "import": "./dist/auth/providers/index.js"
     },
     "./trpc": {
       "types": "./dist/trpc/index.d.ts",
       "import": "./dist/trpc/index.js"
     },
+    "./trpc/routers": {
+      "types": "./dist/trpc/routers/index.d.ts",
+      "import": "./dist/trpc/routers/index.js"
+    },
     "./permissions": {
       "types": "./dist/permissions/index.d.ts",
       "import": "./dist/permissions/index.js"
     },
+    "./rbac": {
+      "types": "./dist/rbac/index.d.ts",
+      "import": "./dist/rbac/index.js"
+    },
+    "./themes": {
+      "types": "./dist/themes/index.d.ts",
+      "import": "./dist/themes/index.js"
+    },
     "./ui": {
       "types": "./dist/ui/index.d.ts",
       "import": "./dist/ui/index.js"
+    },
+    "./ui/primitives": {
+      "types": "./dist/ui/primitives/index.d.ts",
+      "import": "./dist/ui/primitives/index.js"
+    },
+    "./ui/data-table": {
+      "types": "./dist/ui/data-table/index.d.ts",
+      "import": "./dist/ui/data-table/index.js"
+    },
+    "./ui/layout": {
+      "types": "./dist/ui/layout/index.d.ts",
+      "import": "./dist/ui/layout/index.js"
+    },
+    "./ui/auth": {
+      "types": "./dist/ui/auth/index.d.ts",
+      "import": "./dist/ui/auth/index.js"
+    },
+    "./ui/feedback": {
+      "types": "./dist/ui/feedback/index.d.ts",
+      "import": "./dist/ui/feedback/index.js"
+    },
+    "./ui/display": {
+      "types": "./dist/ui/display/index.d.ts",
+      "import": "./dist/ui/display/index.js"
+    },
+    "./ui/skeletons": {
+      "types": "./dist/ui/skeletons/index.d.ts",
+      "import": "./dist/ui/skeletons/index.js"
+    },
+    "./ui/theme": {
+      "types": "./dist/ui/theme/index.d.ts",
+      "import": "./dist/ui/theme/index.js"
+    },
+    "./ui/admin": {
+      "types": "./dist/ui/admin/index.d.ts",
+      "import": "./dist/ui/admin/index.js"
     },
     "./hooks": {
       "types": "./dist/hooks/index.d.ts",
@@ -64,6 +120,30 @@
     "./config": {
       "types": "./dist/config/index.d.ts",
       "import": "./dist/config/index.js"
+    },
+    "./api-keys": {
+      "types": "./dist/api-keys/index.d.ts",
+      "import": "./dist/api-keys/index.js"
+    },
+    "./system-config": {
+      "types": "./dist/system-config/index.d.ts",
+      "import": "./dist/system-config/index.js"
+    },
+    "./users": {
+      "types": "./dist/users/index.d.ts",
+      "import": "./dist/users/index.js"
+    },
+    "./organizations": {
+      "types": "./dist/organizations/index.d.ts",
+      "import": "./dist/organizations/index.js"
+    },
+    "./user-org": {
+      "types": "./dist/user-org/index.d.ts",
+      "import": "./dist/user-org/index.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware/index.d.ts",
+      "import": "./dist/middleware/index.js"
     }
   },
   "scripts": {
@@ -79,14 +159,77 @@
     "zod": "^3.22.4"
   },
   "peerDependencies": {
+    "@yobolabs/framework": "^0.2.0",
+    "@radix-ui/react-checkbox": "^1.0.0",
+    "@radix-ui/react-dialog": "^1.0.0",
+    "@radix-ui/react-dropdown-menu": "^2.0.0",
+    "@radix-ui/react-label": "^2.0.0",
+    "@radix-ui/react-select": "^2.0.0",
+    "@radix-ui/react-slot": "^1.0.0",
+    "@radix-ui/react-tabs": "^1.0.0",
+    "@radix-ui/react-tooltip": "^1.0.0",
+    "@tanstack/react-query": "^5.0.0",
+    "@tanstack/react-table": "^8.0.0",
+    "@trpc/client": "^11.0.0",
     "@trpc/server": "^11.0.0",
+    "class-variance-authority": "^0.7.0",
     "drizzle-orm": "^0.30.0",
+    "immer": "^10.0.0",
+    "libphonenumber-js": "^1.10.0",
+    "lucide-react": "^0.400.0",
     "next": "^15.0.0",
     "next-auth": "^4.24.0",
     "postgres": "^3.4.0",
-    "react": "^18.0.0 || ^19.0.0"
+    "react": "^18.0.0 || ^19.0.0",
+    "react-hook-form": "^7.0.0",
+    "zustand": "^4.4.0"
   },
   "peerDependenciesMeta": {
+    "@yobolabs/framework": {
+      "optional": true
+    },
+    "@radix-ui/react-checkbox": {
+      "optional": true
+    },
+    "@radix-ui/react-dialog": {
+      "optional": true
+    },
+    "@radix-ui/react-dropdown-menu": {
+      "optional": true
+    },
+    "@radix-ui/react-label": {
+      "optional": true
+    },
+    "@radix-ui/react-select": {
+      "optional": true
+    },
+    "@radix-ui/react-slot": {
+      "optional": true
+    },
+    "@radix-ui/react-tabs": {
+      "optional": true
+    },
+    "@radix-ui/react-tooltip": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "@tanstack/react-table": {
+      "optional": true
+    },
+    "@trpc/client": {
+      "optional": true
+    },
+    "class-variance-authority": {
+      "optional": true
+    },
+    "immer": {
+      "optional": true
+    },
+    "lucide-react": {
+      "optional": true
+    },
     "next": {
       "optional": true
     },
@@ -95,16 +238,45 @@
     },
     "react": {
       "optional": true
+    },
+    "react-hook-form": {
+      "optional": true
+    },
+    "zustand": {
+      "optional": true
+    },
+    "libphonenumber-js": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@yobolabs/framework": "workspace:*",
+    "libphonenumber-js": "^1.11.0",
+    "@radix-ui/react-checkbox": "^1.0.4",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-dropdown-menu": "^2.0.6",
+    "@radix-ui/react-label": "^2.0.2",
+    "@radix-ui/react-select": "^2.0.0",
+    "@radix-ui/react-slot": "^1.0.2",
+    "@radix-ui/react-tabs": "^1.0.4",
+    "@radix-ui/react-tooltip": "^1.0.7",
+    "@tanstack/react-query": "^5.0.0",
+    "@tanstack/react-table": "^8.20.0",
+    "@trpc/client": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "@types/node": "^20.0.0",
-    "@types/react": "^18.0.0",
+    "@types/react": "^19.0.0",
+    "class-variance-authority": "^0.7.0",
     "drizzle-orm": "^0.44.0",
+    "immer": "^10.0.0",
+    "lucide-react": "^0.436.0",
+    "next-auth": "^4.24.0",
     "postgres": "^3.4.0",
+    "react": "^19.0.0",
+    "react-hook-form": "^7.49.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",
-    "vitest": "^1.0.0"
+    "vitest": "^1.0.0",
+    "zustand": "^4.4.0"
   }
 }

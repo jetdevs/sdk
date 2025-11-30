@@ -45,16 +45,26 @@ export interface MergeResult {
  * - Two extensions define same permission: ❌ Error
  * - Extension defines same module name as core: ⚠️ Merged (permissions within must be unique)
  *
+ * @param core - The core permission registry
+ * @param extensions - Either an array of PermissionModule[] OR a PermissionRegistry object
+ * @param options - Merge options
  * @throws Error when collision detected and strict mode is enabled (default)
  */
 export function mergePermissions(
   core: PermissionRegistry,
-  extensions: PermissionModule[],
+  extensions: PermissionModule[] | PermissionRegistry,
   options: MergeOptions = {}
 ): PermissionRegistry {
   const { allowOverride = false, strict = true } = options;
   const merged = structuredClone(core);
   const allPermissionKeys = new Set<string>();
+
+  // Normalize extensions: handle both array and registry object
+  const extensionModules: PermissionModule[] = Array.isArray(extensions)
+    ? extensions
+    : extensions?.modules
+      ? Object.values(extensions.modules)
+      : [];
 
   // Collect core permission keys
   for (const module of Object.values(core.modules)) {
@@ -63,7 +73,7 @@ export function mergePermissions(
     }
   }
 
-  for (const ext of extensions) {
+  for (const ext of extensionModules) {
     // Check for module collision
     if (merged.modules[ext.name] && !allowOverride) {
       // Module exists - merge permissions but check for key collisions

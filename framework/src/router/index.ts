@@ -43,6 +43,7 @@ export {
 export type {
     ActorContextAdapter,
     HandlerContext,
+    InferRouterFromConfig,
     RouteConfig,
     RouterConfig as ActorRouterConfig,
     ServiceContext,

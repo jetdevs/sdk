@@ -4,7 +4,7 @@
  * Core database functionality and schema exports.
  */
 
-// Client
+// Client (basic)
 export {
   createDbClient,
   createExtendedDbClient,
@@ -15,6 +15,18 @@ export type {
   DbConfig,
   DbClient,
 } from './client';
+
+// Client Factory (advanced - with privileged/admin clients)
+export {
+  createDbClients,
+  createDbClientsFromEnv,
+} from './client-factory';
+
+export type {
+  PoolConfig,
+  DbClientFactoryConfig,
+  DbClients,
+} from './client-factory';
 
 // Schema
 export * as schema from './schema';

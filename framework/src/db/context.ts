@@ -4,7 +4,8 @@
  * @internal
  */
 
-import { AsyncLocalStorage } from 'node:async_hooks';
+// Use non-prefixed import for better webpack/bundler compatibility
+import { AsyncLocalStorage } from 'async_hooks';
 import type { RLSContext } from './types';
 import type { SQL } from 'drizzle-orm';
 

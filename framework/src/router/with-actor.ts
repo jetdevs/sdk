@@ -8,6 +8,16 @@
  * - dbFunction(async (db) => ...)
  * - createServiceContext(db, actor, orgId)
  *
+ * ## Type Inference
+ *
+ * This module uses advanced TypeScript generics to preserve type information
+ * from the router configuration through to the final tRPC router. The key types:
+ *
+ * - `InferRouterFromConfig<TConfig>`: Maps a RouterConfig to tRPC procedure types
+ * - `InferProcedureFromRoute<TRoute>`: Infers query/mutation procedure from route config
+ *
+ * This allows full type inference for `api.router.procedure.useQuery()` calls.
+ *
  * @module @yobo/framework/router/with-actor
  */
 
@@ -15,6 +25,53 @@ import { z } from 'zod';
 import type { Actor } from '../auth/actor';
 import { withTelemetry } from '../telemetry';
 import { auditLog, type AuditAction } from '../audit';
+
+// =============================================================================
+// TYPE INFERENCE SYSTEM
+// =============================================================================
+
+/**
+ * Infer the output type from a handler function
+ */
+type InferHandlerOutput<THandler> = THandler extends (ctx: any) => Promise<infer TOutput>
+  ? TOutput
+  : THandler extends (ctx: any) => infer TOutput
+    ? TOutput
+    : unknown;
+
+/**
+ * Infer the input type from a Zod schema or undefined
+ */
+type InferInputType<TInput> = TInput extends z.ZodType<infer T> ? T : void;
+
+/**
+ * Infer the procedure type (query or mutation) from route configuration.
+ * Default logic: if type is specified use it, otherwise mutation if has input, query otherwise.
+ */
+type InferProcedureType<TRoute extends RouteConfig<any, any, any>> =
+  TRoute extends { type: 'query' } ? 'query' :
+  TRoute extends { type: 'mutation' } ? 'mutation' :
+  TRoute extends { input: z.ZodType<any> } ? 'mutation' : 'query';
+
+/**
+ * Map a RouterConfig to a record of procedure input/output types.
+ * This is used for type inference when composing routers.
+ *
+ * Note: The actual return type of createRouterWithActor is `any` because
+ * tRPC's internal types are complex and version-specific. However, when
+ * the router is passed to createTRPCRouter in the app, the procedure
+ * types are properly inferred from the tRPC procedures themselves.
+ *
+ * For proper type inference, routers should be composed using createTRPCRouter
+ * directly in the app, allowing tRPC's type system to work correctly.
+ */
+export type InferRouterFromConfig<TConfig extends RouterConfig<any>> = {
+  [K in keyof TConfig]: {
+    input: InferInputType<TConfig[K]['input']>;
+    output: InferHandlerOutput<TConfig[K]['handler']>;
+    type: InferProcedureType<TConfig[K]>;
+  };
+};
 
 /**
  * Service context provided to handlers
@@ -44,8 +101,13 @@ export interface HandlerContext<TInput = any, TDb = any, TRepo = any> {
   /** Database instance with RLS applied */
   db: TDb;
 
-  /** Auto-instantiated repository (if specified in config) */
-  repo?: TRepo;
+  /**
+   * Auto-instantiated repository (if specified in config).
+   * When a route specifies a `repository` in its config, this will be the
+   * instantiated repository. For routes without a repository config, this
+   * will be undefined.
+   */
+  repo: TRepo;
 
   /** Raw tRPC context (for advanced use cases) */
   ctx: any;
@@ -63,6 +125,9 @@ export interface RouteConfig<TInput = any, TOutput = any, TDb = any> {
 
   /** Procedure type - auto-detected if not specified */
   type?: 'query' | 'mutation';
+
+  /** Make this route publicly accessible (no auth required) */
+  public?: boolean;
 
   /** Cache configuration for queries */
   cache?: {
@@ -113,8 +178,11 @@ export interface RouterConfig<TDb = any> {
 
 /**
  * Context adapter functions - must be provided by the application
+ *
+ * @template TDb - Database type (e.g., Drizzle instance)
+ * @template TRouterFn - The createTRPCRouter function type from the app
  */
-export interface ActorContextAdapter<TDb = any> {
+export interface ActorContextAdapter<TDb = any, TRouterFn = (procedures: Record<string, any>) => any> {
   /**
    * Create actor from tRPC context
    * Should call createActor from the application's actor module
@@ -146,13 +214,19 @@ export interface ActorContextAdapter<TDb = any> {
 
   /**
    * Get the base procedure (with or without permission)
+   * @param permission - Permission slug or undefined for no permission check
+   * @param isPublic - If true, returns public procedure (no auth required)
    */
-  getProcedure: (permission?: string) => any;
+  getProcedure: (permission?: string, isPublic?: boolean) => any;
 
   /**
-   * Create the tRPC router
+   * Create the tRPC router.
+   *
+   * This should be your app's `createTRPCRouter` function.
+   * The return type of this function determines the type of routers
+   * created by `createRouterWithActor`.
    */
-  createTRPCRouter: (procedures: Record<string, any>) => any;
+  createTRPCRouter: TRouterFn;
 }
 
 /**
@@ -320,6 +394,62 @@ function extractEntityId(result: any): string | undefined {
  * });
  * ```
  */
+/**
+ * Create a router with automatic actor/context setup.
+ *
+ * ## Important: Type Inference Limitations
+ *
+ * This function returns `any` due to a fundamental TypeScript limitation:
+ * TypeScript cannot infer types from dynamically-built objects at runtime.
+ *
+ * **Why this happens:**
+ * 1. Procedures are built in a loop (`for...of Object.entries(config)`)
+ * 2. TypeScript cannot trace the types through dynamic property access
+ * 3. tRPC's type system requires compile-time type information
+ *
+ * ## Solutions for Type Safety
+ *
+ * ### Option 1: Use Type Assertions (Quick Fix)
+ * ```typescript
+ * // Define router type based on config
+ * type RoleRouter = {
+ *   delete: MutationProcedure<number, void>;
+ *   getAllWithStats: QueryProcedure<void, RoleWithStats[]>;
+ * };
+ *
+ * const roleRouter = createRouterWithActor(config) as RoleRouter;
+ * ```
+ *
+ * ### Option 2: Export Typed Router Builders (Recommended)
+ * Instead of using `createRouterWithActor`, export a builder function:
+ * ```typescript
+ * // In SDK
+ * export function createRoleRouter(t: ReturnType<typeof initTRPC.create>) {
+ *   return t.router({
+ *     delete: t.procedure.input(z.number()).mutation(...),
+ *     getAllWithStats: t.procedure.query(...),
+ *   });
+ * }
+ *
+ * // In App
+ * const roleRouter = createRoleRouter(t);
+ * ```
+ *
+ * ### Option 3: Compose in App (Current Approach)
+ * The current approach works at runtime - types are just erased at compile time.
+ * Add `// @ts-expect-error Type inference limitation` comments where needed.
+ *
+ * ## Why We Keep This Function
+ *
+ * Despite type limitations, `createRouterWithActor` provides:
+ * - Automatic actor/context setup (eliminates 6-7 lines of boilerplate)
+ * - Automatic RLS database context
+ * - Automatic audit logging for mutations
+ * - Automatic telemetry
+ * - Repository auto-instantiation
+ *
+ * The tradeoff is type safety for developer convenience.
+ */
 export function createRouterWithActor<TDb = any>(
   config: RouterConfig<TDb>
 ): any {
@@ -327,8 +457,8 @@ export function createRouterWithActor<TDb = any>(
   const procedures: Record<string, any> = {};
 
   for (const [name, route] of Object.entries(config)) {
-    // 1. Start with permission-protected procedure
-    let procedure = adapter.getProcedure(route.permission);
+    // 1. Start with the appropriate procedure type (public or protected)
+    let procedure = adapter.getProcedure(route.permission, route.public);
 
     // 2. Add input validation
     if (route.input) {
@@ -364,6 +494,40 @@ export function createRouterWithActor<TDb = any>(
 
     // 5. Wrap handler with actor/context setup
     const wrappedHandler = async ({ ctx, input }: any) => {
+      // For public routes, we provide a minimal context without actor/RLS
+      if (route.public) {
+        // Auto-instantiate repository if specified (using ctx.db directly)
+        const repo = route.repository ? new route.repository(ctx.db) : undefined;
+
+        // Add automatic telemetry
+        const telemetryName = route.description || `${name}.public`;
+
+        // Create an empty actor for public routes (not authenticated)
+        const emptyActor: Actor = {
+          userId: 0,
+          email: '',
+          orgId: null,
+          roles: [],
+          isSystemUser: false,
+          isSuperUser: false,
+          permissions: [],
+          sessionExpiry: new Date(0).toISOString(),
+        };
+
+        return withTelemetry(telemetryName, async () => {
+          let result = await route.handler({
+            input,
+            service: { db: ctx.db, orgId: 0, userId: '', actor: emptyActor },
+            actor: emptyActor,
+            db: ctx.db,
+            repo,
+            ctx,
+          });
+
+          return result;
+        });
+      }
+
       // This is the boilerplate we're eliminating:
       const actor = adapter.createActor(ctx);
       const { dbFunction, effectiveOrgId } = adapter.getDbContext(ctx, actor, {
@@ -432,6 +596,9 @@ export function createRouterWithActor<TDb = any>(
     procedures[name] = procedure[procedureType](wrappedHandler);
   }
 
+  // Return the tRPC router directly. The procedures created above are real
+  // tRPC procedures with proper type information, so tRPC's type system
+  // will infer types correctly when this router is composed with others.
   return adapter.createTRPCRouter(procedures);
 }
 

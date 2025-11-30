@@ -4,33 +4,106 @@
  * Zustand stores for client-side state management.
  */
 
-// Placeholder exports - actual stores will be migrated from saas-core-v2
+// =============================================================================
+// AUTH STORE
+// =============================================================================
 
-export interface AuthStoreState {
-  isAuthenticated: boolean;
-  user: unknown | null;
-  login: (user: unknown) => void;
-  logout: () => void;
-}
+export {
+  createAuthStore,
+  useAuthStore,
+  isAuthenticated,
+  isSigningOut,
+  hasPermission,
+  getUserPermissions,
+  getCurrentUser,
+  getCurrentRole,
+} from './auth.store';
 
-export interface UIStoreState {
-  sidebarOpen: boolean;
-  toggleSidebar: () => void;
-  theme: 'light' | 'dark' | 'system';
-  setTheme: (theme: 'light' | 'dark' | 'system') => void;
-}
+export type {
+  AuthState,
+  AuthActions,
+  AuthStore,
+  UserProfile,
+  UserRole,
+  PermissionObject,
+  SessionInfo,
+} from './auth.store';
 
-// Placeholder - actual implementation uses Zustand
-export const useAuthStore = () => ({
-  isAuthenticated: false,
-  user: null,
-  login: () => {},
-  logout: () => {},
-});
+// =============================================================================
+// PERMISSION STORE
+// =============================================================================
 
-export const useUIStore = () => ({
-  sidebarOpen: true,
-  toggleSidebar: () => {},
-  theme: 'system' as const,
-  setTheme: () => {},
-});
+export {
+  createPermissionStore,
+  usePermissionStore,
+  updatePermissionCacheOrg,
+  clearPermissionCache,
+  getPermissions,
+  getRoles,
+  checkPermission,
+  checkAnyPermission,
+  checkAllPermissions,
+} from './permission.store';
+
+export type {
+  PermissionState,
+  PermissionActions,
+  PermissionStore,
+} from './permission.store';
+
+// =============================================================================
+// UI STORE
+// =============================================================================
+
+export {
+  createUIStore,
+  useUIStore,
+  isSidebarOpen,
+  getTheme,
+  toggleSidebar,
+  setTheme,
+} from './ui.store';
+
+export type {
+  UIState,
+  UIActions,
+  UIStore,
+} from './ui.store';
+
+// =============================================================================
+// THEME STORE
+// =============================================================================
+
+export {
+  createThemeStore,
+  useThemeStore,
+  getThemePreference,
+  setThemePreference,
+} from './theme.store';
+
+export type { ThemeState, ThemeActions, ThemeStore } from './theme.store';
+
+// =============================================================================
+// ORG SWITCH STORE
+// =============================================================================
+
+export {
+  createOrgSwitchStore,
+  useOrgSwitchStore,
+  isOrgSwitching,
+  getTargetOrgName,
+  startOrgSwitch,
+  endOrgSwitch,
+} from './org-switch.store';
+
+export type {
+  OrgSwitchState,
+  OrgSwitchActions,
+  OrgSwitchStore,
+} from './org-switch.store';
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+export type * from './types';

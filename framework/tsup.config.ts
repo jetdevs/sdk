@@ -7,6 +7,7 @@ export default defineConfig({
     'permissions/index': 'src/permissions/index.ts',
     'auth/index': 'src/auth/index.ts',
     'router/index': 'src/router/index.ts',
+    'trpc/index': 'src/trpc/index.ts',
   },
   format: ['cjs', 'esm'],
   dts: {
@@ -18,6 +19,7 @@ export default defineConfig({
       'permissions/index': 'src/permissions/index.ts',
       'auth/index': 'src/auth/index.ts',
       'router/index': 'src/router/index.ts',
+      'trpc/index': 'src/trpc/index.ts',
     },
   },
   sourcemap: true,
@@ -33,5 +35,7 @@ export default defineConfig({
     'next/cache',
     'next/headers',
     'next/navigation',
+    // Node.js built-in modules - keep external to avoid bundling issues
+    'async_hooks',
   ],
 });

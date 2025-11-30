@@ -5,10 +5,10 @@
  */
 
 import type { SaasConfig, Extension } from './schema';
-import { mergePermissions, corePermissions } from '../permissions';
+import { mergePermissions, corePermissions } from '../modules/permissions';
 import { createRlsRegistry, coreRlsTables } from '../rls';
 import { router, composeRouters } from '../trpc';
-import type { PermissionRegistry, PermissionModule } from '../permissions';
+import type { PermissionRegistry, PermissionModule } from '../modules/permissions';
 import type { RlsRegistry } from '../rls';
 
 // =============================================================================
