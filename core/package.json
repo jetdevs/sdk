@@ -1,149 +1,188 @@
 {
   "name": "@yobolabs/core",
   "version": "0.1.0",
+  "description": "Core SDK components, UI primitives, and utilities for Yobo Platform",
   "type": "module",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
     },
     "./db": {
       "types": "./dist/db/index.d.ts",
-      "import": "./dist/db/index.js"
+      "import": "./dist/db/index.js",
+      "require": "./dist/db/index.js"
     },
     "./db/schema": {
       "types": "./dist/db/schema/index.d.ts",
-      "import": "./dist/db/schema/index.js"
+      "import": "./dist/db/schema/index.js",
+      "require": "./dist/db/schema/index.js"
     },
     "./db/seeds": {
       "types": "./dist/db/seeds/index.d.ts",
-      "import": "./dist/db/seeds/index.js"
+      "import": "./dist/db/seeds/index.js",
+      "require": "./dist/db/seeds/index.js"
     },
     "./auth": {
       "types": "./dist/auth/index.d.ts",
-      "import": "./dist/auth/index.js"
+      "import": "./dist/auth/index.js",
+      "require": "./dist/auth/index.js"
     },
     "./auth/providers": {
       "types": "./dist/auth/providers/index.d.ts",
-      "import": "./dist/auth/providers/index.js"
+      "import": "./dist/auth/providers/index.js",
+      "require": "./dist/auth/providers/index.js"
     },
     "./trpc": {
       "types": "./dist/trpc/index.d.ts",
-      "import": "./dist/trpc/index.js"
+      "import": "./dist/trpc/index.js",
+      "require": "./dist/trpc/index.js"
     },
     "./trpc/routers": {
       "types": "./dist/trpc/routers/index.d.ts",
-      "import": "./dist/trpc/routers/index.js"
+      "import": "./dist/trpc/routers/index.js",
+      "require": "./dist/trpc/routers/index.js"
     },
     "./permissions": {
       "types": "./dist/permissions/index.d.ts",
-      "import": "./dist/permissions/index.js"
+      "import": "./dist/permissions/index.js",
+      "require": "./dist/permissions/index.js"
     },
     "./rbac": {
       "types": "./dist/rbac/index.d.ts",
-      "import": "./dist/rbac/index.js"
+      "import": "./dist/rbac/index.js",
+      "require": "./dist/rbac/index.js"
     },
     "./themes": {
       "types": "./dist/themes/index.d.ts",
-      "import": "./dist/themes/index.js"
+      "import": "./dist/themes/index.js",
+      "require": "./dist/themes/index.js"
     },
     "./ui": {
       "types": "./dist/ui/index.d.ts",
-      "import": "./dist/ui/index.js"
+      "import": "./dist/ui/index.js",
+      "require": "./dist/ui/index.js"
     },
     "./ui/primitives": {
       "types": "./dist/ui/primitives/index.d.ts",
-      "import": "./dist/ui/primitives/index.js"
+      "import": "./dist/ui/primitives/index.js",
+      "require": "./dist/ui/primitives/index.js"
     },
     "./ui/data-table": {
       "types": "./dist/ui/data-table/index.d.ts",
-      "import": "./dist/ui/data-table/index.js"
+      "import": "./dist/ui/data-table/index.js",
+      "require": "./dist/ui/data-table/index.js"
     },
     "./ui/layout": {
       "types": "./dist/ui/layout/index.d.ts",
-      "import": "./dist/ui/layout/index.js"
+      "import": "./dist/ui/layout/index.js",
+      "require": "./dist/ui/layout/index.js"
     },
     "./ui/auth": {
       "types": "./dist/ui/auth/index.d.ts",
-      "import": "./dist/ui/auth/index.js"
+      "import": "./dist/ui/auth/index.js",
+      "require": "./dist/ui/auth/index.js"
     },
     "./ui/feedback": {
       "types": "./dist/ui/feedback/index.d.ts",
-      "import": "./dist/ui/feedback/index.js"
+      "import": "./dist/ui/feedback/index.js",
+      "require": "./dist/ui/feedback/index.js"
     },
     "./ui/display": {
       "types": "./dist/ui/display/index.d.ts",
-      "import": "./dist/ui/display/index.js"
+      "import": "./dist/ui/display/index.js",
+      "require": "./dist/ui/display/index.js"
     },
     "./ui/skeletons": {
       "types": "./dist/ui/skeletons/index.d.ts",
-      "import": "./dist/ui/skeletons/index.js"
+      "import": "./dist/ui/skeletons/index.js",
+      "require": "./dist/ui/skeletons/index.js"
     },
     "./ui/theme": {
       "types": "./dist/ui/theme/index.d.ts",
-      "import": "./dist/ui/theme/index.js"
+      "import": "./dist/ui/theme/index.js",
+      "require": "./dist/ui/theme/index.js"
     },
     "./ui/admin": {
       "types": "./dist/ui/admin/index.d.ts",
-      "import": "./dist/ui/admin/index.js"
+      "import": "./dist/ui/admin/index.js",
+      "require": "./dist/ui/admin/index.js"
     },
     "./hooks": {
       "types": "./dist/hooks/index.d.ts",
-      "import": "./dist/hooks/index.js"
+      "import": "./dist/hooks/index.js",
+      "require": "./dist/hooks/index.js"
     },
     "./stores": {
       "types": "./dist/stores/index.d.ts",
-      "import": "./dist/stores/index.js"
+      "import": "./dist/stores/index.js",
+      "require": "./dist/stores/index.js"
     },
     "./providers": {
       "types": "./dist/providers/index.d.ts",
-      "import": "./dist/providers/index.js"
+      "import": "./dist/providers/index.js",
+      "require": "./dist/providers/index.js"
     },
     "./lib": {
       "types": "./dist/lib/index.d.ts",
-      "import": "./dist/lib/index.js"
+      "import": "./dist/lib/index.js",
+      "require": "./dist/lib/index.js"
     },
     "./rls": {
       "types": "./dist/rls/index.d.ts",
-      "import": "./dist/rls/index.js"
+      "import": "./dist/rls/index.js",
+      "require": "./dist/rls/index.js"
     },
     "./cli": {
       "types": "./dist/cli/index.d.ts",
-      "import": "./dist/cli/index.js"
+      "import": "./dist/cli/index.js",
+      "require": "./dist/cli/index.js"
     },
     "./cli/db": {
       "types": "./dist/cli/db.d.ts",
-      "import": "./dist/cli/db.js"
+      "import": "./dist/cli/db.js",
+      "require": "./dist/cli/db.js"
     },
     "./config": {
       "types": "./dist/config/index.d.ts",
-      "import": "./dist/config/index.js"
+      "import": "./dist/config/index.js",
+      "require": "./dist/config/index.js"
     },
     "./api-keys": {
       "types": "./dist/api-keys/index.d.ts",
-      "import": "./dist/api-keys/index.js"
+      "import": "./dist/api-keys/index.js",
+      "require": "./dist/api-keys/index.js"
     },
     "./system-config": {
       "types": "./dist/system-config/index.d.ts",
-      "import": "./dist/system-config/index.js"
+      "import": "./dist/system-config/index.js",
+      "require": "./dist/system-config/index.js"
     },
     "./users": {
       "types": "./dist/users/index.d.ts",
-      "import": "./dist/users/index.js"
+      "import": "./dist/users/index.js",
+      "require": "./dist/users/index.js"
     },
     "./organizations": {
       "types": "./dist/organizations/index.d.ts",
-      "import": "./dist/organizations/index.js"
+      "import": "./dist/organizations/index.js",
+      "require": "./dist/organizations/index.js"
     },
     "./user-org": {
       "types": "./dist/user-org/index.d.ts",
-      "import": "./dist/user-org/index.js"
+      "import": "./dist/user-org/index.js",
+      "require": "./dist/user-org/index.js"
     },
     "./middleware": {
       "types": "./dist/middleware/index.d.ts",
-      "import": "./dist/middleware/index.js"
+      "import": "./dist/middleware/index.js",
+      "require": "./dist/middleware/index.js"
     }
   },
   "scripts": {
