@@ -265,6 +265,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
       permission: "role:read",
       input: getRoleByIdSchema,
       cache: { ttl: 60, tags: ["roles"] },
+      crossOrg: true, // Allow querying system roles (org_id = NULL)
       repository: Repository,
       handler: async ({
         input,
@@ -299,6 +300,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
       type: "query" as const,
       permission: "role:read",
       input: getRoleWithPermissionsSchema,
+      crossOrg: true, // Allow querying system roles (org_id = NULL)
       repository: Repository,
       handler: async ({
         input,
@@ -422,6 +424,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
       input: assignPermissionsSchema,
       invalidates: [...invalidationTags, "permissions"],
       entityType: "role_permission",
+      crossOrg: true, // Allow modifying system roles (org_id = NULL)
       repository: Repository,
       handler: async ({
         input,
@@ -457,6 +460,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
       input: removePermissionsSchema,
       invalidates: [...invalidationTags, "permissions"],
       entityType: "role_permission",
+      crossOrg: true, // Allow modifying system roles (org_id = NULL)
       repository: Repository,
       handler: async ({
         input,
