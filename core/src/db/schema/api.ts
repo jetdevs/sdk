@@ -53,7 +53,7 @@ export const apiKeys = pgTable(
     // SHA-256 hash of full key (64 hex chars)
     keyHash: varchar("key_hash", { length: 64 }).notNull(),
 
-    // Permissions as array of permission slugs (e.g., ["campaigns:read", "campaigns:create"])
+    // Permissions as array of permission slugs (e.g., ["user:read", "role:create"])
     permissions: jsonb("permissions").$type<string[]>().notNull().default([]),
 
     // Rate limiting (requests per hour)
