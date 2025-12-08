@@ -18,6 +18,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { orgs, users } from "./orgs";
+import { roles } from "./rbac";
 
 // =============================================================================
 // API KEYS TABLE
@@ -30,7 +31,7 @@ import { orgs, users } from "./orgs";
  * - Org-scoped: Each key belongs to a specific organization
  * - Hashed storage: Only SHA-256 hash stored, never raw key
  * - Rate limited: Per-key rate limiting
- * - Permission-based: Keys have associated RBAC permissions
+ * - Role-based permissions: Keys derive permissions from assigned role
  * - Revocable: Soft deletion via revoked_at timestamp
  */
 export const apiKeys = pgTable(
@@ -53,7 +54,14 @@ export const apiKeys = pgTable(
     // SHA-256 hash of full key (64 hex chars)
     keyHash: varchar("key_hash", { length: 64 }).notNull(),
 
+    // Role-based permissions: API keys derive permissions from this role
+    // When roleId is set, permissions are fetched from role_permissions at runtime
+    // The permissions array is kept as a cache/override for backward compatibility
+    roleId: integer("role_id").references(() => roles.id, { onDelete: 'set null' }),
+
     // Permissions as array of permission slugs (e.g., ["user:read", "role:create"])
+    // When roleId is set, this serves as a cache of the role's permissions
+    // When roleId is null, these are manually assigned permissions (legacy mode)
     permissions: jsonb("permissions").$type<string[]>().notNull().default([]),
 
     // Rate limiting (requests per hour)
@@ -94,6 +102,9 @@ export const apiKeys = pgTable(
 
     // Composite index for active key queries
     orgActiveIdx: index("api_keys_org_active_idx").on(table.orgId, table.revokedAt),
+
+    // Index on role_id for permission lookups
+    roleIdIdx: index("api_keys_role_id_idx").on(table.roleId),
   })
 );
 
@@ -166,6 +177,11 @@ export const apiKeysRelations = relations(apiKeys, ({ one, many }) => ({
   creator: one(users, {
     fields: [apiKeys.createdBy],
     references: [users.id],
+  }),
+  // An API key derives permissions from one role
+  role: one(roles, {
+    fields: [apiKeys.roleId],
+    references: [roles.id],
   }),
   // An API key has many usage logs
   usageLogs: many(apiUsageLogs),

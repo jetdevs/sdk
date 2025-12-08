@@ -27,6 +27,7 @@ export interface ApiKeysTableSchema {
   name: PgColumn<any>;
   keyPrefix: PgColumn<any>;
   keyHash: PgColumn<any>;
+  roleId: PgColumn<any>;
   permissions: PgColumn<any>;
   rateLimit: PgColumn<any>;
   expiresAt: PgColumn<any>;
@@ -77,6 +78,7 @@ export function createApiKeysRepository(
           name: data.name,
           keyPrefix: data.keyPrefix,
           keyHash: data.keyHash,
+          roleId: data.roleId,
           permissions: data.permissions,
           rateLimit: data.rateLimit,
           expiresAt: data.expiresAt,
@@ -102,6 +104,7 @@ export function createApiKeysRepository(
           id: table.id,
           name: table.name,
           keyPrefix: table.keyPrefix,
+          roleId: table.roleId,
           permissions: table.permissions,
           rateLimit: table.rateLimit,
           expiresAt: table.expiresAt,
@@ -125,6 +128,7 @@ export function createApiKeysRepository(
           id: table.id,
           name: table.name,
           keyPrefix: table.keyPrefix,
+          roleId: table.roleId,
           permissions: table.permissions,
           rateLimit: table.rateLimit,
           expiresAt: table.expiresAt,
@@ -178,6 +182,7 @@ export function createApiKeysRepository(
     async update(id: number, orgId: number, data: ApiKeyUpdateData): Promise<ApiKeyListItem | null> {
       const updates: Record<string, unknown> = { updatedAt: new Date() };
       if (data.name !== undefined) updates.name = data.name;
+      if (data.roleId !== undefined) updates.roleId = data.roleId;
       if (data.permissions !== undefined) updates.permissions = data.permissions;
       if (data.rateLimit !== undefined) updates.rateLimit = data.rateLimit;
       if (data.expiresAt !== undefined) updates.expiresAt = data.expiresAt;
@@ -194,6 +199,7 @@ export function createApiKeysRepository(
           id: table.id,
           name: table.name,
           keyPrefix: table.keyPrefix,
+          roleId: table.roleId,
           permissions: table.permissions,
           rateLimit: table.rateLimit,
           expiresAt: table.expiresAt,
