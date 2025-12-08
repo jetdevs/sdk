@@ -196,6 +196,8 @@ export function createOrgRepositoryClass(schema: OrgRepositorySchema) {
   const { orgs, users, userRoles, roles, orgAuditLogs, orgSettings } = schema;
 
   return class OrgRepository implements IOrgRepository {
+    // Expose schema for use in router handlers that need direct table access
+    static __schema__ = schema;
     // -------------------------------------------------------------------------
     // ORGANIZATION CRUD OPERATIONS
     // -------------------------------------------------------------------------

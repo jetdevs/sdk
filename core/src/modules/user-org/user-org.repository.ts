@@ -17,6 +17,7 @@ import { and, eq, or, isNull, asc, sql } from 'drizzle-orm';
 import type {
   UserRoleData,
   UserOrgContext,
+  UserOrgData,
   UserOrgMembership,
   UserOrgPermission,
   OrgUser,
@@ -159,8 +160,10 @@ export function createUserOrgRepository(
 
     /**
      * Get all organizations a user has access to
+     * Returns aggregated organization data with roles grouped per org
+     * Format: { id, name, roles: string[], roleCount }
      */
-    async getUserOrganizations(userId: number): Promise<UserOrgMembership[]> {
+    async getUserOrganizations(userId: number): Promise<UserOrgData[]> {
       return withTelemetry('user-org-repo.getUserOrganizations', async () => {
         const userOrgRoles = await (this.db as any).query.userRoles.findMany({
           where: and(
@@ -174,17 +177,40 @@ export function createUserOrgRepository(
         });
 
         // Filter out null orgs and system roles (orgId null or -1)
-        return userOrgRoles
-          .filter(
-            (ur: any) =>
-              ur.org !== null && ur.orgId !== null && ur.orgId !== -1
-          )
-          .map((ur: any) => ({
-            orgId: ur.org?.id ?? 0,
-            orgName: ur.org?.name ?? 'Unknown',
-            roleName: ur.role?.name ?? 'Unknown',
-            isActive: ur.isActive,
-          }));
+        const validRoles = userOrgRoles.filter(
+          (ur: any) =>
+            ur.org !== null && ur.orgId !== null && ur.orgId !== -1
+        );
+
+        // Aggregate roles by organization
+        const orgMap = new Map<number, { id: number; name: string; roles: string[] }>();
+
+        for (const ur of validRoles) {
+          const orgId = ur.org?.id ?? 0;
+          const orgName = ur.org?.name ?? 'Unknown';
+          const roleName = ur.role?.name ?? 'Unknown';
+
+          if (orgMap.has(orgId)) {
+            const existing = orgMap.get(orgId)!;
+            if (!existing.roles.includes(roleName)) {
+              existing.roles.push(roleName);
+            }
+          } else {
+            orgMap.set(orgId, {
+              id: orgId,
+              name: orgName,
+              roles: [roleName],
+            });
+          }
+        }
+
+        // Convert to array with roleCount
+        return Array.from(orgMap.values()).map(org => ({
+          id: org.id,
+          name: org.name,
+          roles: org.roles,
+          roleCount: org.roles.length,
+        }));
       });
     }
 

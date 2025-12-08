@@ -14,6 +14,13 @@ import type { PolicyTemplate, ColumnRequirements } from './deploy-types';
 
 /**
  * Generate policy condition based on table configuration
+ *
+ * IMPORTANT: The workspace_id check is ONLY added when the isolation level is 'workspace'.
+ * For tables with isolation: 'org' that have a workspace_id column (for association/filtering),
+ * the workspace_id column is NOT used in the RLS policy because:
+ * 1. The primary isolation boundary is the org
+ * 2. workspace_id may be NULL for catalog/shared items
+ * 3. Workspace filtering should happen at the application level, not RLS level
  */
 export function generatePolicyCondition(config: RlsTableConfig): string {
   // If custom policy is defined, use it directly
@@ -27,7 +34,10 @@ export function generatePolicyCondition(config: RlsTableConfig): string {
     conditions.push("org_id = get_current_org_id()");
   }
 
-  if (config.workspaceId) {
+  // Only add workspace_id check if the isolation level is 'workspace'
+  // Tables with isolation: 'org' that have workspace_id columns use it for
+  // association/filtering, not as a security boundary
+  if (config.workspaceId && config.isolation === 'workspace') {
     conditions.push("workspace_id = get_current_workspace_id()");
   }
 

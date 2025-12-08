@@ -51,6 +51,8 @@ export type OrgGetByIdInput = z.infer<typeof orgGetByIdSchema>;
 export const orgGetByUuidSchema = z.object({
   uuid: z.string().uuid(),
   crossOrgAccess: z.boolean().default(true).optional(),
+  includeUsers: z.boolean().default(true).optional(),
+  includeStats: z.boolean().default(false).optional(),
 });
 
 export type OrgGetByUuidInput = z.infer<typeof orgGetByUuidSchema>;

@@ -151,6 +151,7 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
     // -------------------------------------------------------------------------
     getUserOrganizations: {
       type: 'query' as const,
+      crossOrg: true, // Required to see user's roles across ALL organizations, not just current one
       repository: Repository,
       handler: async (context: HandlerContext) => {
         const { service, repo } = context;
@@ -166,6 +167,7 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       input: switchOrgSchema,
       invalidates: ['user-org'],
       entityType: 'user_org',
+      crossOrg: true, // Required to validate access to target org (which may differ from current)
       repository: Repository,
       handler: async (context: HandlerContext<{ orgId: number }>) => {
         const { input, service, repo } = context;
@@ -180,7 +182,19 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
           });
         }
 
-        return repo!.switchOrg(userId, input.orgId, service.userId);
+        // Get the org info before switching
+        const org = await repo!.getOrgById(input.orgId);
+
+        // Perform the switch
+        await repo!.switchOrg(userId, input.orgId, service.userId);
+
+        return {
+          success: true,
+          org: {
+            id: input.orgId,
+            name: org?.name || 'Organization',
+          }
+        };
       },
     },
 
@@ -264,6 +278,7 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
     validateOrgAccess: {
       type: 'query' as const,
       input: validateOrgAccessSchema,
+      crossOrg: true, // Required to validate access to any org, not just current
       repository: Repository,
       handler: async (context: HandlerContext<{ orgId: number }>) => {
         const { input, service, repo } = context;
@@ -314,6 +329,7 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       type: 'query' as const,
       input: getAvailableRolesSchema,
       cache: { ttl: 300, tags: ['roles'] },
+      crossOrg: true, // Required to see global roles (orgId = null)
       repository: Repository,
       handler: async (context: HandlerContext<{ orgId: number }>) => {
         const { input, repo } = context;

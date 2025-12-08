@@ -267,19 +267,36 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
           if (!org) {
             throw new OrgRouterError('NOT_FOUND', 'Organization not found');
           }
-          return org;
+
+          const result: any = { ...org };
+
+          // Include users if requested (default: true)
+          if (input.includeUsers !== false) {
+            result.users = await repo.getOrgUsers(targetDb, org.id);
+            result.userCount = result.users?.length || 0;
+          }
+
+          // Include stats if requested
+          if (input.includeStats) {
+            result.stats = await repo.getStats(targetDb, org.id);
+          }
+
+          return result;
         };
 
         if (input.crossOrgAccess && actor.isSystemUser) {
           return executePrivileged(getOrg, db);
         }
 
-        const org = await getOrg(db);
+        const org = await repo.findById(db, input.uuid);
+        if (!org) {
+          throw new OrgRouterError('NOT_FOUND', 'Organization not found');
+        }
         if (org.id !== service.orgId && !actor.isSystemUser) {
           throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
         }
 
-        return org;
+        return getOrg(db);
       },
     },
 
@@ -892,19 +909,103 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
           throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
         }
 
-        // Log audit event
-        await repo.logAudit(
-          db,
-          input.orgId,
-          parseInt(service.userId),
-          'MEMBER_ADD',
-          'user',
-          String(input.userId),
-          null,
-          { role: input.role }
-        );
+        // Use privileged access for cross-org operations
+        const performAddUser = async (targetDb: any) => {
+          // Import drizzle operators dynamically
+          const { eq, and, isNull, or } = await import('drizzle-orm');
 
-        return { success: true, orgId: input.orgId, userId: input.userId };
+          // Get schema tables from the injected schema via the repository instance
+          // The repository class is created with schema, so we access it through the db
+          const schema = (repo as any).constructor.__schema__;
+
+          if (!schema) {
+            throw new OrgRouterError('INTERNAL_ERROR', 'Repository schema not available');
+          }
+
+          const { userRoles, roles } = schema;
+
+          // Find the role by name (check org-specific role first, then global role)
+          const roleResult = await targetDb
+            .select()
+            .from(roles)
+            .where(
+              and(
+                eq(roles.name, input.role),
+                eq(roles.isActive, true),
+                or(
+                  eq(roles.orgId, input.orgId),
+                  and(
+                    isNull(roles.orgId),
+                    eq(roles.isGlobalRole, true)
+                  )
+                )
+              )
+            )
+            .limit(1);
+
+          if (!roleResult || roleResult.length === 0) {
+            throw new OrgRouterError('NOT_FOUND', `Role "${input.role}" not found`);
+          }
+
+          const role = roleResult[0];
+
+          // Check if user already has this role in this org
+          const existingAssignment = await targetDb
+            .select()
+            .from(userRoles)
+            .where(
+              and(
+                eq(userRoles.userId, input.userId),
+                eq(userRoles.orgId, input.orgId),
+                eq(userRoles.roleId, role.id)
+              )
+            )
+            .limit(1);
+
+          if (existingAssignment && existingAssignment.length > 0) {
+            // If already exists but inactive, reactivate it
+            if (!existingAssignment[0].isActive) {
+              await targetDb
+                .update(userRoles)
+                .set({
+                  isActive: true,
+                  updatedAt: new Date(),
+                })
+                .where(eq(userRoles.id, existingAssignment[0].id));
+            }
+            // If already active, it's a duplicate - no error, just return success
+          } else {
+            // Create new role assignment
+            await targetDb.insert(userRoles).values({
+              userId: input.userId,
+              orgId: input.orgId,
+              roleId: role.id,
+              isActive: true,
+              assignedBy: parseInt(service.userId),
+            });
+          }
+
+          // Log audit event
+          await repo.logAudit(
+            targetDb,
+            input.orgId,
+            parseInt(service.userId),
+            'MEMBER_ADD',
+            'user',
+            String(input.userId),
+            null,
+            { role: input.role, roleId: role.id }
+          );
+
+          return { success: true, orgId: input.orgId, userId: input.userId, roleId: role.id };
+        };
+
+        // Use privileged access for cross-org operations
+        if ((input.crossOrgAccess && actor.isSystemUser) || input.orgId !== service.orgId) {
+          return executePrivileged(performAddUser, db);
+        }
+
+        return performAddUser(db);
       },
     },
 
@@ -923,19 +1024,53 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
           throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
         }
 
-        // Log audit event
-        await repo.logAudit(
-          db,
-          input.orgId,
-          parseInt(service.userId),
-          'MEMBER_REMOVE',
-          'user',
-          String(input.userId),
-          null,
-          null
-        );
+        // Use privileged access for cross-org operations
+        const performRemoveUser = async (targetDb: any) => {
+          const { eq, and } = await import('drizzle-orm');
 
-        return { success: true, orgId: input.orgId, userId: input.userId };
+          const schema = (repo as any).constructor.__schema__;
+          if (!schema) {
+            throw new OrgRouterError('INTERNAL_ERROR', 'Repository schema not available');
+          }
+
+          const { userRoles } = schema;
+
+          // Soft delete: set isActive to false for all role assignments for this user in this org
+          const result = await targetDb
+            .update(userRoles)
+            .set({
+              isActive: false,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(userRoles.userId, input.userId),
+                eq(userRoles.orgId, input.orgId)
+              )
+            )
+            .returning();
+
+          // Log audit event
+          await repo.logAudit(
+            targetDb,
+            input.orgId,
+            parseInt(service.userId),
+            'MEMBER_REMOVE',
+            'user',
+            String(input.userId),
+            null,
+            { removedRoles: result.length }
+          );
+
+          return { success: true, orgId: input.orgId, userId: input.userId, rolesRemoved: result.length };
+        };
+
+        // Use privileged access for cross-org operations
+        if ((input.crossOrgAccess && actor.isSystemUser) || input.orgId !== service.orgId) {
+          return executePrivileged(performRemoveUser, db);
+        }
+
+        return performRemoveUser(db);
       },
     },
 
@@ -954,19 +1089,111 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
           throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
         }
 
-        // Log audit event
-        await repo.logAudit(
-          db,
-          input.orgId,
-          parseInt(service.userId),
-          'ROLE_CHANGE',
-          'user',
-          String(input.userId),
-          null,
-          { newRole: input.role }
-        );
+        // Use privileged access for cross-org operations
+        const performUpdateRole = async (targetDb: any) => {
+          const { eq, and, isNull, or } = await import('drizzle-orm');
 
-        return { success: true, orgId: input.orgId, userId: input.userId, role: input.role };
+          const schema = (repo as any).constructor.__schema__;
+          if (!schema) {
+            throw new OrgRouterError('INTERNAL_ERROR', 'Repository schema not available');
+          }
+
+          const { userRoles, roles } = schema;
+
+          // Find the new role by name
+          const roleResult = await targetDb
+            .select()
+            .from(roles)
+            .where(
+              and(
+                eq(roles.name, input.role),
+                eq(roles.isActive, true),
+                or(
+                  eq(roles.orgId, input.orgId),
+                  and(
+                    isNull(roles.orgId),
+                    eq(roles.isGlobalRole, true)
+                  )
+                )
+              )
+            )
+            .limit(1);
+
+          if (!roleResult || roleResult.length === 0) {
+            throw new OrgRouterError('NOT_FOUND', `Role "${input.role}" not found`);
+          }
+
+          const newRole = roleResult[0];
+
+          // First, deactivate all existing role assignments for this user in this org
+          await targetDb
+            .update(userRoles)
+            .set({
+              isActive: false,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(userRoles.userId, input.userId),
+                eq(userRoles.orgId, input.orgId),
+                eq(userRoles.isActive, true)
+              )
+            );
+
+          // Check if user already has an assignment for this new role
+          const existingAssignment = await targetDb
+            .select()
+            .from(userRoles)
+            .where(
+              and(
+                eq(userRoles.userId, input.userId),
+                eq(userRoles.orgId, input.orgId),
+                eq(userRoles.roleId, newRole.id)
+              )
+            )
+            .limit(1);
+
+          if (existingAssignment && existingAssignment.length > 0) {
+            // Reactivate the existing assignment
+            await targetDb
+              .update(userRoles)
+              .set({
+                isActive: true,
+                updatedAt: new Date(),
+              })
+              .where(eq(userRoles.id, existingAssignment[0].id));
+          } else {
+            // Create new assignment for the new role
+            await targetDb.insert(userRoles).values({
+              userId: input.userId,
+              orgId: input.orgId,
+              roleId: newRole.id,
+              isActive: true,
+              assignedBy: parseInt(service.userId),
+            });
+          }
+
+          // Log audit event
+          await repo.logAudit(
+            targetDb,
+            input.orgId,
+            parseInt(service.userId),
+            'ROLE_CHANGE',
+            'user',
+            String(input.userId),
+            null,
+            { newRole: input.role, newRoleId: newRole.id }
+          );
+
+          return { success: true, orgId: input.orgId, userId: input.userId, role: input.role, roleId: newRole.id };
+        };
+
+        // Use privileged access for cross-org operations
+        if ((input.crossOrgAccess && actor.isSystemUser) || input.orgId !== service.orgId) {
+          return executePrivileged(performUpdateRole, db);
+        }
+
+        return performUpdateRole(db);
       },
     },
   };

@@ -9,6 +9,7 @@
  */
 
 import { z } from 'zod';
+import { and, ilike, isNull } from 'drizzle-orm';
 import {
   userFiltersSchema,
   userCreateSchema,
@@ -47,6 +48,13 @@ export interface UserRouterDeps {
    * Password comparison function (e.g., bcrypt.compare)
    */
   comparePassword: (password: string, hash: string) => Promise<boolean>;
+
+  /**
+   * Execute a function with privileged database access (bypasses RLS).
+   * Required for operations like finding default roles across orgs.
+   * Optional - if not provided, RLS-enabled db will be used.
+   */
+  withPrivilegedDb?: <T>(fn: (db: any) => Promise<T>) => Promise<T>;
 }
 
 /**
@@ -244,17 +252,65 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       entityType: 'user',
       repository: deps.Repository,
       handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userCreateSchema>>) => {
+        /**
+         * Find the global "Standard User" role.
+         *
+         * The "Standard User" role is a GLOBAL role with org_id = NULL.
+         * Uses privileged db connection to bypass RLS since global roles
+         * have org_id = NULL and would be filtered out by RLS policies.
+         *
+         * NO fallback logic - returns undefined if not found.
+         */
+        const findDefaultRoleId = async (): Promise<number | undefined> => {
+          try {
+            // Import roles table lazily to avoid circular dependencies
+            const { roles } = await import('../../db/schema');
+
+            // Query for the global "Standard User" role (org_id IS NULL)
+            const queryGlobalRole = async (queryDb: any) => {
+              const [defaultRole] = await queryDb
+                .select({ id: roles.id })
+                .from(roles)
+                .where(and(
+                  ilike(roles.name, 'Standard User'),
+                  isNull(roles.orgId)  // GLOBAL role - org_id IS NULL
+                ))
+                .limit(1);
+
+              return defaultRole;
+            };
+
+            // MUST use privileged db to bypass RLS (global roles have org_id = NULL)
+            if (!deps.withPrivilegedDb) {
+              console.warn('withPrivilegedDb not provided - cannot look up global Standard User role');
+              return undefined;
+            }
+
+            const defaultRole = await deps.withPrivilegedDb(queryGlobalRole);
+            return defaultRole?.id;
+          } catch (error) {
+            console.error('Error finding global Standard User role:', error);
+            return undefined;
+          }
+        };
+
         // Check if user with email already exists
         const existing = await repo.findByEmail(db, input.email);
 
         if (existing) {
           // User exists - add to org with role
-          if (input.roleId && service.orgId) {
-            const hasRole = await repo.hasRoleInOrg(db, existing.id, input.roleId, service.orgId);
+          // Use provided roleId or find global "Standard User" role
+          let roleIdToAssign = input.roleId;
+          if (!roleIdToAssign) {
+            roleIdToAssign = await findDefaultRoleId();
+          }
+
+          if (roleIdToAssign && service.orgId) {
+            const hasRole = await repo.hasRoleInOrg(db, existing.id, roleIdToAssign, service.orgId);
             if (!hasRole) {
               await repo.assignRole(db, {
                 userId: existing.id,
-                roleId: input.roleId,
+                roleId: roleIdToAssign,
                 orgId: service.orgId,
                 assignedBy: parseInt(service.userId),
               });
@@ -276,11 +332,16 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           currentOrgId: service.orgId,
         });
 
-        // Assign role if provided
-        if (input.roleId && service.orgId) {
+        // Assign role - use provided roleId or find global "Standard User" role
+        let roleIdToAssign = input.roleId;
+        if (!roleIdToAssign) {
+          roleIdToAssign = await findDefaultRoleId();
+        }
+
+        if (roleIdToAssign && service.orgId) {
           await repo.assignRole(db, {
             userId: newUser.id,
-            roleId: input.roleId,
+            roleId: roleIdToAssign,
             orgId: service.orgId,
             assignedBy: parseInt(service.userId),
           });
