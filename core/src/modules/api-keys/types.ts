@@ -15,6 +15,7 @@ export interface ApiKeyRecord {
   name: string;
   keyPrefix: string;
   keyHash: string;
+  roleId: number | null;
   permissions: string[];
   rateLimit: number;
   expiresAt: Date | null;
@@ -33,6 +34,7 @@ export interface ApiKeyCreateData {
   name: string;
   keyPrefix: string;
   keyHash: string;
+  roleId?: number;
   permissions: string[];
   rateLimit: number;
   expiresAt?: Date;
@@ -44,6 +46,7 @@ export interface ApiKeyCreateData {
  */
 export interface ApiKeyUpdateData {
   name?: string;
+  roleId?: number | null;
   permissions?: string[];
   rateLimit?: number;
   expiresAt?: Date | null;
@@ -56,6 +59,8 @@ export interface ApiKeyListItem {
   id: number;
   name: string;
   keyPrefix: string;
+  roleId: number | null;
+  roleName?: string;
   permissions: string[];
   rateLimit: number;
   expiresAt: Date | null;
