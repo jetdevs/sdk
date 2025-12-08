@@ -10,6 +10,7 @@
 import { createLogger } from '../lib/logger';
 import { WhatsAppClient } from './client';
 import { resetWhatsAppTokenCache } from './token-cache';
+import type { WabaConfig } from './types';
 
 const log = createLogger('WhatsAppFactory');
 
@@ -58,20 +59,32 @@ export function resetWhatsAppClient(): void {
  * ```ts
  * import { whatsapp } from '@yobolabs/cloud/whatsapp';
  * await whatsapp.sendTemplateMessage({ ... });
+ *
+ * // With WABA config for multi-tenant
+ * await whatsapp.sendTemplateMessage({
+ *   templateId: 'hello',
+ *   phoneNumber: '6281234567890',
+ *   wabaId: 'org-specific-waba-id',
+ *   senderLabel: 'org-sender-label',
+ * });
  * ```
  */
 export const whatsapp = {
   /**
    * Upload media for template creation
+   * @param imageUrl - URL of the image to upload
+   * @param options - Optional WABA configuration
    */
-  uploadMediaForTemplate: async (imageUrl: string) =>
-    getWhatsAppClient().uploadMediaForTemplate(imageUrl),
+  uploadMediaForTemplate: async (imageUrl: string, options?: WabaConfig) =>
+    getWhatsAppClient().uploadMediaForTemplate(imageUrl, options),
 
   /**
    * Upload media for message sending
+   * @param imageUrl - URL of the image to upload
+   * @param options - Optional WABA configuration
    */
-  uploadMediaForSending: async (imageUrl: string) =>
-    getWhatsAppClient().uploadMediaForSending(imageUrl),
+  uploadMediaForSending: async (imageUrl: string, options?: WabaConfig) =>
+    getWhatsAppClient().uploadMediaForSending(imageUrl, options),
 
   /**
    * Create a new template
@@ -81,15 +94,19 @@ export const whatsapp = {
 
   /**
    * Get template status
+   * @param templateId - Template ID to check
+   * @param options - Optional WABA configuration
    */
-  getTemplateStatus: async (templateId: string) =>
-    getWhatsAppClient().getTemplateStatus(templateId),
+  getTemplateStatus: async (templateId: string, options?: WabaConfig) =>
+    getWhatsAppClient().getTemplateStatus(templateId, options),
 
   /**
    * Delete a template
+   * @param templateId - Template ID to delete
+   * @param options - Optional WABA configuration
    */
-  deleteTemplate: async (templateId: string) =>
-    getWhatsAppClient().deleteTemplate(templateId),
+  deleteTemplate: async (templateId: string, options?: WabaConfig) =>
+    getWhatsAppClient().deleteTemplate(templateId, options),
 
   /**
    * Send a template message

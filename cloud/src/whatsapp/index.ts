@@ -28,13 +28,17 @@
 
 // Types
 export type {
+  WabaConfig,
   WhatsAppCredentials,
   WhatsAppTokenResponse,
   MediaUploadResponse,
+  MediaUploadOptions,
   TemplateComponent,
   CreateTemplateRequest,
   CreateTemplateResponse,
+  TemplateStatusOptions,
   TemplateStatusResponse,
+  DeleteTemplateOptions,
   SendTemplateMessageRequest,
   SendCarouselMessageRequest,
   SendMessageResponse,

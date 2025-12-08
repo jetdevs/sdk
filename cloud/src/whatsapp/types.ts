@@ -5,6 +5,17 @@
  */
 
 /**
+ * WABA (WhatsApp Business Account) configuration
+ * Used for multi-tenant scenarios where each organization has its own WABA
+ */
+export interface WabaConfig {
+  /** WhatsApp Business Account ID */
+  wabaId?: string;
+  /** Sender label for phone number identification, defaults to 'META_DEFAULT' */
+  senderLabel?: string;
+}
+
+/**
  * @deprecated WhatsApp credentials are no longer exposed.
  * Credentials are now managed internally by credentials-service.
  * SDK only receives temporary access tokens via getWhatsAppToken().
@@ -34,6 +45,14 @@ export interface MediaUploadResponse {
 }
 
 /**
+ * Media upload request options
+ */
+export interface MediaUploadOptions extends WabaConfig {
+  /** Image URL to upload */
+  imageUrl: string;
+}
+
+/**
  * Template component types
  */
 export interface TemplateComponent {
@@ -54,7 +73,7 @@ export interface TemplateComponent {
 /**
  * Create template request
  */
-export interface CreateTemplateRequest {
+export interface CreateTemplateRequest extends WabaConfig {
   name: string;
   language: string;
   category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
@@ -72,6 +91,13 @@ export interface CreateTemplateResponse {
 }
 
 /**
+ * Template status request options
+ */
+export interface TemplateStatusOptions extends WabaConfig {
+  templateId: string;
+}
+
+/**
  * Template status response
  */
 export interface TemplateStatusResponse {
@@ -83,9 +109,16 @@ export interface TemplateStatusResponse {
 }
 
 /**
+ * Delete template request options
+ */
+export interface DeleteTemplateOptions extends WabaConfig {
+  templateId: string;
+}
+
+/**
  * Send template message request
  */
-export interface SendTemplateMessageRequest {
+export interface SendTemplateMessageRequest extends WabaConfig {
   templateId: string;
   phoneNumber: string;
   imageUrl?: string;
@@ -104,7 +137,7 @@ export interface CarouselCard {
 /**
  * Send carousel message request
  */
-export interface SendCarouselMessageRequest {
+export interface SendCarouselMessageRequest extends WabaConfig {
   templateId: string;
   phoneNumber: string;
   cards: CarouselCard[];

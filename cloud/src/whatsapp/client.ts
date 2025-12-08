@@ -8,14 +8,21 @@
  *
  * SECURITY: This client uses getWhatsAppToken() to get tokens from
  * credentials-service. It never handles OAuth credentials directly.
+ *
+ * WABA SUPPORT: All methods support optional wabaId and senderLabel
+ * for multi-tenant scenarios where each organization has its own WABA.
  */
 
 import { createLogger } from '../lib/logger';
 import { getWhatsAppToken, resetWhatsAppTokenCache } from './token-cache';
 import type {
+  WabaConfig,
+  MediaUploadOptions,
   CreateTemplateRequest,
   CreateTemplateResponse,
+  TemplateStatusOptions,
   TemplateStatusResponse,
+  DeleteTemplateOptions,
   SendTemplateMessageRequest,
   SendCarouselMessageRequest,
   SendMessageResponse,
@@ -23,6 +30,28 @@ import type {
 } from './types';
 
 const log = createLogger('WhatsAppClient');
+
+/** Default sender label when not specified */
+const DEFAULT_SENDER_LABEL = 'META_DEFAULT';
+
+/**
+ * Build request body with WABA config
+ */
+function withWabaConfig<T extends Record<string, unknown>>(
+  body: T,
+  config: WabaConfig
+): T & { sender_label: string; waba_id?: string } {
+  const result = {
+    ...body,
+    sender_label: config.senderLabel || DEFAULT_SENDER_LABEL,
+  } as T & { sender_label: string; waba_id?: string };
+
+  if (config.wabaId) {
+    result.waba_id = config.wabaId;
+  }
+
+  return result;
+}
 
 export class WhatsAppClient {
   /**
@@ -70,9 +99,12 @@ export class WhatsAppClient {
   /**
    * Upload media for template creation (uses URL-based upload)
    * Uses /api/v1/whatsapp/media/upload/handle API
+   *
+   * @param imageUrl - URL of the image to upload
+   * @param options - Optional WABA configuration
    */
-  async uploadMediaForTemplate(imageUrl: string): Promise<string> {
-    log.debug('Uploading media for template', { imageUrl });
+  async uploadMediaForTemplate(imageUrl: string, options?: WabaConfig): Promise<string> {
+    log.debug('Uploading media for template', { imageUrl, wabaId: options?.wabaId });
 
     const tokenData = await getWhatsAppToken();
     const { accessToken, apiUrl } = tokenData;
@@ -80,6 +112,14 @@ export class WhatsAppClient {
 
     const formData = new FormData();
     formData.append('media_url', imageUrl);
+
+    // Add WABA config if provided
+    if (options?.senderLabel) {
+      formData.append('sender_label', options.senderLabel);
+    }
+    if (options?.wabaId) {
+      formData.append('waba_id', options.wabaId);
+    }
 
     const response = await fetch(uploadUrl, {
       method: 'POST',
@@ -103,9 +143,12 @@ export class WhatsAppClient {
   /**
    * Upload media for message sending
    * Uses /api/v1/whatsapp/media/upload/by-sender API
+   *
+   * @param imageUrl - URL of the image to upload
+   * @param options - Optional WABA configuration
    */
-  async uploadMediaForSending(imageUrl: string): Promise<string> {
-    log.debug('Uploading media for sending', { imageUrl });
+  async uploadMediaForSending(imageUrl: string, options?: WabaConfig): Promise<string> {
+    log.debug('Uploading media for sending', { imageUrl, wabaId: options?.wabaId });
 
     const tokenData = await getWhatsAppToken();
     const { accessToken, apiUrl } = tokenData;
@@ -123,8 +166,13 @@ export class WhatsAppClient {
     const uploadUrl = `${apiUrl}/api/v1/whatsapp/media/upload/by-sender`;
     const formData = new FormData();
     formData.append('file', new Blob([buffer], { type: contentType }), 'promo.png');
-    formData.append('sender_label', 'META_DEFAULT');
+    formData.append('sender_label', options?.senderLabel || DEFAULT_SENDER_LABEL);
     formData.append('file_name', 'promo.png');
+
+    // Add WABA ID if provided
+    if (options?.wabaId) {
+      formData.append('waba_id', options.wabaId);
+    }
 
     const response = await fetch(uploadUrl, {
       method: 'POST',
@@ -150,12 +198,23 @@ export class WhatsAppClient {
   /**
    * Create a new WhatsApp template
    * Uses /api/v1/whatsapp/templates API
+   *
+   * @param data - Template creation request with optional WABA config
    */
   async createTemplate(data: CreateTemplateRequest): Promise<CreateTemplateResponse> {
-    log.info('Creating WhatsApp template', { name: data.name, category: data.category });
+    const { wabaId, senderLabel, ...templateData } = data;
+
+    log.info('Creating WhatsApp template', {
+      name: data.name,
+      category: data.category,
+      wabaId,
+    });
     log.debug('Template request data', { components: JSON.stringify(data.components) });
 
-    const response = (await this.request('POST', '/api/v1/whatsapp/templates', data)) as {
+    // Build request body with WABA config
+    const requestBody = withWabaConfig(templateData, { wabaId, senderLabel });
+
+    const response = (await this.request('POST', '/api/v1/whatsapp/templates', requestBody)) as {
       id?: string;
       ProviderTemplateID?: string;
       Status?: string;
@@ -188,14 +247,23 @@ export class WhatsAppClient {
   /**
    * Sync template status from WhatsApp
    * Uses /api/v1/whatsapp/templates/{id}/sync API
+   *
+   * @param templateId - Template ID to check status
+   * @param options - Optional WABA configuration
    */
-  async getTemplateStatus(templateId: string): Promise<TemplateStatusResponse> {
-    log.debug('Syncing template status', { templateId });
+  async getTemplateStatus(
+    templateId: string,
+    options?: WabaConfig
+  ): Promise<TemplateStatusResponse> {
+    log.debug('Syncing template status', { templateId, wabaId: options?.wabaId });
 
-    const response = (await this.request(
-      'GET',
-      `/api/v1/whatsapp/templates/${templateId}/sync`
-    )) as {
+    // Build query params if WABA config provided
+    let path = `/api/v1/whatsapp/templates/${templateId}/sync`;
+    if (options?.wabaId) {
+      path += `?waba_id=${encodeURIComponent(options.wabaId)}`;
+    }
+
+    const response = (await this.request('GET', path)) as {
       Status?: string;
       Name?: string;
       Category?: string;
@@ -212,13 +280,24 @@ export class WhatsAppClient {
   /**
    * Delete a template
    * Uses /api/v1/whatsapp/templates/{id} API
+   *
+   * @param templateId - Template ID to delete
+   * @param options - Optional WABA configuration
    */
-  async deleteTemplate(templateId: string): Promise<{ success: boolean; status: number }> {
-    log.info('Deleting WhatsApp template', { templateId });
+  async deleteTemplate(
+    templateId: string,
+    options?: WabaConfig
+  ): Promise<{ success: boolean; status: number }> {
+    log.info('Deleting WhatsApp template', { templateId, wabaId: options?.wabaId });
 
     const tokenData = await getWhatsAppToken();
     const { accessToken, apiUrl } = tokenData;
-    const url = `${apiUrl}/api/v1/whatsapp/templates/${templateId}`;
+
+    // Build URL with query params if WABA config provided
+    let url = `${apiUrl}/api/v1/whatsapp/templates/${templateId}`;
+    if (options?.wabaId) {
+      url += `?waba_id=${encodeURIComponent(options.wabaId)}`;
+    }
 
     const response = await fetch(url, {
       method: 'DELETE',
@@ -240,11 +319,19 @@ export class WhatsAppClient {
    * Send a template message
    * Uses /api/v1/whatsapp/send/template API
    * Uses image URL directly (no pre-upload needed)
+   *
+   * @param params - Send template message request with optional WABA config
    */
   async sendTemplateMessage(params: SendTemplateMessageRequest): Promise<SendMessageResponse> {
-    const { templateId, phoneNumber, imageUrl, metadata, bodyParameters } = params;
+    const { templateId, phoneNumber, imageUrl, metadata, bodyParameters, wabaId, senderLabel } =
+      params;
 
-    log.debug('Sending template message', { templateId, phoneNumber, hasImage: !!imageUrl });
+    log.debug('Sending template message', {
+      templateId,
+      phoneNumber,
+      hasImage: !!imageUrl,
+      wabaId,
+    });
 
     // Build body parameters
     const bodyParams =
@@ -253,8 +340,7 @@ export class WhatsAppClient {
         text: value,
       })) || [];
 
-    const requestBody = {
-      sender_label: 'META_DEFAULT',
+    const baseRequestBody = {
       provider_template_id: templateId,
       recipient_phone_number: phoneNumber,
       metadata: metadata || {},
@@ -279,6 +365,9 @@ export class WhatsAppClient {
       ],
     };
 
+    // Add WABA config
+    const requestBody = withWabaConfig(baseRequestBody, { wabaId, senderLabel });
+
     const response = (await this.request('POST', '/api/v1/whatsapp/send/template', requestBody)) as {
       ProviderMessageID?: string;
       Status?: string;
@@ -296,15 +385,26 @@ export class WhatsAppClient {
    * Send a carousel message
    * Uses /api/v1/whatsapp/send/template API with carousel components
    * Uses image URLs directly (no pre-upload needed)
+   *
+   * @param params - Send carousel message request with optional WABA config
    */
   async sendCarouselMessage(params: SendCarouselMessageRequest): Promise<SendMessageResponse> {
-    const { templateId, phoneNumber, cards, metadata, mainBodyParameters, cardBodyParameters } =
-      params;
+    const {
+      templateId,
+      phoneNumber,
+      cards,
+      metadata,
+      mainBodyParameters,
+      cardBodyParameters,
+      wabaId,
+      senderLabel,
+    } = params;
 
     log.debug('Sending carousel message', {
       templateId,
       phoneNumber,
       cardCount: cards.length,
+      wabaId,
     });
 
     // Build carousel cards
@@ -363,20 +463,26 @@ export class WhatsAppClient {
       cards: carouselCards,
     });
 
-    const requestBody = {
-      sender_label: 'META_DEFAULT',
+    const baseRequestBody = {
       provider_template_id: templateId,
       recipient_phone_number: phoneNumber,
       metadata: metadata || {},
       components: components,
     };
 
+    // Add WABA config
+    const requestBody = withWabaConfig(baseRequestBody, { wabaId, senderLabel });
+
     const response = (await this.request('POST', '/api/v1/whatsapp/send/template', requestBody)) as {
       ProviderMessageID?: string;
       Status?: string;
     };
 
-    log.info('Carousel message sent', { templateId, cardCount: cards.length, messageId: response.ProviderMessageID });
+    log.info('Carousel message sent', {
+      templateId,
+      cardCount: cards.length,
+      messageId: response.ProviderMessageID,
+    });
 
     return {
       success: true,
