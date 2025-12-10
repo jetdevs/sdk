@@ -17,7 +17,21 @@ let defaultClient: StorageClient | null = null;
 /**
  * Check if error is due to expired credentials
  */
-function isCredentialsExpiredError(error: unknown): boolean {
+function isCredentialsExpiredError(error: unknown, visited = new WeakSet<object>()): boolean {
+  if (!error) return false;
+
+  // Prevent infinite loop from circular references
+  if (typeof error === 'object' && error !== null) {
+    if (visited.has(error)) return false;
+    visited.add(error);
+  }
+
+  // Check AWS SDK v3 specific Code property
+  const awsError = error as { Code?: string; name?: string };
+  if (awsError.Code === 'ExpiredToken' || awsError.Code === 'ExpiredTokenException') {
+    return true;
+  }
+
   if (!(error instanceof Error)) return false;
 
   const expiredIndicators = [
@@ -25,12 +39,27 @@ function isCredentialsExpiredError(error: unknown): boolean {
     'ExpiredTokenException',
     'TokenRefreshRequired',
     'The security token included in the request is expired',
+    'The provided token has expired',
+    'The provided token is expired',
     'Request has expired',
   ];
 
-  return expiredIndicators.some(
-    (indicator) => error.message.includes(indicator) || error.name.includes(indicator)
+  // Check error.name and error.message (case-insensitive)
+  const matchesCurrent = expiredIndicators.some(
+    (indicator) =>
+      error.message.toLowerCase().includes(indicator.toLowerCase()) ||
+      error.name.includes(indicator)
   );
+
+  if (matchesCurrent) return true;
+
+  // Recursively check cause chain (pass visited set to prevent cycles)
+  const errorWithCause = error as { cause?: unknown };
+  if (errorWithCause.cause) {
+    return isCredentialsExpiredError(errorWithCause.cause, visited);
+  }
+
+  return false;
 }
 
 /**

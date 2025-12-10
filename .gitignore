@@ -33,9 +33,13 @@ npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-cloud/.npmrc
+
 # Misc
 .cache/
 .temp/
 *.tsbuildinfo.npmrc
 .npmrc
+
+#cloud 
+cloud/.npmrc
+cloud/.serena
