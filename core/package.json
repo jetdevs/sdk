@@ -1,6 +1,6 @@
 {
   "name": "@yobolabs/core",
-  "version": "0.1.2",
+  "version": "0.1.5",
   "description": "Core SDK components, UI primitives, and utilities for Yobo Platform",
   "type": "module",
   "publishConfig": {
@@ -183,6 +183,11 @@
       "types": "./dist/middleware/index.d.ts",
       "import": "./dist/middleware/index.js",
       "require": "./dist/middleware/index.js"
+    },
+    "./db/drivers": {
+      "types": "./dist/db/drivers/index.d.ts",
+      "import": "./dist/db/drivers/index.js",
+      "require": "./dist/db/drivers/index.js"
     }
   },
   "scripts": {
@@ -198,7 +203,9 @@
     "zod": "^3.22.4"
   },
   "peerDependencies": {
-    "@yobolabs/framework": "^0.2.0",
+    "@libsql/client": "^0.5.0",
+    "@neondatabase/serverless": "^0.9.0",
+    "@planetscale/database": "^1.16.0",
     "@radix-ui/react-checkbox": "^1.0.0",
     "@radix-ui/react-dialog": "^1.0.0",
     "@radix-ui/react-dropdown-menu": "^2.0.0",
@@ -211,13 +218,17 @@
     "@tanstack/react-table": "^8.0.0",
     "@trpc/client": "^11.0.0",
     "@trpc/server": "^11.0.0",
+    "@yobolabs/framework": "^0.2.0",
+    "better-sqlite3": "^9.4.0",
     "class-variance-authority": "^0.7.0",
     "drizzle-orm": "^0.30.0",
     "immer": "^10.0.0",
     "libphonenumber-js": "^1.10.0",
     "lucide-react": "^0.400.0",
+    "mysql2": "^3.9.0",
     "next": "^15.0.0",
     "next-auth": "^4.24.0",
+    "pg": "^8.11.0",
     "postgres": "^3.4.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-hook-form": "^7.0.0",
@@ -286,6 +297,24 @@
     },
     "libphonenumber-js": {
       "optional": true
+    },
+    "@neondatabase/serverless": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "@planetscale/database": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    },
+    "@libsql/client": {
+      "optional": true
     }
   },
   "files": [
@@ -293,8 +322,6 @@
     "README.md"
   ],
   "devDependencies": {
-    "@yobolabs/framework": "workspace:*",
-    "libphonenumber-js": "^1.11.0",
     "@radix-ui/react-checkbox": "^1.0.4",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-dropdown-menu": "^2.0.6",
@@ -308,10 +335,13 @@
     "@trpc/client": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "@types/node": "^20.0.0",
+    "@types/pg": "^8.16.0",
     "@types/react": "^19.0.0",
+    "@yobolabs/framework": "workspace:*",
     "class-variance-authority": "^0.7.0",
     "drizzle-orm": "^0.44.0",
     "immer": "^10.0.0",
+    "libphonenumber-js": "^1.11.0",
     "lucide-react": "^0.436.0",
     "next-auth": "^4.24.0",
     "postgres": "^3.4.0",

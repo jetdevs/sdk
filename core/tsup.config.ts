@@ -44,6 +44,8 @@ export default defineConfig({
     'user-org/index': 'src/modules/user-org/index.ts',
     // Security Middleware module
     'middleware/index': 'src/middleware/index.ts',
+    // Database drivers module
+    'db/drivers/index': 'src/db/drivers/index.ts',
   },
   format: ['esm'],
   dts: true,
@@ -75,5 +77,21 @@ export default defineConfig({
     'zustand',
     'immer',
     '@yobolabs/framework',
+    // Database drivers - externalized to allow optional usage
+    '@neondatabase/serverless',
+    '@planetscale/database',
+    'mysql2',
+    'pg',
+    'better-sqlite3',
+    '@libsql/client',
+    // Drizzle driver-specific packages
+    'drizzle-orm/postgres-js',
+    'drizzle-orm/neon-http',
+    'drizzle-orm/neon-serverless',
+    'drizzle-orm/node-postgres',
+    'drizzle-orm/planetscale-serverless',
+    'drizzle-orm/mysql2',
+    'drizzle-orm/better-sqlite3',
+    'drizzle-orm/libsql',
   ],
 })
