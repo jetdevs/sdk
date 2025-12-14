@@ -303,7 +303,7 @@ class NeonWsAdapter implements DriverAdapter<any> {
     return {
       total: this.pool.totalCount ?? 0,
       idle: this.pool.idleCount ?? 0,
-      active: this.pool.totalCount - this.pool.idleCount ?? 0,
+      active: (this.pool.totalCount ?? 0) - (this.pool.idleCount ?? 0),
       waiting: this.pool.waitingCount ?? 0,
     };
   }

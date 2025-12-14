@@ -23,7 +23,6 @@ import type { SQL } from 'drizzle-orm';
  * - `pg`: node-postgres (pg) - Best for AWS RDS, traditional PostgreSQL with pooling
  * - `planetscale`: @planetscale/database - For PlanetScale MySQL (serverless)
  * - `mysql2`: mysql2 driver - For traditional MySQL servers
- * - `better-sqlite3`: better-sqlite3 - For SQLite (local development/testing)
  */
 export type DatabaseDriver =
   | 'postgres'      // postgres.js
@@ -33,14 +32,12 @@ export type DatabaseDriver =
   | 'pg-pool'       // node-postgres with pg-pool
   | 'planetscale'   // PlanetScale MySQL
   | 'mysql2'        // MySQL2
-  | 'better-sqlite3' // SQLite
-  | 'libsql'        // Turso/LibSQL
   | 'custom';       // Custom driver implementation
 
 /**
  * Database dialect - the underlying SQL dialect
  */
-export type DatabaseDialect = 'postgresql' | 'mysql' | 'sqlite';
+export type DatabaseDialect = 'postgresql' | 'mysql';
 
 // =============================================================================
 // CONNECTION CONFIGURATION
@@ -55,7 +52,6 @@ export interface BaseDriverConfig {
    * Format depends on driver:
    * - PostgreSQL: postgresql://user:pass@host:port/db
    * - MySQL: mysql://user:pass@host:port/db
-   * - SQLite: file:./path/to/db.sqlite
    */
   url: string;
 
@@ -297,54 +293,6 @@ export interface MySQL2DriverConfig extends BaseDriverConfig {
   charset?: string;
 }
 
-/**
- * SQLite-specific configuration
- */
-export interface SQLiteDriverConfig {
-  /**
-   * Path to the SQLite database file
-   * Use `:memory:` for in-memory database
-   */
-  filename: string;
-
-  /**
-   * Enable verbose mode
-   * @default false
-   */
-  verbose?: boolean;
-
-  /**
-   * Enable WAL mode for better concurrent access
-   * @default true
-   */
-  walMode?: boolean;
-
-  /**
-   * Enable foreign key constraints
-   * @default true
-   */
-  foreignKeys?: boolean;
-}
-
-/**
- * LibSQL/Turso-specific configuration
- */
-export interface LibSQLDriverConfig extends BaseDriverConfig {
-  /**
-   * Auth token for Turso
-   */
-  authToken?: string;
-
-  /**
-   * Encryption key for local encryption
-   */
-  encryptionKey?: string;
-
-  /**
-   * Sync URL for embedded replicas
-   */
-  syncUrl?: string;
-}
 
 /**
  * Union type of all driver-specific configurations
@@ -356,9 +304,7 @@ export type DriverConfig =
   | ({ driver: 'pg' } & PgDriverConfig)
   | ({ driver: 'pg-pool' } & PgDriverConfig)
   | ({ driver: 'planetscale' } & PlanetScaleDriverConfig)
-  | ({ driver: 'mysql2' } & MySQL2DriverConfig)
-  | ({ driver: 'better-sqlite3' } & SQLiteDriverConfig)
-  | ({ driver: 'libsql' } & LibSQLDriverConfig);
+  | ({ driver: 'mysql2' } & MySQL2DriverConfig);
 
 // =============================================================================
 // DRIVER CAPABILITIES

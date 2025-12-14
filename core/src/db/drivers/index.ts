@@ -12,8 +12,6 @@
  * - `pg-pool`: node-postgres with pooling - Production PostgreSQL
  * - `planetscale`: PlanetScale MySQL - Serverless MySQL
  * - `mysql2`: MySQL2 - Traditional MySQL (not yet implemented)
- * - `better-sqlite3`: SQLite - Local dev/testing (not yet implemented)
- * - `libsql`: LibSQL/Turso - Edge SQLite (not yet implemented)
  *
  * @module @yobolabs/core/db/drivers
  *
@@ -71,8 +69,6 @@ export type {
   PgDriverConfig,
   PlanetScaleDriverConfig,
   MySQL2DriverConfig,
-  SQLiteDriverConfig,
-  LibSQLDriverConfig,
   DriverConfig,
 
   // Capabilities

@@ -28,6 +28,9 @@ export type {
   DbClients,
 } from './client-factory';
 
+// Driver Abstraction Layer (advanced - multi-driver support)
+export * from './drivers';
+
 // Schema
 export * as schema from './schema';
 export * from './schema';

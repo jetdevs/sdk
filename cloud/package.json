@@ -1,6 +1,6 @@
 {
   "name": "@yobolabs/cloud",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "AWS S3 and cloud service integrations for Yobo Platform",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

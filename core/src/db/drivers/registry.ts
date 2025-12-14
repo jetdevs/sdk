@@ -106,35 +106,6 @@ const MYSQL2_CAPABILITIES: DriverCapabilities = {
   maxParameters: 65535,
 };
 
-/**
- * Capabilities for better-sqlite3 driver
- */
-const SQLITE_CAPABILITIES: DriverCapabilities = {
-  transactions: true,
-  nestedTransactions: true,
-  preparedStatements: true,
-  connectionPooling: false, // Single connection
-  serverless: false,
-  streaming: false,
-  batchQueries: true,
-  returning: true, // SQLite 3.35+ supports RETURNING
-  maxParameters: 999, // SQLite default limit
-};
-
-/**
- * Capabilities for LibSQL/Turso driver
- */
-const LIBSQL_CAPABILITIES: DriverCapabilities = {
-  transactions: true,
-  nestedTransactions: false,
-  preparedStatements: true,
-  connectionPooling: false,
-  serverless: true,
-  streaming: false,
-  batchQueries: true,
-  returning: true,
-  maxParameters: 999,
-};
 
 // =============================================================================
 // DRIVER REGISTRY
@@ -284,36 +255,6 @@ registerDriver({
   },
 });
 
-// Register better-sqlite3 driver
-registerDriver({
-  driver: 'better-sqlite3',
-  dialect: 'sqlite',
-  capabilities: SQLITE_CAPABILITIES,
-  packageName: 'better-sqlite3',
-  optional: true,
-  factory: async (config) => {
-    const { createSQLiteAdapter } = await import('./adapters/sqlite');
-    // SQLite uses filename from URL or a separate config
-    return createSQLiteAdapter({
-      filename: config.url?.replace(/^file:/, '') || ':memory:',
-      walMode: true,
-      foreignKeys: true,
-    });
-  },
-});
-
-// Register LibSQL/Turso driver
-registerDriver({
-  driver: 'libsql',
-  dialect: 'sqlite',
-  capabilities: LIBSQL_CAPABILITIES,
-  packageName: '@libsql/client',
-  optional: true,
-  factory: async (config) => {
-    const { createLibSQLAdapter } = await import('./adapters/libsql');
-    return createLibSQLAdapter(config);
-  },
-});
 
 // =============================================================================
 // DRIVER AVAILABILITY CHECK

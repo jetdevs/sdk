@@ -392,16 +392,6 @@ async function createDrizzleInstance<TSchema extends Record<string, unknown>>(
       return drizzle(adapter.rawClient as any, { schema, mode: 'default' });
     }
 
-    case 'better-sqlite3': {
-      const { drizzle } = await import('drizzle-orm/better-sqlite3');
-      return drizzle(adapter.rawClient as any, { schema });
-    }
-
-    case 'libsql': {
-      const { drizzle } = await import('drizzle-orm/libsql');
-      return drizzle(adapter.rawClient as any, { schema });
-    }
-
     default:
       throw new Error(`Unsupported driver for Drizzle integration: ${driver}`);
   }

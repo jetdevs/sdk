@@ -184,8 +184,6 @@ export function parseConnectionUrl(url: string): ParsedConnectionUrl {
       dialect = 'postgresql';
     } else if (['mysql', 'mysql2', 'mariadb'].includes(protocol)) {
       dialect = 'mysql';
-    } else if (['file', 'sqlite', 'sqlite3'].includes(protocol)) {
-      dialect = 'sqlite';
     }
 
     // Parse query parameters
@@ -301,13 +299,6 @@ export function recommendDriver(url?: string): DriverDetectionResult {
     };
   }
 
-  if (urlInfo?.dialect === 'sqlite') {
-    return {
-      recommendedDriver: 'libsql',
-      reason: 'SQLite connection detected - LibSQL recommended for edge compatibility',
-      alternatives: ['better-sqlite3'],
-    };
-  }
 
   // PostgreSQL driver selection
 
@@ -450,8 +441,6 @@ export function getDatabaseDriverFromEnv(): DatabaseDriver | undefined {
     'pg-pool',
     'planetscale',
     'mysql2',
-    'better-sqlite3',
-    'libsql',
   ];
 
   if (knownDrivers.includes(driver as DatabaseDriver)) {
