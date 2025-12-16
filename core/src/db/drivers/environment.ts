@@ -4,14 +4,14 @@
  * Utilities for detecting the runtime environment and
  * recommending the appropriate database driver.
  *
- * @module @yobolabs/core/db/drivers/environment
+ * @module @jetdevs/core/db/drivers/environment
  */
 
 import type {
-  RuntimeEnvironment,
-  DriverDetectionResult,
-  DatabaseDriver,
-  DatabaseDialect,
+    DatabaseDialect,
+    DatabaseDriver,
+    DriverDetectionResult,
+    RuntimeEnvironment,
 } from './types';
 
 // =============================================================================

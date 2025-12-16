@@ -11,19 +11,19 @@
  * - Traditional PostgreSQL servers with connection pooling
  * - Enterprise deployments
  *
- * @module @yobolabs/core/db/drivers/adapters/pg
+ * @module @jetdevs/core/db/drivers/adapters/pg
  */
 
 import type { SQL } from 'drizzle-orm';
 import type {
-  DriverAdapter,
-  DatabaseDriver,
-  DatabaseDialect,
-  DriverCapabilities,
-  PgDriverConfig,
-  QueryResult,
-  TransactionOptions,
-  ConnectionStats,
+    ConnectionStats,
+    DatabaseDialect,
+    DatabaseDriver,
+    DriverAdapter,
+    DriverCapabilities,
+    PgDriverConfig,
+    QueryResult,
+    TransactionOptions,
 } from '../types';
 
 // =============================================================================

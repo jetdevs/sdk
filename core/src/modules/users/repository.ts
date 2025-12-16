@@ -5,34 +5,34 @@
  * This factory pattern allows apps to inject their own schema while
  * reusing the repository logic from core.
  *
- * @module @yobolabs/core/users
+ * @module @jetdevs/core/users
  */
 
 import {
-  and,
-  asc,
-  desc,
-  eq,
-  inArray,
-  isNull,
-  like,
-  not,
-  or,
-  count,
-  type SQL,
+    and,
+    asc,
+    count,
+    desc,
+    eq,
+    inArray,
+    isNull,
+    like,
+    not,
+    or,
+    type SQL,
 } from 'drizzle-orm';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { PgTable } from 'drizzle-orm/pg-core';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import type {
-  UserWithRoles,
-  UserRole,
-  UserFilters,
-  UserListOptions,
-  UserCreateData,
-  UserUpdateData,
-  UserRoleAssignment,
-  UserPermissionsData,
+    UserCreateData,
+    UserFilters,
+    UserListOptions,
+    UserPermissionsData,
+    UserRole,
+    UserRoleAssignment,
+    UserUpdateData,
+    UserWithRoles,
 } from './types';
 
 // =============================================================================
@@ -145,7 +145,7 @@ export interface IUserRepository {
  *
  * @example
  * ```typescript
- * import { createUserRepositoryClass } from '@yobolabs/core/users';
+ * import { createUserRepositoryClass } from '@jetdevs/core/users';
  * import { users, userRoles, roles, orgs, permissions, rolePermissions } from '@/db/schema';
  *
  * const UserRepositoryBase = createUserRepositoryClass({

@@ -1,7 +1,7 @@
 {
-  "name": "@yobolabs/framework",
-  "version": "0.2.3-dev",
-  "description": "Core infrastructure abstractions for Yobo Platform",
+  "name": "@jetdevs/framework",
+  "version": "0.2.4-dev",
+  "description": "Core infrastructure abstractions for Jetdevs Platform",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -78,13 +78,13 @@
     "clean": "rm -rf dist"
   },
   "keywords": [
-    "yobo",
+    "jetdevs",
     "framework",
     "database",
     "permissions",
     "auth"
   ],
-  "author": "Yobo",
+  "author": "Jetdevs",
   "license": "PRIVATE",
   "peerDependencies": {
     "drizzle-orm": "^0.44.2",

@@ -4,13 +4,13 @@
  * Provides a factory function that creates permission router configuration.
  * Apps can use this with their specific repository implementation.
  *
- * @module @yobolabs/core/trpc/routers
+ * @module @jetdevs/core/trpc/routers
  *
  * @example
  * ```typescript
- * import { createPermissionRouterConfig } from '@yobolabs/core/trpc/routers';
+ * import { createPermissionRouterConfig } from '@jetdevs/core/trpc/routers';
  * import { PermissionRepository } from '@/server/repos/permission.repository';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * const config = createPermissionRouterConfig({ Repository: PermissionRepository });
  * export const permissionRouter = createRouterWithActor(config);
@@ -231,8 +231,8 @@ export function createPermissionRouterConfig(
  *
  * @example
  * ```typescript
- * import { permissionRouterConfig } from '@yobolabs/core/trpc/routers';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { permissionRouterConfig } from '@jetdevs/core/trpc/routers';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * export const permissionRouter = createRouterWithActor(permissionRouterConfig);
  * ```

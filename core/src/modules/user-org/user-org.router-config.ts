@@ -2,19 +2,19 @@
  * User Organization Router Configuration
  *
  * This provides a router configuration factory that can be used
- * with createRouterWithActor from @yobolabs/framework/router.
+ * with createRouterWithActor from @jetdevs/framework/router.
  *
  * The configuration defines all the procedures for user-organization
  * relationship management while allowing apps to inject their own
  * repository implementation.
  *
- * @module @yobolabs/core/user-org
+ * @module @jetdevs/core/user-org
  *
  * @example
  * ```typescript
  * // Option 1: Factory pattern with custom repository (full control)
- * import { createUserOrgRouterConfig, createUserOrgRepository } from '@yobolabs/core/user-org';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createUserOrgRouterConfig, createUserOrgRepository } from '@jetdevs/core/user-org';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  * import { TRPCError } from '@trpc/server';
  * import * as schema from '@/db/schema';
  *
@@ -27,25 +27,25 @@
  * );
  *
  * // Option 2: Pre-built router config (zero boilerplate) - uses SDK schema
- * import { userOrgRouterConfig } from '@yobolabs/core/user-org';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { userOrgRouterConfig } from '@jetdevs/core/user-org';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * export const userOrgRouter = createRouterWithActor(userOrgRouterConfig);
  * ```
  */
 
-import {
-  switchOrgSchema,
-  validateOrgAccessSchema,
-  assignRoleSchema,
-  removeRoleSchema,
-  getUsersByRoleSchema,
-  getAvailableRolesSchema,
-  getUserRolesAllOrgsSchema,
-} from './schemas';
-import { createUserOrgRepository, type UserOrgRepositoryConfig } from './user-org.repository';
-import { userRoles, users, roles, orgs } from '../../db/schema';
+import { orgs, roles, userRoles, users } from '../../db/schema';
 import type { HandlerContext } from '../../trpc/routers/types';
+import {
+    assignRoleSchema,
+    getAvailableRolesSchema,
+    getUserRolesAllOrgsSchema,
+    getUsersByRoleSchema,
+    removeRoleSchema,
+    switchOrgSchema,
+    validateOrgAccessSchema,
+} from './schemas';
+import { createUserOrgRepository } from './user-org.repository';
 
 /**
  * TRPCError-like constructor interface
@@ -111,8 +111,8 @@ export interface UserOrgRouterFactoryDeps {
  *
  * @example
  * ```ts
- * import { createRouterWithActor } from '@yobolabs/framework/router';
- * import { createUserOrgRouterConfig, createUserOrgRepository } from '@yobolabs/core/user-org';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
+ * import { createUserOrgRouterConfig, createUserOrgRepository } from '@jetdevs/core/user-org';
  * import { TRPCError } from '@trpc/server';
  * import * as schema from '@/db/schema';
  *
@@ -384,7 +384,7 @@ export type UserOrgRouterConfig = ReturnType<typeof createUserOrgRouterConfig>;
  *
  * @example
  * ```typescript
- * import { SDKUserOrgRepository } from '@yobolabs/core/user-org';
+ * import { SDKUserOrgRepository } from '@jetdevs/core/user-org';
  *
  * // Create repository with app's database client
  * const repo = new SDKUserOrgRepository(db);
@@ -407,8 +407,8 @@ export const SDKUserOrgRepository = createUserOrgRepository({
  *
  * @example
  * ```typescript
- * import { userOrgRouterConfig } from '@yobolabs/core/user-org';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { userOrgRouterConfig } from '@jetdevs/core/user-org';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * // One-liner to create a user-org router
  * export const userOrgRouter = createRouterWithActor(userOrgRouterConfig);

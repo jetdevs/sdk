@@ -7,30 +7,30 @@
  * Also exports pre-built router configurations using the SDK's own repository
  * for apps that don't need customization.
  *
- * @module @yobolabs/core/trpc/routers
+ * @module @jetdevs/core/trpc/routers
  *
  * @example
  * ```typescript
  * // Option 1: Use factory with custom repository
- * import { createThemeRouterConfig } from '@yobolabs/core/trpc/routers';
+ * import { createThemeRouterConfig } from '@jetdevs/core/trpc/routers';
  * import { ThemeRepository } from '@/server/repos/theme.repository';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * const config = createThemeRouterConfig({ Repository: ThemeRepository });
  * export const themeRouter = createRouterWithActor(config);
  *
  * // Option 2: Use pre-built router config (simpler, no customization)
- * import { themeRouterConfig, SDKThemeRepository } from '@yobolabs/core/trpc/routers';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { themeRouterConfig, SDKThemeRepository } from '@jetdevs/core/trpc/routers';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * export const themeRouter = createRouterWithActor(themeRouterConfig);
  * ```
  */
 
 import { z } from "zod";
-import type { RouterConfig, RouterFactoryDeps } from "./types";
-import { ThemeRepository } from "../../modules/themes/theme.repository";
 import { themes } from "../../db/schema/themes";
+import { ThemeRepository } from "../../modules/themes/theme.repository";
+import type { RouterConfig, RouterFactoryDeps } from "./types";
 
 // =============================================================================
 // INPUT SCHEMAS
@@ -295,7 +295,7 @@ export function createThemeRouterConfig(deps: RouterFactoryDeps): RouterConfig {
  *
  * @example
  * ```typescript
- * import { SDKThemeRepository } from '@yobolabs/core/trpc/routers';
+ * import { SDKThemeRepository } from '@jetdevs/core/trpc/routers';
  *
  * // Create repository with app's database client
  * const repo = new SDKThemeRepository(db);
@@ -320,8 +320,8 @@ export class SDKThemeRepository extends ThemeRepository {
  *
  * @example
  * ```typescript
- * import { themeRouterConfig } from '@yobolabs/core/trpc/routers';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { themeRouterConfig } from '@jetdevs/core/trpc/routers';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * // One-liner to create a theme router
  * export const themeRouter = createRouterWithActor(themeRouterConfig);

@@ -9,18 +9,18 @@
  * Note: PlanetScale is MySQL-based, so some PostgreSQL-specific features
  * (like RETURNING) are not available.
  *
- * @module @yobolabs/core/db/drivers/adapters/planetscale
+ * @module @jetdevs/core/db/drivers/adapters/planetscale
  */
 
 import type { SQL } from 'drizzle-orm';
 import type {
-  DriverAdapter,
-  DatabaseDriver,
-  DatabaseDialect,
-  DriverCapabilities,
-  PlanetScaleDriverConfig,
-  QueryResult,
-  TransactionOptions,
+    DatabaseDialect,
+    DatabaseDriver,
+    DriverAdapter,
+    DriverCapabilities,
+    PlanetScaleDriverConfig,
+    QueryResult,
+    TransactionOptions,
 } from '../types';
 
 // =============================================================================

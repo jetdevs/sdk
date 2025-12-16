@@ -1,7 +1,7 @@
 {
-  "name": "@yobolabs/core",
-  "version": "0.1.7-dev",
-  "description": "Core SDK components, UI primitives, and utilities for Yobo Platform",
+  "name": "@jetdevs/core",
+  "version": "0.1.8-dev",
+  "description": "Core SDK components, UI primitives, and utilities for Jetdevs Platform",
   "type": "module",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
@@ -217,7 +217,7 @@
     "@tanstack/react-table": "^8.0.0",
     "@trpc/client": "^11.0.0",
     "@trpc/server": "^11.0.0",
-    "@yobolabs/framework": "^0.2.0",
+    "@jetdevs/framework": "^0.2.4-dev",
     "class-variance-authority": "^0.7.0",
     "drizzle-orm": "^0.30.0 || ^0.44.0",
     "immer": "^10.0.0",
@@ -233,7 +233,7 @@
     "zustand": "^4.4.0 || ^5.0.0"
   },
   "peerDependenciesMeta": {
-    "@yobolabs/framework": {
+    "@jetdevs/framework": {
       "optional": true
     },
     "@radix-ui/react-checkbox": {
@@ -329,7 +329,7 @@
     "@types/node": "^20.0.0",
     "@types/pg": "^8.16.0",
     "@types/react": "^19.0.0",
-    "@yobolabs/framework": "workspace:*",
+    "@jetdevs/framework": "workspace:*",
     "class-variance-authority": "^0.7.0",
     "drizzle-orm": "^0.44.7",
     "immer": "^10.0.0",

@@ -36,7 +36,7 @@ export const EXAMPLE_APP_SIDE_IMPLEMENTATION = `
 // File: apps/merchant-portal/src/server/api/sdk-router-factory.ts
 
 import { createTRPCRouter, orgProtectedProcedureWithPermission } from './trpc';
-import type { RouterConfig } from '@yobolabs/framework/router';
+import type { RouterConfig } from '@jetdevs/framework/router';
 
 /**
  * Create a tRPC router from SDK route configuration
@@ -105,7 +105,7 @@ export const HYBRID_APPROACH = `
 // File: apps/merchant-portal/src/server/api/routers/campaigns.router.sdk-test.ts
 
 import { createTRPCRouter, orgProtectedProcedureWithPermission } from "@/server/api/trpc";
-import { createRepository } from '@yobolabs/framework/db';
+import { createRepository } from '@jetdevs/framework/db';
 import { CampaignPermissions } from "@/types/permissions";
 
 export const campaignsRouterSDK = createTRPCRouter({

@@ -4,7 +4,7 @@
  * Type definitions for creating tRPC router factories.
  * These types allow core to define router configurations that apps can use.
  *
- * @module @yobolabs/core/trpc/routers
+ * @module @jetdevs/core/trpc/routers
  */
 
 import type { z } from "zod";

@@ -6,12 +6,12 @@
  * - Traditional MySQL servers
  * - AWS RDS MySQL/Aurora MySQL
  *
- * @module @yobolabs/core/db/drivers/adapters/mysql2
+ * @module @jetdevs/core/db/drivers/adapters/mysql2
  */
 
 import type {
-  DriverAdapter,
-  MySQL2DriverConfig,
+    DriverAdapter,
+    MySQL2DriverConfig,
 } from '../types';
 
 /**

@@ -3,7 +3,7 @@
  *
  * Zod schemas for system configuration validation.
  *
- * @module @yobolabs/core/system-config
+ * @module @jetdevs/core/system-config
  */
 
 import { z } from 'zod';

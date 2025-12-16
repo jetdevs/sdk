@@ -7,7 +7,7 @@
  * - Repository factory for database operations
  * - Router configuration factory for tRPC integration
  *
- * @module @yobolabs/core/users
+ * @module @jetdevs/core/users
  */
 
 // =============================================================================
@@ -15,36 +15,25 @@
 // =============================================================================
 
 export type {
-  // User records
-  UserRecord,
-  UserWithRoles,
-  UserWithStats,
+    BulkOperationResult,
 
-  // Role types
-  UserRole,
-  UserRoleAssignment,
-
-  // Permission types
-  UserPermission,
-  UserPermissionsData,
-
-  // Filter and options
-  UserFilters,
-  UserListOptions,
-
-  // Input data
-  UserCreateData,
-  UserUpdateData,
-
-  // Results
-  UserListResult,
-  BulkOperationResult,
-
-  // UI-specific types
-  User,
-  UserTableColumn,
-  UserFormData,
-  UserBulkActions,
+    // UI-specific types
+    User, UserBulkActions,
+    // Input data
+    UserCreateData,
+    // Filter and options
+    UserFilters, UserFormData, UserListOptions,
+    // Results
+    UserListResult,
+    // Permission types
+    UserPermission,
+    UserPermissionsData,
+    // User records
+    UserRecord,
+    // Role types
+    UserRole,
+    UserRoleAssignment, UserTableColumn, UserUpdateData, UserWithRoles,
+    UserWithStats
 } from './types';
 
 // =============================================================================
@@ -52,44 +41,25 @@ export type {
 // =============================================================================
 
 export {
-  // Filter schemas
-  userFiltersSchema,
 
-  // Create/Update schemas
-  userCreateSchema,
-  userUpdateSchema,
-
-  // Role assignment schemas
-  assignRoleSchema,
-  removeRoleSchema,
-  removeFromOrgSchema,
-
-  // User settings schemas
-  changePasswordSchema,
-  updateSessionPreferenceSchema,
-  updateThemePreferenceSchema,
-
-  // Utility schemas
-  checkUsernameSchema,
-
-  // Bulk operation schemas
-  userBulkUpdateSchema,
-  userBulkDeleteSchema,
+    // Role assignment schemas
+    assignRoleSchema,
+    // User settings schemas
+    changePasswordSchema,
+    // Utility schemas
+    checkUsernameSchema, removeFromOrgSchema, removeRoleSchema, updateSessionPreferenceSchema,
+    updateThemePreferenceSchema, userBulkDeleteSchema,
+    // Bulk operation schemas
+    userBulkUpdateSchema,
+    // Create/Update schemas
+    userCreateSchema,
+    // Filter schemas
+    userFiltersSchema, userUpdateSchema
 } from './schemas';
 
 export type {
-  UserFiltersInput,
-  UserCreateInput,
-  UserUpdateInput,
-  AssignRoleInput,
-  RemoveRoleInput,
-  RemoveFromOrgInput,
-  ChangePasswordInput,
-  UpdateSessionPreferenceInput,
-  UpdateThemePreferenceInput,
-  CheckUsernameInput,
-  UserBulkUpdateInput,
-  UserBulkDeleteInput,
+    AssignRoleInput, ChangePasswordInput, CheckUsernameInput, RemoveFromOrgInput, RemoveRoleInput, UpdateSessionPreferenceInput,
+    UpdateThemePreferenceInput, UserBulkDeleteInput, UserBulkUpdateInput, UserCreateInput, UserFiltersInput, UserUpdateInput
 } from './schemas';
 
 // =============================================================================
@@ -97,12 +67,11 @@ export type {
 // =============================================================================
 
 export {
-  createUserRepositoryClass,
+    createUserRepositoryClass
 } from './repository';
 
 export type {
-  UserRepositorySchema,
-  IUserRepository,
+    IUserRepository, UserRepositorySchema
 } from './repository';
 
 // =============================================================================
@@ -110,17 +79,13 @@ export type {
 // =============================================================================
 
 export {
-  createUserRouterConfig,
-  UserRouterError,
-  // Pre-built SDK exports
-  SDKUserRepository,
-  userRouterConfig,
+    // Pre-built SDK exports
+    SDKUserRepository, UserRouterError, createUserRouterConfig, userRouterConfig
 } from './router-config';
 
 export type {
-  UserRouterDeps,
-  UserServiceContext as RouterServiceContext,
-  UserHandlerContext,
+    UserServiceContext as RouterServiceContext,
+    UserHandlerContext, UserRouterDeps
 } from './router-config';
 
 // =============================================================================
@@ -128,36 +93,23 @@ export type {
 // =============================================================================
 
 export {
-  createUserService,
-  createDefaultUserService,
-  UserServiceError,
+    UserServiceError, createDefaultUserService, createUserService
 } from './service';
 
 export type {
-  // Service interface
-  IUserService,
-  UserServiceDeps,
-  UserServiceHooks,
-
-  // Service context
-  UserServiceContext,
-
-  // Service parameter types
-  UserListParams,
-  UserGetByIdParams,
-  UserInviteParams,
-  UserUpdateParams,
-  UserBulkUpdateParams,
-  UserBulkDeleteParams,
-  UserRoleAssignParams,
-  UserRoleRemoveParams,
-  UserOrgRemoveParams,
-  CheckUsernameParams,
-  UpdateSessionPreferenceParams,
-  UpdateThemePreferenceParams,
-  ChangePasswordParams,
-
-  // Hook parameter types
-  InvitationEmailParams,
-  RoleOperationParams,
+    ChangePasswordParams, CheckUsernameParams,
+    // Service interface
+    IUserService,
+    // Hook parameter types
+    InvitationEmailParams,
+    RoleOperationParams, UpdateSessionPreferenceParams,
+    UpdateThemePreferenceParams, UserBulkDeleteParams, UserBulkUpdateParams, UserGetByIdParams,
+    UserInviteParams,
+    // Service parameter types
+    UserListParams, UserOrgRemoveParams, UserRoleAssignParams,
+    UserRoleRemoveParams,
+    // Service context
+    UserServiceContext, UserServiceDeps,
+    UserServiceHooks, UserUpdateParams
 } from './service';
+

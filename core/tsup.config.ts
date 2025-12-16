@@ -78,7 +78,7 @@ const externalDeps = [
   'libphonenumber-js',
   'zustand',
   'immer',
-  '@yobolabs/framework',
+  '@jetdevs/framework',
   '@neondatabase/serverless',
   '@planetscale/database',
   'mysql2',

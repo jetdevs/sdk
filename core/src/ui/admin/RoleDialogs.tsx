@@ -6,12 +6,12 @@
  * Provides factory functions for creating role management dialogs.
  * Apps create dialog components using factory functions that accept their tRPC client and UI components.
  *
- * @module @yobolabs/core/ui/admin
+ * @module @jetdevs/core/ui/admin
  *
  * @example
  * ```typescript
  * // Create delete role dialog
- * import { createDeleteRoleDialogFactory } from '@yobolabs/core/ui/admin';
+ * import { createDeleteRoleDialogFactory } from '@jetdevs/core/ui/admin';
  * import { api } from '@/utils/trpc';
  * import { toast } from 'sonner';
  * import * as UI from '@/components/ui';

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { cn } from '../../lib';
 
 // =============================================================================
@@ -324,7 +324,7 @@ const CRUD_OPS = ['create', 'read', 'update', 'delete'] as const;
  *
  * @example
  * ```typescript
- * import { createManagePermissionsMatrix } from '@yobolabs/core/ui/admin';
+ * import { createManagePermissionsMatrix } from '@jetdevs/core/ui/admin';
  * import { PERMISSION_REGISTRY } from '@/permissions/registry';
  * import { api } from '@/utils/trpc';
  *

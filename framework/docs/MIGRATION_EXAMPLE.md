@@ -1,6 +1,6 @@
 # Campaign Router Migration Example
 
-This document demonstrates migrating the existing `campaigns.router.ts` to use the `@yobolabs/framework` SDK.
+This document demonstrates migrating the existing `campaigns.router.ts` to use the `@jetdevs/framework` SDK.
 
 ## Before: Current Implementation (70+ lines per endpoint)
 
@@ -70,13 +70,13 @@ export const campaignsRouter = createTRPCRouter({
 
 ---
 
-## After: Using @yobolabs/framework SDK (8 lines per endpoint)
+## After: Using @jetdevs/framework SDK (8 lines per endpoint)
 
 ```typescript
 // apps/merchant-portal/src/server/api/routers/campaigns.router.ts
 
-import { createRouter } from '@yobolabs/framework/router';
-import { createRepository } from '@yobolabs/framework/db';
+import { createRouter } from '@jetdevs/framework/router';
+import { createRepository } from '@jetdevs/framework/db';
 import { listCampaignsSchema, createCampaignSchema } from "@/db/schema/campaigns";
 import { CampaignPermissions } from "@/types/permissions";
 
@@ -145,7 +145,7 @@ export const campaignsRouter = createRouter({
 
 ```bash
 # In merchant-portal workspace
-pnpm add @yobolabs/framework
+pnpm add @jetdevs/framework
 ```
 
 ### Step 2: Import SDK Functions
@@ -159,8 +159,8 @@ import {
 import { createActor, getDbContext, createServiceContext } from "@/server/domain/auth/actor";
 
 // With these:
-import { createRouter } from '@yobolabs/framework/router';
-import { createRepository } from '@yobolabs/framework/db';
+import { createRouter } from '@jetdevs/framework/router';
+import { createRepository } from '@jetdevs/framework/db';
 ```
 
 ### Step 3: Convert Router Structure
@@ -336,8 +336,8 @@ export const campaignsRouter = createTRPCRouter({
 ### After: Full Router (40 lines - 67% reduction!)
 
 ```typescript
-import { createRouter } from '@yobolabs/framework/router';
-import { createRepository } from '@yobolabs/framework/db';
+import { createRouter } from '@jetdevs/framework/router';
+import { createRepository } from '@jetdevs/framework/db';
 import { CampaignPermissions } from "@/types/permissions";
 import {
   listCampaignsSchema,
@@ -560,7 +560,7 @@ Based on the implementation, expected performance:
 
 ## Conclusion
 
-The `@yobolabs/framework` SDK successfully:
+The `@jetdevs/framework` SDK successfully:
 
 ✅ **Reduces code by 67%** (120 → 40 lines)
 ✅ **Hides RLS complexity** (automatic via `orgScoped: true`)

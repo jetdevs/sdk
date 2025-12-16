@@ -5,27 +5,23 @@
  * This factory pattern allows apps to inject their own implementations
  * for privileged database access and role template copying.
  *
- * @module @yobolabs/core/organizations
+ * @module @jetdevs/core/organizations
  */
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import type {
-  OrgRecord,
-  OrgWithStats,
-  OrgStats,
-  OrgListOptions,
-  OrgListResult,
-  OrgCreateData,
-  OrgUpdateData,
-  OrgDeleteResult,
-  OrgSetting,
-  OrgSettingUpdate,
-  AuditLogOptions,
-  AuditLogListResult,
-  OrgAuditLogRecord,
-  OrgAnalytics,
-  OrgUser,
+    AuditLogListResult,
+    OrgAnalytics,
+    OrgAuditLogRecord,
+    OrgCreateData,
+    OrgDeleteResult,
+    OrgListResult,
+    OrgRecord,
+    OrgSetting,
+    OrgSettingUpdate,
+    OrgStats,
+    OrgUser
 } from './types';
 
 import type { IOrgRepository } from './repository';
@@ -271,7 +267,7 @@ export class OrgServiceError extends Error {
  *
  * @example
  * ```typescript
- * import { createOrgServiceClass } from '@yobolabs/core/organizations';
+ * import { createOrgServiceClass } from '@jetdevs/core/organizations';
  * import { OrgRepository } from './org.repository';
  * import { withPrivilegedDb } from '@/db/clients';
  * import { copyOrgRoleTemplates } from '@/db/seeds/seed-rbac';

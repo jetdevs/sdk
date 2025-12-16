@@ -3,7 +3,7 @@
  *
  * Type definitions for theme management.
  *
- * @module @yobolabs/core/themes
+ * @module @jetdevs/core/themes
  */
 
 // =============================================================================

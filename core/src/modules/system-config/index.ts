@@ -4,11 +4,11 @@
  * Provides system configuration management for application-wide settings.
  * Includes typed value storage, categorization, and router configuration.
  *
- * @module @yobolabs/core/system-config
+ * @module @jetdevs/core/system-config
  *
  * @example
  * // Create repository
- * import { createSystemConfigRepository } from '@yobolabs/core/system-config';
+ * import { createSystemConfigRepository } from '@jetdevs/core/system-config';
  * import { systemConfig } from '@/db/schema';
  *
  * const repo = createSystemConfigRepository({
@@ -18,8 +18,8 @@
  *
  * @example
  * // Use router config
- * import { createSystemConfigRouterConfig } from '@yobolabs/core/system-config';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createSystemConfigRouterConfig } from '@jetdevs/core/system-config';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * const systemConfigRouter = createRouterWithActor({
  *   ...createSystemConfigRouterConfig(),
@@ -34,21 +34,14 @@ export * from './schemas';
 
 // Repository
 export {
-  createSystemConfigRepository,
-  createCachingSystemConfigRepository,
-  SDKSystemConfigRepository,
-  type SystemConfigRepository,
-  type CachingSystemConfigRepository,
-  type SystemConfigTableSchema,
-  type SystemConfigRepositoryConfig,
-  type CachingSystemConfigRepositoryDeps,
-  type AuditLogParams,
+    SDKSystemConfigRepository, createCachingSystemConfigRepository, createSystemConfigRepository, type AuditLogParams, type CachingSystemConfigRepository, type CachingSystemConfigRepositoryDeps, type SystemConfigRepository, type SystemConfigRepositoryConfig, type SystemConfigTableSchema
 } from './system-config.repository';
 
 // Router configuration
 export {
-  createSystemConfigRouterConfig,
-  systemConfigRouterConfig,
-  type CreateSystemConfigRouterConfigOptions,
-  type SystemConfigServiceContext,
+    createSystemConfigRouterConfig,
+    systemConfigRouterConfig,
+    type CreateSystemConfigRouterConfigOptions,
+    type SystemConfigServiceContext
 } from './system-config.router-config';
+

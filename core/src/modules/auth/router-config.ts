@@ -5,12 +5,12 @@
  * This factory pattern allows apps to inject their own dependencies while
  * reusing the core auth logic.
  *
- * @module @yobolabs/core/auth
+ * @module @jetdevs/core/auth
  */
 
 import { z } from 'zod';
+import type { IAuthRepository } from './repository';
 import { registerSchema, updateProfileSchema } from './schemas';
-import type { IAuthRepository, AuthUserRecord } from './repository';
 
 // =============================================================================
 // TYPES
@@ -121,8 +121,8 @@ export class AuthRouterError extends Error {
  *
  * @example
  * ```typescript
- * import { createAuthRouterConfig } from '@yobolabs/core/auth';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createAuthRouterConfig } from '@jetdevs/core/auth';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  * import { AuthRepository } from '@/server/repos/auth.repository';
  * import { privilegedDb } from '@/db/clients';
  * import bcrypt from 'bcrypt';
@@ -478,7 +478,7 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
  *
  * @example
  * ```typescript
- * import { createGetCurrentUserHandler } from '@yobolabs/core/auth';
+ * import { createGetCurrentUserHandler } from '@jetdevs/core/auth';
  * import { privilegedDb } from '@/db/clients';
  * import { users, userRoles } from '@/db/schema';
  *

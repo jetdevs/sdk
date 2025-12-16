@@ -1,22 +1,20 @@
 'use client';
 
-import * as React from 'react';
-import { useState, useMemo } from 'react';
 import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  SortingState,
-  ColumnFiltersState,
-  VisibilityState,
-  RowSelectionState,
-  useReactTable,
-  Table as TanstackTable,
+    ColumnDef,
+    ColumnFiltersState,
+    flexRender,
+    getCoreRowModel,
+    getFilteredRowModel,
+    getPaginationRowModel,
+    getSortedRowModel,
+    RowSelectionState,
+    SortingState,
+    useReactTable,
+    VisibilityState
 } from '@tanstack/react-table';
-import { cn } from '../../lib';
+import * as React from 'react';
+import { useState } from 'react';
 
 // =============================================================================
 // SVG ICONS - Built-in to avoid lucide-react dependency in this component
@@ -278,7 +276,7 @@ export interface DataTableWithToolbarFactoryConfig<TData> {
  *
  * @example
  * ```typescript
- * import { createDataTableWithToolbar } from '@yobolabs/core/ui/data-table';
+ * import { createDataTableWithToolbar } from '@jetdevs/core/ui/data-table';
  *
  * const RoleDataTable = createDataTableWithToolbar({
  *   config: {

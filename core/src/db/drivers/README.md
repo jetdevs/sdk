@@ -1,6 +1,6 @@
 # Database Driver Abstraction Layer
 
-A flexible, driver-agnostic database abstraction for `@yobolabs/core` that allows easy switching between different cloud providers and database systems.
+A flexible, driver-agnostic database abstraction for `@jetdevs/core` that allows easy switching between different cloud providers and database systems.
 
 ## Overview
 
@@ -33,7 +33,7 @@ npm install @planetscale/database
 ### Basic Usage
 
 ```typescript
-import { createDatabase } from '@yobolabs/core/db/drivers';
+import { createDatabase } from '@jetdevs/core/db/drivers';
 import * as schema from './schema';
 
 // Auto-detect driver based on environment and URL
@@ -148,7 +148,7 @@ const db = await createDatabase({
 For applications with Row-Level Security requiring multiple access levels:
 
 ```typescript
-import { createDbClients } from '@yobolabs/core/db/drivers';
+import { createDbClients } from '@jetdevs/core/db/drivers';
 import * as schema from './schema';
 
 const clients = await createDbClients({
@@ -197,7 +197,7 @@ export const db = drizzle(client, { schema });
 
 ```typescript
 // New: ai-saas-v2/src/db/clients.ts
-import { createDatabase } from '@yobolabs/core/db/drivers';
+import { createDatabase } from '@jetdevs/core/db/drivers';
 import * as schema from './schema';
 
 // Simple - auto-detects driver
@@ -332,7 +332,7 @@ await db.transaction(async (tx) => {
 The abstraction maintains full type safety with Drizzle ORM:
 
 ```typescript
-import { createDatabase, type Database } from '@yobolabs/core/db/drivers';
+import { createDatabase, type Database } from '@jetdevs/core/db/drivers';
 import * as schema from './schema';
 
 // Full type inference

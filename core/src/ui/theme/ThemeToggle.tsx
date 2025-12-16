@@ -4,11 +4,11 @@
  * A simple theme toggle button that switches between light and dark modes.
  * Uses the SDK's ThemeProvider context.
  *
- * @module @yobolabs/core/ui/theme
+ * @module @jetdevs/core/ui/theme
  *
  * @example
  * ```tsx
- * import { ThemeToggle } from '@yobolabs/core/ui/theme';
+ * import { ThemeToggle } from '@jetdevs/core/ui/theme';
  *
  * function Header() {
  *   return (

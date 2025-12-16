@@ -5,14 +5,13 @@
  * Uses schema injection pattern - apps pass their schema tables.
  */
 
-import { and, eq } from 'drizzle-orm';
 import { seedLog } from '../../cli';
 import type {
-  SeedDatabase,
-  RoleSeedData,
-  RoleSeedSchema,
-  RoleSeedOptions,
-  SeedResult,
+    RoleSeedData,
+    RoleSeedOptions,
+    RoleSeedSchema,
+    SeedDatabase,
+    SeedResult,
 } from './types';
 import { createSeedResult } from './types';
 
@@ -27,7 +26,7 @@ import { createSeedResult } from './types';
  *
  * @example
  * ```typescript
- * import { seedRoles } from '@yobolabs/core/db/seeds';
+ * import { seedRoles } from '@jetdevs/core/db/seeds';
  * import { roles, permissions, rolePermissions } from '@/db/schema';
  * import { DEFAULT_ROLES } from '@/constants/roles';
  *

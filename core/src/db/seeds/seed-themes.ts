@@ -8,11 +8,11 @@
 import { eq } from 'drizzle-orm';
 import { seedLog } from '../../cli';
 import type {
-  SeedDatabase,
-  ThemeSeedData,
-  ThemeSeedSchema,
-  ThemeSeedOptions,
-  SeedResult,
+    SeedDatabase,
+    SeedResult,
+    ThemeSeedData,
+    ThemeSeedOptions,
+    ThemeSeedSchema,
 } from './types';
 import { createSeedResult } from './types';
 
@@ -121,14 +121,14 @@ export const EXTENDED_THEMES: ThemeSeedData[] = [
  *
  * @example
  * ```typescript
- * import { seedThemes, DEFAULT_THEMES } from '@yobolabs/core/db/seeds';
+ * import { seedThemes, DEFAULT_THEMES } from '@jetdevs/core/db/seeds';
  * import { themes } from '@/db/schema';
  *
  * // Use default themes
  * await seedThemes(db, { themes }, DEFAULT_THEMES);
  *
  * // Or with extended themes
- * import { EXTENDED_THEMES } from '@yobolabs/core/db/seeds';
+ * import { EXTENDED_THEMES } from '@jetdevs/core/db/seeds';
  * await seedThemes(db, { themes }, EXTENDED_THEMES);
  * ```
  */

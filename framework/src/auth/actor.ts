@@ -7,7 +7,7 @@
  * - Works seamlessly with RLS and privileged database access
  * - Provides type-safe context for service layer operations
  *
- * @module @yobolabs/framework/auth/actor
+ * @module @jetdevs/framework/auth/actor
  */
 
 import type { Session } from './types';

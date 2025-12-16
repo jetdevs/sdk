@@ -8,22 +8,16 @@
  * - Role templates (copying default roles for new orgs)
  * - Privileged database access (cross-org operations)
  *
- * @module @yobolabs/core/users
+ * @module @jetdevs/core/users
  */
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { IUserRepository } from './repository';
 import type {
-  UserRecord,
-  UserWithRoles,
-  UserWithStats,
-  UserRole,
-  UserFilters,
-  UserListOptions,
-  UserCreateData,
-  UserUpdateData,
-  UserRoleAssignment,
-  UserPermissionsData,
+    UserPermissionsData,
+    UserRecord,
+    UserWithRoles,
+    UserWithStats
 } from './types';
 
 // =============================================================================
@@ -397,7 +391,7 @@ export interface IUserService {
  *
  * @example
  * ```typescript
- * import { createUserService, SDKUserRepository } from '@yobolabs/core/users';
+ * import { createUserService, SDKUserRepository } from '@jetdevs/core/users';
  * import { withPrivilegedDb } from '@/db/clients';
  * import { emailService } from '@/lib/email';
  * import bcrypt from 'bcrypt';
@@ -1340,7 +1334,7 @@ async function defaultComparePassword(password: string, hash: string): Promise<b
  *
  * @example
  * ```typescript
- * import { createUserService, SDKUserRepository } from '@yobolabs/core/users';
+ * import { createUserService, SDKUserRepository } from '@jetdevs/core/users';
  * import { withPrivilegedDb } from '@/db/clients';
  * import bcrypt from 'bcrypt';
  *

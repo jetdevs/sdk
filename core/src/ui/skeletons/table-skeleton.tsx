@@ -1,8 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { cn } from "../../lib";
-import type { TableSkeletonUIComponents, TableSkeletonProps } from "./types";
+import type { TableSkeletonProps, TableSkeletonUIComponents } from "./types";
 
 /**
  * Factory function to create a TableSkeleton component.
@@ -12,7 +11,7 @@ import type { TableSkeletonUIComponents, TableSkeletonProps } from "./types";
  *
  * @example
  * ```tsx
- * import { createTableSkeleton } from '@yobolabs/core/ui/skeletons';
+ * import { createTableSkeleton } from '@jetdevs/core/ui/skeletons';
  * import { Skeleton } from '@/components/ui/skeleton';
  * import {
  *   Table,

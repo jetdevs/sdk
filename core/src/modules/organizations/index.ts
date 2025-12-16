@@ -8,7 +8,7 @@
  * - Service factory for business logic
  * - Router configuration factory for tRPC integration
  *
- * @module @yobolabs/core/organizations
+ * @module @jetdevs/core/organizations
  */
 
 // =============================================================================
@@ -16,53 +16,32 @@
 // =============================================================================
 
 export type {
-  // Organization records
-  OrgRecord,
-  OrgWithStats,
-  OrgStats,
-  OrgUserCount,
-
-  // Settings types
-  OrgSetting,
-  OrgSettingUpdate,
-
-  // Audit log types
-  OrgAuditLogRecord,
-
-  // Filter and options
-  OrgFilters,
-  OrgListOptions,
-  AuditLogFilters,
-  AuditLogOptions,
-
-  // Input data
-  OrgCreateData,
-  OrgUpdateData,
-
-  // Results
-  OrgListResult,
-  AuditLogListResult,
-  OrgDeleteResult,
-
-  // Analytics
-  OrgAnalytics,
-
-  // User types
-  OrgUser,
-
-  // UI types (for backward compatibility)
-  OrganizationWithStats,
-  OrganizationDetails,
-  OrganizationUserManagement,
-  OrganizationListResponse,
-  OrganizationStatus,
-  OrganizationRole,
+    AuditLogFilters, AuditLogListResult, AuditLogOptions,
+    // Analytics
+    OrgAnalytics,
+    // Audit log types
+    OrgAuditLogRecord,
+    // Input data
+    OrgCreateData, OrgDeleteResult,
+    // Filter and options
+    OrgFilters,
+    OrgListOptions,
+    // Results
+    OrgListResult,
+    // Organization records
+    OrgRecord,
+    // Settings types
+    OrgSetting,
+    OrgSettingUpdate, OrgStats, OrgUpdateData,
+    // User types
+    OrgUser, OrgUserCount, OrgWithStats, OrganizationDetails, OrganizationListResponse, OrganizationRole, OrganizationStatus, OrganizationUserManagement,
+    // UI types (for backward compatibility)
+    OrganizationWithStats
 } from './types';
 
 // Constants
 export {
-  ORGANIZATION_STATUS,
-  ORGANIZATION_ROLES,
+    ORGANIZATION_ROLES, ORGANIZATION_STATUS
 } from './types';
 
 // =============================================================================
@@ -70,70 +49,31 @@ export {
 // =============================================================================
 
 export {
-  // List/filter schemas
-  orgListSchema,
-  orgGetByIdSchema,
-  orgGetByUuidSchema,
 
-  // CRUD schemas
-  orgCreateSchema,
-  orgUpdateSchema,
-  orgUpdateCurrentSchema,
-  orgDeleteSchema,
-  orgCreateForUserSchema,
+    // User management schemas
+    orgAddUserSchema,
+    // Analytics/stats schemas
+    orgAnalyticsSchema,
+    // Audit log schemas
+    orgAuditLogsSchema,
 
-  // Analytics/stats schemas
-  orgAnalyticsSchema,
-  orgStatsSchema,
-  orgGetAllWithStatsSchema,
-
-  // Settings schemas
-  orgGetSettingsSchema,
-  orgUpdateSettingsSchema,
-
-  // Audit log schemas
-  orgAuditLogsSchema,
-
-  // Copilot schemas
-  orgCopilotStatusSchema,
-  orgUpdateCopilotStatusSchema,
-
-  // User management schemas
-  orgAddUserSchema,
-  orgRemoveUserSchema,
-  orgUpdateUserRoleSchema,
-
-  // Utility schemas
-  orgEnsureDefaultSchema,
-  orgGetCurrentSchema,
-  orgCountSchema,
-  orgGetAllSchema,
+    // Copilot schemas
+    orgCopilotStatusSchema, orgCountSchema, orgCreateForUserSchema,
+    // CRUD schemas
+    orgCreateSchema, orgDeleteSchema,
+    // Utility schemas
+    orgEnsureDefaultSchema, orgGetAllSchema, orgGetAllWithStatsSchema, orgGetByIdSchema,
+    orgGetByUuidSchema, orgGetCurrentSchema,
+    // Settings schemas
+    orgGetSettingsSchema,
+    // List/filter schemas
+    orgListSchema, orgRemoveUserSchema, orgStatsSchema, orgUpdateCopilotStatusSchema, orgUpdateCurrentSchema, orgUpdateSchema, orgUpdateSettingsSchema, orgUpdateUserRoleSchema
 } from './schemas';
 
 export type {
-  OrgListInput,
-  OrgGetByIdInput,
-  OrgGetByUuidInput,
-  OrgCreateInput,
-  OrgUpdateInput,
-  OrgUpdateCurrentInput,
-  OrgDeleteInput,
-  OrgCreateForUserInput,
-  OrgAnalyticsInput,
-  OrgStatsInput,
-  OrgGetAllWithStatsInput,
-  OrgGetSettingsInput,
-  OrgUpdateSettingsInput,
-  OrgAuditLogsInput,
-  OrgCopilotStatusInput,
-  OrgUpdateCopilotStatusInput,
-  OrgAddUserInput,
-  OrgRemoveUserInput,
-  OrgUpdateUserRoleInput,
-  OrgEnsureDefaultInput,
-  OrgGetCurrentInput,
-  OrgCountInput,
-  OrgGetAllInput,
+    OrgAddUserInput, OrgAnalyticsInput, OrgAuditLogsInput,
+    OrgCopilotStatusInput, OrgCountInput, OrgCreateForUserInput, OrgCreateInput, OrgDeleteInput, OrgEnsureDefaultInput, OrgGetAllInput, OrgGetAllWithStatsInput, OrgGetByIdInput,
+    OrgGetByUuidInput, OrgGetCurrentInput, OrgGetSettingsInput, OrgListInput, OrgRemoveUserInput, OrgStatsInput, OrgUpdateCopilotStatusInput, OrgUpdateCurrentInput, OrgUpdateInput, OrgUpdateSettingsInput, OrgUpdateUserRoleInput
 } from './schemas';
 
 // =============================================================================
@@ -141,12 +81,11 @@ export type {
 // =============================================================================
 
 export {
-  createOrgRepositoryClass,
+    createOrgRepositoryClass
 } from './repository';
 
 export type {
-  OrgRepositorySchema,
-  IOrgRepository,
+    IOrgRepository, OrgRepositorySchema
 } from './repository';
 
 // =============================================================================
@@ -154,27 +93,13 @@ export type {
 // =============================================================================
 
 export {
-  createOrgServiceClass,
-  OrgServiceError,
-  OrgAuditActions,
+    OrgAuditActions, OrgServiceError, createOrgServiceClass
 } from './service';
 
 export type {
-  OrgActor,
-  OrgServiceContext,
-  OrgServiceHooks,
-  IOrgService,
-  OrgListParams,
-  OrgGetByIdParams,
-  OrgGetAllWithStatsParams,
-  OrgUpdateParams,
-  OrgUpdateCurrentParams,
-  OrgDeleteParams,
-  OrgGetSettingsParams,
-  OrgUpdateSettingsParams,
-  OrgAnalyticsParams,
-  OrgAuditLogsParams,
-  OrgWithDetails,
+    IOrgService, OrgActor, OrgAnalyticsParams,
+    OrgAuditLogsParams, OrgDeleteParams, OrgGetAllWithStatsParams, OrgGetByIdParams, OrgGetSettingsParams, OrgListParams, OrgServiceContext,
+    OrgServiceHooks, OrgUpdateCurrentParams, OrgUpdateParams, OrgUpdateSettingsParams, OrgWithDetails
 } from './service';
 
 // =============================================================================
@@ -182,12 +107,11 @@ export type {
 // =============================================================================
 
 export {
-  createOrgRouterConfig,
-  OrgRouterError,
+    OrgRouterError, createOrgRouterConfig
 } from './router-config';
 
 export type {
-  OrgRouterDeps,
-  OrgServiceContext as OrgRouterServiceContext,
-  OrgHandlerContext,
+    OrgHandlerContext, OrgRouterDeps,
+    OrgServiceContext as OrgRouterServiceContext
 } from './router-config';
+

@@ -1,7 +1,7 @@
 'use client';
 
-import * as React from 'react';
 import type { Column } from '@tanstack/react-table';
+import * as React from 'react';
 
 // =============================================================================
 // UI COMPONENT TYPES
@@ -44,7 +44,7 @@ export interface DataTableColumnHeaderProps<TData, TValue> {
  *
  * @example
  * ```typescript
- * import { createDataTableColumnHeader } from '@yobolabs/core/ui/data-table';
+ * import { createDataTableColumnHeader } from '@jetdevs/core/ui/data-table';
  * import { Button } from '@/components/ui/button';
  * import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
  *

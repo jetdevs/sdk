@@ -95,7 +95,7 @@ export function createAuthProvider(config: AuthProviderConfig) {
  * @example
  * // In your app:
  * import { SessionProvider } from 'next-auth/react';
- * import { SimpleAuthProvider } from '@yobolabs/core/ui/auth';
+ * import { SimpleAuthProvider } from '@jetdevs/core/ui/auth';
  *
  * function RootLayout({ children }) {
  *   return (

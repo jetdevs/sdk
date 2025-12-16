@@ -4,28 +4,26 @@
  * Main entry point for creating database instances with the driver abstraction.
  * Integrates with Drizzle ORM for type-safe database access.
  *
- * @module @yobolabs/core/db/drivers/factory
+ * @module @jetdevs/core/db/drivers/factory
  */
 
 import type { SQL } from 'drizzle-orm';
-import type {
-  DatabaseDriver,
-  DriverAdapter,
-  DriverConfig,
-  PostgresDriverConfig,
-  NeonDriverConfig,
-  PgDriverConfig,
-  PlanetScaleDriverConfig,
-  PoolConfig,
-  TransactionOptions,
-} from './types';
-import { createDriverAdapter } from './registry';
 import {
-  recommendDriver,
-  getDatabaseUrlFromEnv,
-  getDatabaseDriverFromEnv,
-  parseConnectionUrl,
+    getDatabaseDriverFromEnv,
+    getDatabaseUrlFromEnv,
+    recommendDriver
 } from './environment';
+import { createDriverAdapter } from './registry';
+import type {
+    DatabaseDriver,
+    DriverAdapter,
+    NeonDriverConfig,
+    PgDriverConfig,
+    PlanetScaleDriverConfig,
+    PoolConfig,
+    PostgresDriverConfig,
+    TransactionOptions
+} from './types';
 
 // =============================================================================
 // DATABASE OPTIONS
@@ -184,7 +182,7 @@ export interface TransactionContext<TSchema extends Record<string, unknown>> {
  *
  * @example Auto-detect driver
  * ```typescript
- * import { createDatabase } from '@yobolabs/core/db/drivers';
+ * import { createDatabase } from '@jetdevs/core/db/drivers';
  * import * as schema from './schema';
  *
  * const db = await createDatabase({
@@ -280,7 +278,7 @@ export async function createDatabase<TSchema extends Record<string, unknown>>(
  *
  * @example
  * ```typescript
- * import { createDatabaseFromEnv } from '@yobolabs/core/db/drivers';
+ * import { createDatabaseFromEnv } from '@jetdevs/core/db/drivers';
  * import * as schema from './schema';
  *
  * const db = await createDatabaseFromEnv(schema);

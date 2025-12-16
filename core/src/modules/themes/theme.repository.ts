@@ -4,19 +4,18 @@
  * Handles all database operations for theme-related data.
  * Provides a clean data access layer for theme management.
  *
- * @module @yobolabs/core/themes
+ * @module @jetdevs/core/themes
  */
 
 import { asc, count, eq } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import type {
-  Theme,
-  ThemeCreateData,
-  ThemeListOptions,
-  ThemeListResult,
-  ThemeUpdateData,
-  ThemeWithStats,
+    Theme,
+    ThemeCreateData,
+    ThemeListOptions,
+    ThemeListResult,
+    ThemeUpdateData
 } from "./types";
 
 // =============================================================================
@@ -30,7 +29,7 @@ import type {
  *
  * @example
  * ```typescript
- * import { ThemeRepository } from '@yobolabs/core/themes';
+ * import { ThemeRepository } from '@jetdevs/core/themes';
  *
  * const repo = new ThemeRepository(db, { themes });
  * const themes = await repo.findAll();

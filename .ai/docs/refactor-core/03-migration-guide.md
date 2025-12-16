@@ -76,7 +76,7 @@ cd packages/saas-core
 
 cat > package.json << 'EOF'
 {
-  "name": "@yobo/saas-core",
+  "name": "@jetdevs/saas-core",
   "version": "1.0.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -935,7 +935,7 @@ cp ../../saas-core-v2/tsconfig.json .
 # Initialize package.json
 cat > package.json << 'EOF'
 {
-  "name": "@yobo/saas-app",
+  "name": "@jetdevs/saas-app",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -949,7 +949,7 @@ cat > package.json << 'EOF'
     "saas": "saas-cli"
   },
   "dependencies": {
-    "@yobo/saas-core": "workspace:*",
+    "@jetdevs/saas-core": "workspace:*",
     "next": "^15.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -965,7 +965,7 @@ pnpm install
 ```typescript
 // apps/saas-app/saas.config.ts
 
-import { defineSaasConfig } from '@yobo/saas-core'
+import { defineSaasConfig } from '@jetdevs/saas-core'
 // Import your extensions (if any)
 // import { projectsExtension } from './src/extensions/projects'
 
@@ -1027,7 +1027,7 @@ export default defineSaasConfig({
 ```typescript
 // apps/saas-app/src/server/api/root.ts
 
-import { coreRouter, composeRouters } from '@yobo/saas-core/trpc'
+import { coreRouter, composeRouters } from '@jetdevs/saas-core/trpc'
 import config from '../../../saas.config'
 
 // Collect extension routers
@@ -1046,7 +1046,7 @@ export type AppRouter = typeof appRouter
 ```typescript
 // apps/saas-app/src/server/auth/config.ts
 
-import { createAuthConfig } from '@yobo/saas-core/auth'
+import { createAuthConfig } from '@jetdevs/saas-core/auth'
 import config from '../../../saas.config'
 
 export const authConfig = createAuthConfig(config.auth)
@@ -1057,8 +1057,8 @@ export const authConfig = createAuthConfig(config.auth)
 ```typescript
 // apps/saas-app/src/db/index.ts
 
-import { createDbClient, schema as coreSchema } from '@yobo/saas-core/db'
-import { loadExtensions } from '@yobo/saas-core/config'
+import { createDbClient, schema as coreSchema } from '@jetdevs/saas-core/db'
+import { loadExtensions } from '@jetdevs/saas-core/config'
 import config from '../../saas.config'
 
 const { schema: extensionSchema } = loadExtensions(config)
@@ -1086,10 +1086,10 @@ import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/data-table/DataTable'
 
 // After
-import { usePermissionCheck, Button, DataTable } from '@yobo/saas-core'
+import { usePermissionCheck, Button, DataTable } from '@jetdevs/saas-core'
 // Or more specific imports
-import { usePermissionCheck } from '@yobo/saas-core/hooks'
-import { Button } from '@yobo/saas-core/ui'
+import { usePermissionCheck } from '@jetdevs/saas-core/hooks'
+import { Button } from '@jetdevs/saas-core/ui'
 ```
 
 ### Step 4.7: Create First Extension (Optional)
@@ -1101,7 +1101,7 @@ mkdir -p apps/saas-app/src/extensions/projects
 ```typescript
 // apps/saas-app/src/extensions/projects/index.ts
 
-import { defineExtension } from '@yobo/saas-core'
+import { defineExtension } from '@jetdevs/saas-core'
 import * as schema from './schema'
 import { permissions } from './permissions'
 import { projectsRouter } from './router'
@@ -1238,7 +1238,7 @@ pnpm saas migrate:rollback --all --to-state <state-id>
 
 ### Core Version Upgrades
 
-When upgrading `@yobo/saas-core`:
+When upgrading `@jetdevs/saas-core`:
 
 1. Core package ships new migrations
 2. `pnpm saas migrate` detects pending core migrations
@@ -1246,7 +1246,7 @@ When upgrading `@yobo/saas-core`:
 4. Reports any breaking changes
 
 ```bash
-# After pnpm update @yobo/saas-core
+# After pnpm update @jetdevs/saas-core
 pnpm saas migrate
 
 # Output:
@@ -1288,7 +1288,7 @@ After migration, ensure RLS context is properly set. The core provides middlewar
 ```typescript
 // apps/my-saas/src/server/api/trpc.ts
 
-import { createTRPCContext, setRlsContext, clearRlsContext } from '@yobo/saas-core'
+import { createTRPCContext, setRlsContext, clearRlsContext } from '@jetdevs/saas-core'
 
 export const createContext = async (opts: CreateContextOptions) => {
   const baseContext = await createTRPCContext(opts)

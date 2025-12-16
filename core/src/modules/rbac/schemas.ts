@@ -4,7 +4,7 @@
  * Zod schemas for role and permission operations.
  * These provide validation for RBAC operations.
  *
- * @module @yobolabs/core/rbac
+ * @module @jetdevs/core/rbac
  */
 
 import { z } from "zod";

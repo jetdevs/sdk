@@ -2,7 +2,7 @@
  * Phone number utility functions for normalization and validation
  * Uses libphonenumber-js for E.164 formatting
  *
- * @module @yobolabs/core/lib/phone
+ * @module @jetdevs/core/lib/phone
  */
 
 import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js';

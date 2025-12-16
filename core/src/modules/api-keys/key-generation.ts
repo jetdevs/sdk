@@ -4,11 +4,11 @@
  * Generates cryptographically secure API keys for external integrations.
  * Format: {prefix}_{env}_{random_bytes}_{checksum}
  *
- * @module @yobolabs/core/api-keys
+ * @module @jetdevs/core/api-keys
  */
 
 import crypto from 'crypto';
-import type { ApiKeyGenerationResult, ApiKeyEnvironment } from './types';
+import type { ApiKeyEnvironment, ApiKeyGenerationResult } from './types';
 
 /**
  * Default prefix for API keys.

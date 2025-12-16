@@ -4,12 +4,12 @@
  * Generic repository for authentication-related database operations.
  * This is a factory that creates a repository class with injected schema dependencies.
  *
- * @module @yobolabs/core/auth
+ * @module @jetdevs/core/auth
  */
 
 import { and, eq, isNull, or } from 'drizzle-orm';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { PgTable } from 'drizzle-orm/pg-core';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 // =============================================================================
 // TYPES & INTERFACES
@@ -107,7 +107,7 @@ export interface AuthRepositorySchema {
  *
  * @example
  * ```typescript
- * import { createAuthRepositoryClass } from '@yobolabs/core/auth';
+ * import { createAuthRepositoryClass } from '@jetdevs/core/auth';
  * import { users, userRoles } from '@/db/schema';
  *
  * const AuthRepository = createAuthRepositoryClass({ users, userRoles });
@@ -301,8 +301,8 @@ function getSDKAuthSchema(): AuthRepositorySchema {
  *
  * @example
  * ```typescript
- * import { SDKAuthRepository } from '@yobolabs/core/auth';
- * import { createAuthRouterConfig } from '@yobolabs/core/auth';
+ * import { SDKAuthRepository } from '@jetdevs/core/auth';
+ * import { createAuthRouterConfig } from '@jetdevs/core/auth';
  * import bcrypt from 'bcrypt';
  *
  * const authRouterConfig = createAuthRouterConfig({

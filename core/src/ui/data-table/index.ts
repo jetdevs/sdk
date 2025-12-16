@@ -8,7 +8,7 @@
  * @example
  * ```typescript
  * // In your app's components/data-table/index.ts
- * import { createBaseListTable, createDataTableColumnHeader, createDataTablePagination } from '@yobolabs/core/ui/data-table';
+ * import { createBaseListTable, createDataTableColumnHeader, createDataTablePagination } from '@jetdevs/core/ui/data-table';
  * import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
  * import { Button } from '@/components/ui/button';
  * import { Input } from '@/components/ui/input';
@@ -49,10 +49,8 @@ export type { DataTableWithToolbarUIComponents } from './DataTableWithToolbar';
 
 // Type exports - Props interfaces
 export type {
-  StatusOption,
-  ListToolbarProps,
-  PaginationConfig,
-  BaseListTableProps,
+    BaseListTableProps, ListToolbarProps,
+    PaginationConfig, StatusOption
 } from './BaseListTable';
 
 export type { DataTableColumnHeaderProps } from './DataTableColumnHeader';
@@ -60,10 +58,7 @@ export type { DataTablePaginationProps } from './DataTablePagination';
 
 // DataTableWithToolbar types
 export type {
-  ToastInterface,
-  FilterColumnConfig,
-  BulkAction,
-  DataTableWithToolbarConfig,
-  DataTableWithToolbarProps,
-  DataTableWithToolbarFactoryConfig,
+    BulkAction,
+    DataTableWithToolbarConfig, DataTableWithToolbarFactoryConfig, DataTableWithToolbarProps, FilterColumnConfig, ToastInterface
 } from './DataTableWithToolbar';
+

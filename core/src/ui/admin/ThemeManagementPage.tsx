@@ -6,12 +6,12 @@
  * Creates a drop-in admin page for theme management.
  * Apps provide their tRPC client and UI components via factory.
  *
- * @module @yobolabs/core/ui/admin
+ * @module @jetdevs/core/ui/admin
  *
  * @example
  * ```typescript
  * // Create the page component with your tRPC client
- * import { createThemeManagementPage } from '@yobolabs/core/ui/admin';
+ * import { createThemeManagementPage } from '@jetdevs/core/ui/admin';
  * import { api } from '@/utils/trpc';
  *
  * export const ThemeManagementPage = createThemeManagementPage({ api });
@@ -59,7 +59,7 @@ export interface ThemeFormData {
 
 /**
  * tRPC API interface that the app must provide
- * This matches the theme router structure from @yobolabs/core/trpc/routers
+ * This matches the theme router structure from @jetdevs/core/trpc/routers
  */
 export interface ThemeApi {
   theme: {

@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { seedPermissions, seedRoles, seedThemes } from '@yobolabs/core/db/seeds';
+ * import { seedPermissions, seedRoles, seedThemes } from '@jetdevs/core/db/seeds';
  * import { permissions, roles, rolePermissions, themes } from '@/db/schema';
  * import { getAllPermissions } from '@/permissions/registry';
  *
@@ -28,17 +28,7 @@
 // =============================================================================
 
 export type {
-  SeedDatabase,
-  PermissionSeedData,
-  PermissionSeedSchema,
-  PermissionSeedOptions,
-  RoleSeedData,
-  RoleSeedSchema,
-  RoleSeedOptions,
-  ThemeSeedData,
-  ThemeSeedSchema,
-  ThemeSeedOptions,
-  SeedResult,
+    PermissionSeedData, PermissionSeedOptions, PermissionSeedSchema, RoleSeedData, RoleSeedOptions, RoleSeedSchema, SeedDatabase, SeedResult, ThemeSeedData, ThemeSeedOptions, ThemeSeedSchema
 } from './types';
 
 export { createSeedResult, mergeSeedResults } from './types';
@@ -53,15 +43,14 @@ export { seedPermissions, validatePermissions } from './seed-permissions';
 // ROLE SEEDS
 // =============================================================================
 
-export { seedRoles, getRoleSummary } from './seed-roles';
+export { getRoleSummary, seedRoles } from './seed-roles';
 
 // =============================================================================
 // THEME SEEDS
 // =============================================================================
 
 export {
-  seedThemes,
-  ensureDefaultTheme,
-  DEFAULT_THEMES,
-  EXTENDED_THEMES,
+    DEFAULT_THEMES,
+    EXTENDED_THEMES, ensureDefaultTheme, seedThemes
 } from './seed-themes';
+

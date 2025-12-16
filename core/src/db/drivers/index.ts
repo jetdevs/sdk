@@ -13,11 +13,11 @@
  * - `planetscale`: PlanetScale MySQL - Serverless MySQL
  * - `mysql2`: MySQL2 - Traditional MySQL (not yet implemented)
  *
- * @module @yobolabs/core/db/drivers
+ * @module @jetdevs/core/db/drivers
  *
  * @example Basic Usage
  * ```typescript
- * import { createDatabase } from '@yobolabs/core/db/drivers';
+ * import { createDatabase } from '@jetdevs/core/db/drivers';
  * import * as schema from './schema';
  *
  * // Auto-detect driver based on environment
@@ -54,43 +54,27 @@
 // =============================================================================
 
 export type {
-  // Driver identifiers
-  DatabaseDriver,
-  DatabaseDialect,
 
-  // Base configuration
-  BaseDriverConfig,
-  SSLConfig,
-  PoolConfig,
+    // Base configuration
+    BaseDriverConfig, ConnectionStats, DatabaseDialect,
+    // Driver identifiers
+    DatabaseDriver,
+    // Adapter interface
+    DriverAdapter,
+    // Capabilities
+    DriverCapabilities, DriverConfig, DriverDetectionResult,
+    // Factory types
+    DriverFactory,
+    DriverRegistryEntry, DrizzleConfig,
+    // Drizzle integration
+    DrizzleDatabase, MySQL2DriverConfig, NeonDriverConfig,
+    PgDriverConfig,
+    PlanetScaleDriverConfig, PoolConfig,
 
-  // Driver-specific configurations
-  PostgresDriverConfig,
-  NeonDriverConfig,
-  PgDriverConfig,
-  PlanetScaleDriverConfig,
-  MySQL2DriverConfig,
-  DriverConfig,
-
-  // Capabilities
-  DriverCapabilities,
-
-  // Adapter interface
-  DriverAdapter,
-  QueryResult,
-  TransactionOptions,
-  ConnectionStats,
-
-  // Drizzle integration
-  DrizzleDatabase,
-  DrizzleConfig,
-
-  // Factory types
-  DriverFactory,
-  DriverRegistryEntry,
-
-  // Environment detection
-  RuntimeEnvironment,
-  DriverDetectionResult,
+    // Driver-specific configurations
+    PostgresDriverConfig, QueryResult,
+    // Environment detection
+    RuntimeEnvironment, SSLConfig, TransactionOptions
 } from './types';
 
 // =============================================================================
@@ -98,38 +82,31 @@ export type {
 // =============================================================================
 
 export {
-  // Registry management
-  registerDriver,
-  getDriver,
-  getAllDrivers,
-  hasDriver,
-  getDriversByDialect,
-  getServerlessDrivers,
 
-  // Driver availability
-  isDriverAvailable,
-  getAvailableDrivers,
-
-  // Driver creation
-  createDriverAdapter,
-  getDriverCapabilities,
-  getDriverDialect,
+    // Driver creation
+    createDriverAdapter, getAllDrivers, getAvailableDrivers, getDriver, getDriverCapabilities,
+    getDriverDialect, getDriversByDialect,
+    getServerlessDrivers, hasDriver,
+    // Driver availability
+    isDriverAvailable,
+    // Registry management
+    registerDriver
 } from './registry';
 
 // =============================================================================
 // ADAPTER FACTORY EXPORTS
 // =============================================================================
 
-export { createPostgresAdapter } from './adapters/postgres';
-export { createNeonHttpAdapter, createNeonWsAdapter, createNeonAdapter } from './adapters/neon';
+export { createNeonAdapter, createNeonHttpAdapter, createNeonWsAdapter } from './adapters/neon';
 export { createPgAdapter, createPgPoolAdapter } from './adapters/pg';
 export { createPlanetScaleAdapter } from './adapters/planetscale';
+export { createPostgresAdapter } from './adapters/postgres';
 
 // =============================================================================
 // ENVIRONMENT DETECTION
 // =============================================================================
 
-export { detectEnvironment, recommendDriver, parseConnectionUrl } from './environment';
+export { detectEnvironment, parseConnectionUrl, recommendDriver } from './environment';
 
 // =============================================================================
 // DATABASE FACTORY

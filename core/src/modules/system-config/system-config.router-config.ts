@@ -2,17 +2,17 @@
  * System Config Router Configuration Factory
  *
  * Creates router configuration for system configuration management.
- * Apps use this with createRouterWithActor from @yobolabs/framework.
+ * Apps use this with createRouterWithActor from @jetdevs/framework.
  *
- * @module @yobolabs/core/system-config
+ * @module @jetdevs/core/system-config
  */
 
-import type { SystemConfigRepository } from './system-config.repository';
 import {
-  updateConfigSchema,
-  getByKeySchema,
-  getByCategorySchema,
+    getByCategorySchema,
+    getByKeySchema,
+    updateConfigSchema,
 } from './schemas';
+import type { SystemConfigRepository } from './system-config.repository';
 
 /**
  * Service context interface expected by router handlers
@@ -47,11 +47,11 @@ export interface CreateSystemConfigRouterConfigOptions {
 /**
  * Creates router configuration for system configuration management.
  *
- * Use this with createRouterWithActor from @yobolabs/framework.
+ * Use this with createRouterWithActor from @jetdevs/framework.
  *
  * @example
- * import { createSystemConfigRouterConfig } from '@yobolabs/core/system-config';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createSystemConfigRouterConfig } from '@jetdevs/core/system-config';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * export const systemConfigRouter = createRouterWithActor({
  *   ...createSystemConfigRouterConfig({

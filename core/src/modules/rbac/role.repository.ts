@@ -5,36 +5,35 @@
  * Provides a clean data access layer with proper type safety and RLS support.
  * Manages role-permission relationships and role hierarchy.
  *
- * @module @yobolabs/core/rbac
+ * @module @jetdevs/core/rbac
  */
 
 import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  inArray,
-  isNull,
-  like,
-  not,
-  or,
-  type SQL,
+    and,
+    asc,
+    count,
+    desc,
+    eq,
+    inArray,
+    isNull,
+    like,
+    not,
+    or,
+    type SQL,
 } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import type {
-  Role,
-  RoleCreateData,
-  RoleFilters,
-  RoleListOptions,
-  RoleListResult,
-  RolePermission,
-  RolePermissionAssignment,
-  RolePermissionStats,
-  RoleUpdateData,
-  RoleWithStats,
-  UserRoleStats,
+    Role,
+    RoleCreateData,
+    RoleFilters,
+    RoleListOptions,
+    RoleListResult,
+    RolePermissionAssignment,
+    RolePermissionStats,
+    RoleUpdateData,
+    RoleWithStats,
+    UserRoleStats
 } from "./types";
 
 // =============================================================================
@@ -46,7 +45,7 @@ import type {
  *
  * @example
  * ```typescript
- * import { RoleRepository } from '@yobolabs/core/rbac';
+ * import { RoleRepository } from '@jetdevs/core/rbac';
  *
  * const repo = new RoleRepository(db, schema);
  * const roles = await repo.list({ limit: 10, offset: 0, filters: {} });
@@ -848,10 +847,10 @@ export class RoleRepository {
 
 // Import SDK schema tables (lazy to avoid circular deps)
 import {
-  roles as sdkRoles,
-  permissions as sdkPermissions,
-  rolePermissions as sdkRolePermissions,
-  userRoles as sdkUserRoles,
+    permissions as sdkPermissions,
+    rolePermissions as sdkRolePermissions,
+    roles as sdkRoles,
+    userRoles as sdkUserRoles,
 } from "../../db/schema/rbac";
 
 /**
@@ -873,8 +872,8 @@ export const sdkRoleRepositorySchema = {
  * @example
  * ```typescript
  * // Zero-boilerplate usage with createRouterWithActor
- * import { SDKRoleRepository, roleRouterConfig } from '@yobolabs/core/rbac';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { SDKRoleRepository, roleRouterConfig } from '@jetdevs/core/rbac';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * const roleRouter = createRouterWithActor(roleRouterConfig);
  * ```
@@ -882,7 +881,7 @@ export const sdkRoleRepositorySchema = {
  * @example
  * ```typescript
  * // Direct usage
- * import { SDKRoleRepository } from '@yobolabs/core/rbac';
+ * import { SDKRoleRepository } from '@jetdevs/core/rbac';
  *
  * const repo = new SDKRoleRepository(db);
  * const roles = await repo.list({ limit: 10, offset: 0, filters: {} });

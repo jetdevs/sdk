@@ -3,7 +3,7 @@
  *
  * Zod validation schemas for user management operations.
  *
- * @module @yobolabs/core/users
+ * @module @jetdevs/core/users
  */
 
 import { z } from 'zod';

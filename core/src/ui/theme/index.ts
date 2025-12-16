@@ -3,7 +3,7 @@
  *
  * UI components for theme management.
  *
- * @module @yobolabs/core/ui/theme
+ * @module @jetdevs/core/ui/theme
  */
 
 export { ThemeToggle, ThemeToggleThreeState } from './ThemeToggle';

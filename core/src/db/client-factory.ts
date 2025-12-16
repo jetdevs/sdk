@@ -8,7 +8,7 @@
  *
  * @example
  * ```ts
- * import { createDbClients } from '@yobolabs/core/db/client-factory';
+ * import { createDbClients } from '@jetdevs/core/db/client-factory';
  * import * as schema from '@/db/schema';
  *
  * const clients = createDbClients({

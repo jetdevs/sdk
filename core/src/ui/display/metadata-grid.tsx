@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { cn } from "../../lib";
 import type { MetadataGridProps } from "./types";
 
@@ -32,7 +31,7 @@ function renderValue(
  *
  * @example
  * ```tsx
- * import { MetadataGrid } from '@yobolabs/core/ui/display';
+ * import { MetadataGrid } from '@jetdevs/core/ui/display';
  *
  * <MetadataGrid
  *   items={[

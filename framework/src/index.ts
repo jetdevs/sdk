@@ -1,5 +1,5 @@
 /**
- * @yobolabs/framework - Cross-cutting concerns for Next.js 15 applications
+ * @jetdevs/framework - Cross-cutting concerns for Next.js 15 applications
  *
  * This SDK provides horizontal utilities that every module needs:
  * - RLS context management

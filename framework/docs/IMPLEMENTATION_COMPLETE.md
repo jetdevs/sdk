@@ -326,7 +326,7 @@ No breaking changes - all existing code continues to work. The deprecated functi
 1. **Configure Router Factory** (one-time setup)
 ```typescript
 // In src/server/api/trpc.ts or similar
-import { configureRouterFactory } from '@yobo/framework/router';
+import { configureRouterFactory } from '@jetdevs/framework/router';
 
 configureRouterFactory({
   createRouter: createTRPCRouter,
@@ -337,7 +337,7 @@ configureRouterFactory({
 2. **Configure Auth** (one-time setup)
 ```typescript
 // In src/server/auth.ts or similar
-import { configureAuth } from '@yobo/framework/auth';
+import { configureAuth } from '@jetdevs/framework/auth';
 
 configureAuth({
   getSession: async () => await getServerSession(authOptions),
@@ -350,9 +350,9 @@ configureAuth({
 3. **Use Framework APIs**
 ```typescript
 // In your routers
-import { createRouter } from '@yobo/framework/router';
-import { createRepository } from '@yobo/framework/db';
-import { getCurrentOrgId } from '@yobo/framework/auth';
+import { createRouter } from '@jetdevs/framework/router';
+import { createRepository } from '@jetdevs/framework/db';
+import { getCurrentOrgId } from '@jetdevs/framework/auth';
 ```
 
 ---

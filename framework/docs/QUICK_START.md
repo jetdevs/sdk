@@ -7,7 +7,7 @@
 In your tRPC setup file (e.g., `src/server/api/trpc.ts`):
 
 ```typescript
-import { configureRouterFactory } from '@yobolabs/framework/router';
+import { configureRouterFactory } from '@jetdevs/framework/router';
 import { createTRPCRouter, orgProtectedProcedureWithPermission } from './trpc';
 
 // Configure once during app initialization
@@ -22,7 +22,7 @@ configureRouterFactory({
 In your auth setup file (e.g., `src/server/auth.ts`):
 
 ```typescript
-import { configureAuth } from '@yobolabs/framework/auth';
+import { configureAuth } from '@jetdevs/framework/auth';
 import { getServerSession } from 'next-auth';
 import { authOptions } from './auth-options';
 import { db } from '@/server/db';
@@ -49,8 +49,8 @@ configureAuth({
 ### Creating Routers
 
 ```typescript
-import { createRouter, createRouteGroup } from '@yobolabs/framework/router';
-import { createRepository } from '@yobolabs/framework/db';
+import { createRouter, createRouteGroup } from '@jetdevs/framework/router';
+import { createRepository } from '@jetdevs/framework/db';
 import { z } from 'zod';
 
 // Simple router
@@ -127,7 +127,7 @@ export const adminRouter = createRouter(adminRoutes);
 ### Using Repository
 
 ```typescript
-import { createRepository } from '@yobolabs/framework/db';
+import { createRepository } from '@jetdevs/framework/db';
 
 // In your tRPC handler (ctx has db and RLS context is set automatically)
 const handler = async (ctx) => {
@@ -163,7 +163,7 @@ import {
   getCurrentOrgId,
   switchOrg,
   requireAuth,
-} from '@yobolabs/framework/auth';
+} from '@jetdevs/framework/auth';
 
 // In API routes or server components
 export async function GET() {
@@ -257,7 +257,7 @@ const handler = async (ctx) => {
 ### Pattern: Manual RLS Context (Advanced)
 
 ```typescript
-import { withRLSContext } from '@yobolabs/framework/db';
+import { withRLSContext } from '@jetdevs/framework/db';
 
 // Rarely needed - routers set this up automatically
 const result = await withRLSContext(
@@ -297,7 +297,7 @@ const created: Campaign = await repo.create({ name: 'New', status: 'draft' });
 ### Typed Route Handlers
 
 ```typescript
-import type { RouteHandler } from '@yobolabs/framework/router';
+import type { RouteHandler } from '@jetdevs/framework/router';
 
 // Define handler type
 type ListCampaignsHandler = RouteHandler<
@@ -344,8 +344,8 @@ try {
 ## Testing
 
 ```typescript
-import { withRLSContext } from '@yobolabs/framework/db';
-import { createRepository } from '@yobolabs/framework/db';
+import { withRLSContext } from '@jetdevs/framework/db';
+import { createRepository } from '@jetdevs/framework/db';
 
 describe('Campaign Repository', () => {
   it('should create campaign with org_id', async () => {

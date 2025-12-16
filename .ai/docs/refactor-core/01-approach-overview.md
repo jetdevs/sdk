@@ -133,13 +133,13 @@ saas-app/
 ```
 monorepo/
 ├── packages/
-│   └── @yobo/saas-core/           # Core as workspace package
+│   └── @jetdevs/saas-core/           # Core as workspace package
 │       └── ...
 │
 ├── apps/
 │   └── my-app/
 │       ├── src/
-│       │   ├── core/              # Symlink or re-exports from @yobo/saas-core
+│       │   ├── core/              # Symlink or re-exports from @jetdevs/saas-core
 │       │   ├── extensions/
 │       │   └── app/
 │       └── package.json
@@ -196,7 +196,7 @@ Core behavior should be configurable:
 
 ```typescript
 // saas.config.ts
-import { defineSaasConfig } from '@yobo/saas-core'
+import { defineSaasConfig } from '@jetdevs/saas-core'
 
 export default defineSaasConfig({
   auth: {
@@ -227,7 +227,7 @@ Core should emit events that extensions can hook into:
 
 ```typescript
 // Extension hooking into user creation
-import { hooks } from '@yobo/saas-core'
+import { hooks } from '@jetdevs/saas-core'
 
 hooks.on('user:created', async (user, context) => {
   await myFeatureService.initializeForUser(user.id)
@@ -245,7 +245,7 @@ Extensions add tables without modifying core:
 ```typescript
 // extensions/projects/schema.ts
 import { pgTable, text, uuid, timestamp } from 'drizzle-orm/pg-core'
-import { users, orgs } from '@yobo/saas-core/db'
+import { users, orgs } from '@jetdevs/saas-core/db'
 
 export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -264,7 +264,7 @@ Routers are composed, not modified:
 
 ```typescript
 // app/server/api/root.ts
-import { coreRouter } from '@yobo/saas-core/trpc'
+import { coreRouter } from '@jetdevs/saas-core/trpc'
 import { projectsRouter } from '@/extensions/projects/router'
 import { invoicesRouter } from '@/extensions/invoices/router'
 

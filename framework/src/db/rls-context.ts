@@ -4,7 +4,7 @@
  * Provides utilities for managing Row-Level Security context
  * in multi-tenant PostgreSQL databases.
  *
- * @module @yobolabs/framework/db/rls-context
+ * @module @jetdevs/framework/db/rls-context
  */
 
 import type { Actor, DbAccessOptions } from '../auth/actor';

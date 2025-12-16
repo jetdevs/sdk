@@ -5,7 +5,7 @@
  * database abstraction layer. It supports multiple database drivers while
  * maintaining type safety with Drizzle ORM.
  *
- * @module @yobolabs/core/db/drivers
+ * @module @jetdevs/core/db/drivers
  */
 
 import type { SQL } from 'drizzle-orm';

@@ -4,7 +4,7 @@
  * Role-Based Access Control system for SaaS applications.
  * Provides repositories, services, utilities, and validation schemas.
  *
- * @module @yobolabs/core/rbac
+ * @module @jetdevs/core/rbac
  *
  * @example
  * ```typescript
@@ -14,7 +14,7 @@
  *   PermissionRepository,
  *   hasSystemAccess,
  *   createRoleSchema,
- * } from '@yobolabs/core/rbac';
+ * } from '@jetdevs/core/rbac';
  *
  * // Create repository with schema injection
  * const roleRepo = new RoleRepository(db, {
@@ -46,39 +46,14 @@
 // =============================================================================
 
 export type {
-  // Role types
-  Role,
-  RoleWithStats,
-  RoleStats,
-  RolePermission,
-  RoleFilters,
-  RoleListOptions,
-  RoleListResult,
-  RoleCreateData,
-  RoleUpdateData,
-  RolePermissionAssignment,
-  UserRoleStats,
-  RolePermissionStats,
-  // Permission types
-  Permission,
-  PermissionWithUsage,
-  PermissionCreateData,
-  PermissionUpdateData,
-  CategoryCount,
-  PermissionStats,
-  // Service context types
-  Actor,
-  RbacServiceContext,
-  // Service params types
-  RoleListParams,
-  RoleGetByIdParams,
-  RoleCreateParams,
-  RoleUpdateParams,
-  RoleDeleteParams,
-  RoleAssignPermissionsParams,
-  RoleRemovePermissionsParams,
-  RoleBulkUpdateParams,
-  RoleBulkDeleteParams,
+    // Service context types
+    Actor, CategoryCount,
+    // Permission types
+    Permission, PermissionCreateData, PermissionStats, PermissionUpdateData, PermissionWithUsage, RbacServiceContext,
+    // Role types
+    Role, RoleAssignPermissionsParams, RoleBulkDeleteParams, RoleBulkUpdateParams, RoleCreateData, RoleCreateParams, RoleDeleteParams, RoleFilters, RoleGetByIdParams, RoleListOptions,
+    // Service params types
+    RoleListParams, RoleListResult, RolePermission, RolePermissionAssignment, RolePermissionStats, RoleRemovePermissionsParams, RoleStats, RoleUpdateData, RoleUpdateParams, RoleWithStats, UserRoleStats
 } from "./types";
 
 // =============================================================================
@@ -86,35 +61,32 @@ export type {
 // =============================================================================
 
 export {
-  RoleRepository,
-  SDKRoleRepository,
-  sdkRoleRepositorySchema,
-} from "./role.repository";
-export {
-  PermissionRepository,
-  SDKPermissionRepository,
+    PermissionRepository,
+    SDKPermissionRepository
 } from "./permission.repository";
+export {
+    RoleRepository,
+    SDKRoleRepository,
+    sdkRoleRepositorySchema
+} from "./role.repository";
 
 // =============================================================================
 // SERVICES
 // =============================================================================
 
 export {
-  RoleService,
-  RbacError,
-  // Factory functions
-  createRoleService,
-  createSDKRoleService,
-  // Pre-built instances
-  SDKRoleService,
-  sdkRbacSchema,
-  // Constants
-  ADMIN_FULL_ACCESS_PERMISSION,
+    // Constants
+    ADMIN_FULL_ACCESS_PERMISSION, RbacError, RoleService,
+    // Pre-built instances
+    SDKRoleService,
+    // Factory functions
+    createRoleService,
+    createSDKRoleService, sdkRbacSchema
 } from "./role.service";
 
 export type {
-  RoleServiceHooks,
-  RoleServiceSchema,
+    RoleServiceHooks,
+    RoleServiceSchema
 } from "./role.service";
 
 // =============================================================================
@@ -122,29 +94,17 @@ export type {
 // =============================================================================
 
 export {
-  // Modern role checks
-  hasSystemAccess,
-  isSystemRole,
-  isGlobalRole,
-  isOrgSpecificRole,
-  hasPlatformSystemRole,
-  hasBackofficeAccess,
-  canManageRoles,
-  canViewRoles,
-  canAssignPermissions,
-  // Legacy exports (deprecated)
-  SYSTEM_ROLES,
-  ORG_ROLES,
-  isSystemRoleName,
-  isOrgRoleName,
-  isGlobalRoleName,
-  isPlatformSystemRole,
+    ORG_ROLES,
+    // Legacy exports (deprecated)
+    SYSTEM_ROLES, canAssignPermissions, canManageRoles,
+    canViewRoles, hasBackofficeAccess, hasPlatformSystemRole,
+    // Modern role checks
+    hasSystemAccess, isGlobalRole, isGlobalRoleName, isOrgRoleName, isOrgSpecificRole, isPlatformSystemRole, isSystemRole, isSystemRoleName
 } from "./utils";
 
 export type {
-  SystemRoleName,
-  OrgRoleName,
-  RoleName,
+    OrgRoleName,
+    RoleName, SystemRoleName
 } from "./utils";
 
 // =============================================================================
@@ -152,42 +112,20 @@ export type {
 // =============================================================================
 
 export {
-  // Role schemas
-  createRoleSchema,
-  updateRoleSchema,
-  roleFiltersSchema,
-  getRoleByIdSchema,
-  getRoleWithPermissionsSchema,
-  assignPermissionsSchema,
-  removePermissionsSchema,
-  bulkUpdateRolesSchema,
-  bulkDeleteRolesSchema,
-  deleteRoleSchema,
-  copyRoleSchema,
-  // Permission schemas
-  createPermissionSchema,
-  updatePermissionSchema,
-  permissionFiltersSchema,
-  getPermissionByIdSchema,
-  getPermissionBySlugSchema,
+    assignPermissionsSchema, bulkDeleteRolesSchema, bulkUpdateRolesSchema, copyRoleSchema,
+    // Permission schemas
+    createPermissionSchema,
+    // Role schemas
+    createRoleSchema, deleteRoleSchema, getPermissionByIdSchema,
+    getPermissionBySlugSchema, getRoleByIdSchema,
+    getRoleWithPermissionsSchema, permissionFiltersSchema, removePermissionsSchema, roleFiltersSchema, updatePermissionSchema, updateRoleSchema
 } from "./schemas";
 
 export type {
-  CreateRoleInput,
-  UpdateRoleInput,
-  RoleFiltersInput,
-  GetRoleByIdInput,
-  GetRoleWithPermissionsInput,
-  AssignPermissionsInput,
-  RemovePermissionsInput,
-  BulkUpdateRolesInput,
-  BulkDeleteRolesInput,
-  CopyRoleInput,
-  CreatePermissionInput,
-  UpdatePermissionInput,
-  PermissionFiltersInput,
-  GetPermissionByIdInput,
-  GetPermissionBySlugInput,
+    AssignPermissionsInput, BulkDeleteRolesInput, BulkUpdateRolesInput, CopyRoleInput,
+    CreatePermissionInput, CreateRoleInput, GetPermissionByIdInput,
+    GetPermissionBySlugInput, GetRoleByIdInput,
+    GetRoleWithPermissionsInput, PermissionFiltersInput, RemovePermissionsInput, RoleFiltersInput, UpdatePermissionInput, UpdateRoleInput
 } from "./schemas";
 
 // =============================================================================
@@ -195,12 +133,11 @@ export type {
 // =============================================================================
 
 export {
-  createRoleRouterConfig,
-  roleRouterConfig,
-  defaultCreateServiceContext,
+    createRoleRouterConfig, defaultCreateServiceContext, roleRouterConfig
 } from "./router-config";
 
 export type {
-  CreateRoleRouterConfigOptions,
-  CreateServiceContext,
+    CreateRoleRouterConfigOptions,
+    CreateServiceContext
 } from "./router-config";
+

@@ -71,7 +71,7 @@ let permissionConfig: PermissionConfig | null = null;
  *
  * @example
  * ```typescript
- * import { configurePermissions } from '@yobolabs/framework/permissions';
+ * import { configurePermissions } from '@jetdevs/framework/permissions';
  * import { hasPermission } from './auth';
  *
  * configurePermissions({

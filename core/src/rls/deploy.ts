@@ -6,27 +6,26 @@
  * with their specific registry and database connections.
  */
 
-import type { RlsRegistry, RlsTableConfig } from './types';
 import type {
-  PolicyGenerationResult,
-  GenerationSummary,
-  TablePolicySet,
-  DeployOptions,
-  DbIntrospection,
+    DbIntrospection,
+    DeployOptions,
+    GenerationSummary,
+    PolicyGenerationResult,
+    TablePolicySet,
 } from './deploy-types';
 import {
-  generatePoliciesForIsolation,
-  generateDropPolicySQL,
-  generateCreatePolicySQL,
-  generateEnableRLSSQL,
-  generateDisableRLSSQL,
-  generateAddColumnSQL,
-  analyzePermissionRequirements,
-  RLS_CONTEXT_FUNCTIONS,
-  RLS_ROLES_SQL,
-  RLS_FUNCTION_PERMISSIONS,
-  RLS_TABLE_PERMISSIONS,
+    generateAddColumnSQL,
+    generateCreatePolicySQL,
+    generateDisableRLSSQL,
+    generateDropPolicySQL,
+    generateEnableRLSSQL,
+    generatePoliciesForIsolation,
+    RLS_CONTEXT_FUNCTIONS,
+    RLS_FUNCTION_PERMISSIONS,
+    RLS_ROLES_SQL,
+    RLS_TABLE_PERMISSIONS
 } from './policies';
+import type { RlsRegistry, RlsTableConfig } from './types';
 
 // =============================================================================
 // TABLE POLICY SET GENERATION
@@ -306,7 +305,7 @@ export async function ensureRequiredColumns(
  *
  * @example
  * ```typescript
- * import { deployRls, createDbIntrospection } from '@yobolabs/core/rls';
+ * import { deployRls, createDbIntrospection } from '@jetdevs/core/rls';
  * import { RLS_REGISTRY } from './rls-registry';
  * import postgres from 'postgres';
  *

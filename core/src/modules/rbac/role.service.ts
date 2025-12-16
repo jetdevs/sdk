@@ -5,25 +5,24 @@
  * Handles validation, orchestration, and business rules for role operations.
  * Framework-agnostic - does not depend on tRPC or app-specific code.
  *
- * @module @yobolabs/core/rbac
+ * @module @jetdevs/core/rbac
  */
 
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { RoleRepository } from "./role.repository";
 import type {
-  Actor,
-  RbacServiceContext,
-  RoleAssignPermissionsParams,
-  RoleBulkDeleteParams,
-  RoleBulkUpdateParams,
-  RoleCreateParams,
-  RoleDeleteParams,
-  RoleGetByIdParams,
-  RoleListParams,
-  RoleRemovePermissionsParams,
-  RoleUpdateParams,
-  RoleWithStats,
+    Actor,
+    RbacServiceContext,
+    RoleAssignPermissionsParams,
+    RoleBulkDeleteParams,
+    RoleBulkUpdateParams,
+    RoleCreateParams,
+    RoleDeleteParams,
+    RoleGetByIdParams,
+    RoleListParams,
+    RoleRemovePermissionsParams,
+    RoleUpdateParams
 } from "./types";
 
 // =============================================================================
@@ -101,7 +100,7 @@ export interface RoleServiceHooks {
  *
  * @example
  * ```typescript
- * import { RoleService } from '@yobolabs/core/rbac';
+ * import { RoleService } from '@jetdevs/core/rbac';
  *
  * const service = new RoleService(schema, {
  *   onPermissionsChanged: async (roleId, userIds) => {
@@ -773,7 +772,7 @@ export interface RoleServiceSchema {
  *
  * @example
  * ```typescript
- * import { createRoleService } from '@yobolabs/core/rbac';
+ * import { createRoleService } from '@jetdevs/core/rbac';
  * import { roles, permissions, rolePermissions, userRoles } from './schema';
  *
  * const roleService = createRoleService(
@@ -799,10 +798,10 @@ export function createRoleService(
 
 // Import SDK schema tables
 import {
-  roles as sdkRoles,
-  permissions as sdkPermissions,
-  rolePermissions as sdkRolePermissions,
-  userRoles as sdkUserRoles,
+    permissions as sdkPermissions,
+    rolePermissions as sdkRolePermissions,
+    roles as sdkRoles,
+    userRoles as sdkUserRoles,
 } from "../../db/schema/rbac";
 
 /**
@@ -829,7 +828,7 @@ export const sdkRbacSchema: RoleServiceSchema = {
  * @example
  * ```typescript
  * // Zero-boilerplate usage - uses default "admin:full_access" check
- * import { SDKRoleService } from '@yobolabs/core/rbac';
+ * import { SDKRoleService } from '@jetdevs/core/rbac';
  *
  * const roles = await SDKRoleService.list({}, ctx);
  * ```
@@ -837,7 +836,7 @@ export const sdkRbacSchema: RoleServiceSchema = {
  * @example
  * ```typescript
  * // With WebSocket broadcasts for real-time updates
- * import { createSDKRoleService } from '@yobolabs/core/rbac';
+ * import { createSDKRoleService } from '@jetdevs/core/rbac';
  *
  * const roleService = createSDKRoleService({
  *   onPermissionsChanged: async (roleId, userIds) => {
@@ -856,7 +855,7 @@ export const SDKRoleService = new RoleService(sdkRbacSchema);
  *
  * @example
  * ```typescript
- * import { createSDKRoleService } from '@yobolabs/core/rbac';
+ * import { createSDKRoleService } from '@jetdevs/core/rbac';
  *
  * const roleService = createSDKRoleService({
  *   canManageSystemRoles: (actor) =>

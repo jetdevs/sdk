@@ -18,13 +18,13 @@
  *
  * This allows full type inference for `api.router.procedure.useQuery()` calls.
  *
- * @module @yobo/framework/router/with-actor
+ * @module @jetdevs/framework/router/with-actor
  */
 
 import { z } from 'zod';
+import { auditLog, type AuditAction } from '../audit';
 import type { Actor } from '../auth/actor';
 import { withTelemetry } from '../telemetry';
-import { auditLog, type AuditAction } from '../audit';
 
 // =============================================================================
 // TYPE INFERENCE SYSTEM
@@ -240,7 +240,7 @@ let globalActorAdapter: ActorContextAdapter | null = null;
  * @example
  * ```typescript
  * // In src/server/api/trpc.ts or similar initialization file
- * import { configureActorAdapter } from '@yobo/framework/router/with-actor';
+ * import { configureActorAdapter } from '@jetdevs/framework/router/with-actor';
  * import { createActor, getDbContext, createServiceContext } from '@/server/domain/auth/actor';
  * import {
  *   createTRPCRouter,

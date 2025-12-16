@@ -65,7 +65,7 @@ let databaseConfig: DatabaseConfig | null = null;
  *
  * @example
  * ```typescript
- * import { configureDatabaseContext } from '@yobolabs/framework/db';
+ * import { configureDatabaseContext } from '@jetdevs/framework/db';
  * import { db } from './database';
  *
  * configureDatabaseContext({
@@ -110,7 +110,7 @@ export function getConfiguredDatabase(): any {
     throw new Error(
       'Database not configured. Call configureDatabaseContext() during app initialization.\n' +
       'Example:\n' +
-      '  import { configureDatabaseContext } from \'@yobolabs/framework/db\';\n' +
+      '  import { configureDatabaseContext } from \'@jetdevs/framework/db\';\n' +
       '  import { db } from \'./database\';\n' +
       '  configureDatabaseContext({\n' +
       '    getDatabase: () => db,\n' +

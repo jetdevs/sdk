@@ -6,24 +6,20 @@
  * - CardSkeleton: Card loading placeholder
  * - FullScreenLoading: Full screen loading overlay
  *
- * @module @yobolabs/core/ui/skeletons
+ * @module @jetdevs/core/ui/skeletons
  */
 
 // Types
 export type {
-  SkeletonUIComponents,
-  TableSkeletonUIComponents,
-  CardSkeletonUIComponents,
-  TableSkeletonProps,
-  CardSkeletonProps,
-  FullScreenLoadingProps,
+    CardSkeletonProps, CardSkeletonUIComponents, FullScreenLoadingProps, SkeletonUIComponents, TableSkeletonProps, TableSkeletonUIComponents
 } from "./types";
 
 // Components - Table Skeleton
-export { createTableSkeleton, SimpleTableSkeleton } from "./table-skeleton";
+export { SimpleTableSkeleton, createTableSkeleton } from "./table-skeleton";
 
 // Components - Card Skeleton
-export { createCardSkeleton, SimpleCardSkeleton } from "./card-skeleton";
+export { SimpleCardSkeleton, createCardSkeleton } from "./card-skeleton";
 
 // Components - Full Screen Loading
-export { FullScreenLoading, CenteredSpinner } from "./full-screen-loading";
+export { CenteredSpinner, FullScreenLoading } from "./full-screen-loading";
+

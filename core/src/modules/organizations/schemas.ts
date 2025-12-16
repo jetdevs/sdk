@@ -3,7 +3,7 @@
  *
  * Zod validation schemas for organization management operations.
  *
- * @module @yobolabs/core/organizations
+ * @module @jetdevs/core/organizations
  */
 
 import { z } from 'zod';

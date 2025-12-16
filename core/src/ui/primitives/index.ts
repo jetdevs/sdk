@@ -9,7 +9,7 @@
  *
  * Example usage in apps:
  * ```typescript
- * import { createBaseListTable } from '@yobolabs/core/ui/data-table';
+ * import { createBaseListTable } from '@jetdevs/core/ui/data-table';
  * import { Table, Button, Input, ... } from '@/components/ui';
  *
  * const BaseListTable = createBaseListTable({
@@ -21,4 +21,5 @@
 
 // This module is intentionally empty.
 // Primitives should be provided by the consuming application.
-export {};
+export { };
+

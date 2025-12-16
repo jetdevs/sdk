@@ -5,31 +5,31 @@
  * This factory pattern allows apps to inject their own dependencies while
  * reusing the core organization management logic.
  *
- * @module @yobolabs/core/organizations
+ * @module @jetdevs/core/organizations
  */
 
 import { z } from 'zod';
-import {
-  orgListSchema,
-  orgGetByIdSchema,
-  orgGetByUuidSchema,
-  orgCreateSchema,
-  orgUpdateSchema,
-  orgUpdateCurrentSchema,
-  orgDeleteSchema,
-  orgCreateForUserSchema,
-  orgAnalyticsSchema,
-  orgStatsSchema,
-  orgGetAllWithStatsSchema,
-  orgGetSettingsSchema,
-  orgUpdateSettingsSchema,
-  orgAuditLogsSchema,
-  orgUpdateCopilotStatusSchema,
-  orgAddUserSchema,
-  orgRemoveUserSchema,
-  orgUpdateUserRoleSchema,
-} from './schemas';
 import type { IOrgRepository } from './repository';
+import {
+    orgAddUserSchema,
+    orgAnalyticsSchema,
+    orgAuditLogsSchema,
+    orgCreateForUserSchema,
+    orgCreateSchema,
+    orgDeleteSchema,
+    orgGetAllWithStatsSchema,
+    orgGetByIdSchema,
+    orgGetByUuidSchema,
+    orgGetSettingsSchema,
+    orgListSchema,
+    orgRemoveUserSchema,
+    orgStatsSchema,
+    orgUpdateCopilotStatusSchema,
+    orgUpdateCurrentSchema,
+    orgUpdateSchema,
+    orgUpdateSettingsSchema,
+    orgUpdateUserRoleSchema,
+} from './schemas';
 import type { IOrgService } from './service';
 
 // =============================================================================
@@ -107,8 +107,8 @@ export class OrgRouterError extends Error {
  *
  * @example
  * ```typescript
- * import { createOrgRouterConfig } from '@yobolabs/core/organizations';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createOrgRouterConfig } from '@jetdevs/core/organizations';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  * import { OrgRepository } from '@/server/repos/org.repository';
  * import { OrgService } from '@/server/services/domain/org.service';
  * import { withPrivilegedDb } from '@/db/clients';

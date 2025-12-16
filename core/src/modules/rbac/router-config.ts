@@ -2,41 +2,32 @@
  * Role Router Configuration Factory
  *
  * Creates router configuration for role management.
- * Apps use this with createRouterWithActor from @yobolabs/framework.
+ * Apps use this with createRouterWithActor from @jetdevs/framework.
  *
- * @module @yobolabs/core/rbac
+ * @module @jetdevs/core/rbac
  */
 
 import { z } from "zod";
-import type { RoleService } from "./role.service";
-import type {
-  RbacServiceContext,
-  Actor,
-  RoleListParams,
-  RoleGetByIdParams,
-  RoleCreateParams,
-  RoleUpdateParams,
-  RoleDeleteParams,
-  RoleAssignPermissionsParams,
-  RoleRemovePermissionsParams,
-  RoleBulkUpdateParams,
-  RoleBulkDeleteParams,
-} from "./types";
-import {
-  roleFiltersSchema,
-  getRoleByIdSchema,
-  getRoleWithPermissionsSchema,
-  createRoleSchema,
-  updateRoleSchema,
-  deleteRoleSchema,
-  assignPermissionsSchema,
-  removePermissionsSchema,
-  bulkUpdateRolesSchema,
-  bulkDeleteRolesSchema,
-  copyRoleSchema,
-} from "./schemas";
-import { SDKRoleService } from "./role.service";
 import { SDKRoleRepository } from "./role.repository";
+import type { RoleService } from "./role.service";
+import { SDKRoleService } from "./role.service";
+import {
+    assignPermissionsSchema,
+    bulkDeleteRolesSchema,
+    bulkUpdateRolesSchema,
+    copyRoleSchema,
+    createRoleSchema,
+    deleteRoleSchema,
+    getRoleByIdSchema,
+    getRoleWithPermissionsSchema,
+    removePermissionsSchema,
+    roleFiltersSchema,
+    updateRoleSchema,
+} from "./schemas";
+import type {
+    Actor,
+    RbacServiceContext
+} from "./types";
 
 // =============================================================================
 // TYPES
@@ -124,19 +115,19 @@ export const defaultCreateServiceContext: CreateServiceContext = (
 /**
  * Creates router configuration for role management.
  *
- * Use this with createRouterWithActor from @yobolabs/framework.
+ * Use this with createRouterWithActor from @jetdevs/framework.
  *
  * @example
  * // Zero-boilerplate usage with SDK defaults
- * import { roleRouterConfig } from '@yobolabs/core/rbac';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { roleRouterConfig } from '@jetdevs/core/rbac';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * export const roleRouter = createRouterWithActor(roleRouterConfig);
  *
  * @example
  * // With custom service for WebSocket broadcasts
- * import { createRoleRouterConfig, createSDKRoleService } from '@yobolabs/core/rbac';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createRoleRouterConfig, createSDKRoleService } from '@jetdevs/core/rbac';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * const RoleServiceWithWS = createSDKRoleService({
  *   onPermissionsChanged: async (roleId, userIds) => {
@@ -608,8 +599,8 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
  * @example
  * ```typescript
  * // Zero-boilerplate usage
- * import { roleRouterConfig } from '@yobolabs/core/rbac';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { roleRouterConfig } from '@jetdevs/core/rbac';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * const roleRouter = createRouterWithActor(roleRouterConfig);
  * ```
@@ -617,7 +608,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
  * @example
  * ```typescript
  * // With WebSocket broadcasts
- * import { createRoleRouterConfig, createSDKRoleService } from '@yobolabs/core/rbac';
+ * import { createRoleRouterConfig, createSDKRoleService } from '@jetdevs/core/rbac';
  *
  * const roleService = createSDKRoleService({
  *   onPermissionsChanged: async (roleId, userIds) => {

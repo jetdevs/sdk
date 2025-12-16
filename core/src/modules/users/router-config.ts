@@ -5,26 +5,26 @@
  * This factory pattern allows apps to inject their own dependencies while
  * reusing the core user management logic.
  *
- * @module @yobolabs/core/users
+ * @module @jetdevs/core/users
  */
 
-import { z } from 'zod';
 import { and, ilike, isNull } from 'drizzle-orm';
-import {
-  userFiltersSchema,
-  userCreateSchema,
-  userUpdateSchema,
-  assignRoleSchema,
-  removeRoleSchema,
-  removeFromOrgSchema,
-  changePasswordSchema,
-  updateSessionPreferenceSchema,
-  updateThemePreferenceSchema,
-  checkUsernameSchema,
-  userBulkUpdateSchema,
-  userBulkDeleteSchema,
-} from './schemas';
+import { z } from 'zod';
 import type { IUserRepository } from './repository';
+import {
+    assignRoleSchema,
+    changePasswordSchema,
+    checkUsernameSchema,
+    removeFromOrgSchema,
+    removeRoleSchema,
+    updateSessionPreferenceSchema,
+    updateThemePreferenceSchema,
+    userBulkDeleteSchema,
+    userBulkUpdateSchema,
+    userCreateSchema,
+    userFiltersSchema,
+    userUpdateSchema,
+} from './schemas';
 
 // =============================================================================
 // TYPES
@@ -103,8 +103,8 @@ export class UserRouterError extends Error {
  *
  * @example
  * ```typescript
- * import { createUserRouterConfig } from '@yobolabs/core/users';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createUserRouterConfig } from '@jetdevs/core/users';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  * import { UserRepository } from '@/server/repos/user.repository';
  * import bcrypt from 'bcrypt';
  *
@@ -680,15 +680,15 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
 // SDK PRE-BUILT REPOSITORY
 // =============================================================================
 
-import { createUserRepositoryClass } from './repository';
 import {
-  users,
-  userRoles,
-  roles,
-  orgs,
-  permissions,
-  rolePermissions,
+    orgs,
+    permissions,
+    rolePermissions,
+    roles,
+    userRoles,
+    users,
 } from '../../db/schema';
+import { createUserRepositoryClass } from './repository';
 
 /**
  * SDK User Repository
@@ -698,7 +698,7 @@ import {
  *
  * @example
  * ```typescript
- * import { SDKUserRepository } from '@yobolabs/core/users';
+ * import { SDKUserRepository } from '@jetdevs/core/users';
  *
  * // Create repository instance
  * const repo = new SDKUserRepository(db);
@@ -751,14 +751,14 @@ async function defaultComparePassword(password: string, hash: string): Promise<b
  * @example
  * ```typescript
  * // Option 1: Simple usage with SDK defaults (development only)
- * import { userRouterConfig } from '@yobolabs/core/users';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { userRouterConfig } from '@jetdevs/core/users';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * export const userRouter = createRouterWithActor(userRouterConfig);
  *
  * // Option 2: Production usage with bcrypt
- * import { createUserRouterConfig, SDKUserRepository } from '@yobolabs/core/users';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createUserRouterConfig, SDKUserRepository } from '@jetdevs/core/users';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  * import bcrypt from 'bcrypt';
  *
  * const userRouterConfig = createUserRouterConfig({

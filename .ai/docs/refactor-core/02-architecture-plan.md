@@ -244,14 +244,14 @@ monorepo/
 
 - All UI components preserve `"use client"` directives in the build
 - CSS is **not bundled** - apps must import Tailwind and configure `content` paths
-- Design tokens exported as CSS variables via `@yobo/saas-core/styles`
+- Design tokens exported as CSS variables via `@jetdevs/saas-core/styles`
 
 ```typescript
 // tailwind.config.ts in consuming app
 export default {
   content: [
     './src/**/*.{ts,tsx}',
-    './node_modules/@yobo/saas-core/dist/**/*.{js,jsx}', // Include core UI
+    './node_modules/@jetdevs/saas-core/dist/**/*.{js,jsx}', // Include core UI
   ],
   // ...
 }
@@ -265,7 +265,7 @@ export default {
 
 ```typescript
 // ==========================================
-// @yobo/saas-core - Main Exports
+// @jetdevs/saas-core - Main Exports
 // ==========================================
 
 // Configuration
@@ -340,7 +340,7 @@ export { TRPCProvider, AuthProvider, ThemeProvider } from './providers'
 export { cn, generateId, logger } from './lib'
 
 // CLI (for scripts only - not exported from main)
-// Use: import { cli } from '@yobo/saas-core/cli'
+// Use: import { cli } from '@jetdevs/saas-core/cli'
 ```
 
 ### Internal/CLI-Only Exports
@@ -349,11 +349,11 @@ The following are **internal** and only available via CLI or direct import paths
 
 ```typescript
 // CLI tools - only for scripts, not runtime
-import { cli } from '@yobo/saas-core/cli'
+import { cli } from '@jetdevs/saas-core/cli'
 
 // Privileged DB access - CLI/migrations only, NOT for application code
 // Uses ADMIN_DATABASE_URL, bypasses RLS
-import { createPrivilegedClient } from '@yobo/saas-core/cli/db'
+import { createPrivilegedClient } from '@jetdevs/saas-core/cli/db'
 ```
 
 > **WARNING**: `createPrivilegedClient` is for migrations and RLS deployment only.
@@ -364,7 +364,7 @@ import { createPrivilegedClient } from '@yobo/saas-core/cli/db'
 ### `saas.config.ts`
 
 ```typescript
-import { defineSaasConfig } from '@yobo/saas-core'
+import { defineSaasConfig } from '@jetdevs/saas-core'
 import { projectsExtension } from './src/extensions/projects'
 import { invoicesExtension } from './src/extensions/invoices'
 
@@ -494,7 +494,7 @@ export function defineExtension(config: Extension): Extension {
 ```typescript
 // apps/my-saas/src/extensions/projects/index.ts
 
-import { defineExtension } from '@yobo/saas-core'
+import { defineExtension } from '@jetdevs/saas-core'
 import * as schema from './schema'
 import { permissions } from './permissions'
 import { projectsRouter } from './router'
@@ -521,7 +521,7 @@ export const projectsExtension = defineExtension({
 // apps/my-saas/src/extensions/projects/schema.ts
 
 import { pgTable, text, uuid, timestamp, boolean } from 'drizzle-orm/pg-core'
-import { schema } from '@yobo/saas-core'
+import { schema } from '@jetdevs/saas-core'
 
 export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -547,7 +547,7 @@ export const projectMembers = pgTable('project_members', {
 ```typescript
 // apps/my-saas/src/extensions/projects/permissions.ts
 
-import type { PermissionModule } from '@yobo/saas-core'
+import type { PermissionModule } from '@jetdevs/saas-core'
 
 export const permissions: PermissionModule = {
   name: 'projects',
@@ -580,7 +580,7 @@ export const permissions: PermissionModule = {
 ```typescript
 // apps/my-saas/src/extensions/projects/router.ts
 
-import { createRouterWithActor } from '@yobo/saas-core'
+import { createRouterWithActor } from '@jetdevs/saas-core'
 import { z } from 'zod'
 import { ProjectRepository } from './repository'
 import { ProjectService } from './service'
@@ -637,7 +637,7 @@ Core provides `composeRouters()` which:
 ### Application Router (`apps/my-saas/src/server/api/root.ts`)
 
 ```typescript
-import { coreRouter, composeRouters } from '@yobo/saas-core/trpc'
+import { coreRouter, composeRouters } from '@jetdevs/saas-core/trpc'
 import config from '../../../saas.config'
 
 // Collect extension routers
@@ -752,7 +752,7 @@ export * from './api'
 ### App Schema (`apps/my-saas/src/db/schema.ts`)
 
 ```typescript
-import * as coreSchema from '@yobo/saas-core/db/schema'
+import * as coreSchema from '@jetdevs/saas-core/db/schema'
 import config from '../../saas.config'
 
 // Merge core + extension schemas
@@ -861,7 +861,7 @@ export const protectedProcedure = t.procedure
 
 ```typescript
 // For non-tRPC routes, wrap handlers manually
-import { withRlsContext } from '@yobo/saas-core/rls'
+import { withRlsContext } from '@jetdevs/saas-core/rls'
 
 export async function GET(req: Request) {
   const session = await getServerSession()
@@ -914,7 +914,7 @@ export function createRlsRegistry(extensions: Extension[]): RlsTableConfig[] {
 ```typescript
 // apps/my-saas/src/extensions/projects/rls.ts
 
-import type { RlsTableConfig } from '@yobo/saas-core'
+import type { RlsTableConfig } from '@jetdevs/saas-core'
 
 export const rlsConfig: RlsTableConfig[] = [
   { tableName: 'projects', orgIdColumn: 'org_id' },
@@ -1046,7 +1046,7 @@ export function mergePermissions(
 
 ```typescript
 // Automatically done by core when loading config
-import { corePermissions, mergePermissions } from '@yobo/saas-core'
+import { corePermissions, mergePermissions } from '@jetdevs/saas-core'
 import config from './saas.config'
 
 const extensionPermissions = config.extensions
@@ -1118,7 +1118,7 @@ PATCH: Bug fixes
 ### Upgrade Process
 
 1. **Check changelog** - Review breaking changes
-2. **Update dependency** - `pnpm update @yobo/saas-core`
+2. **Update dependency** - `pnpm update @jetdevs/saas-core`
 3. **Run migrations** - `pnpm saas db:migrate`
 4. **Regenerate types** - `pnpm saas generate:types`
 5. **Fix breaking changes** - Address any API changes
@@ -1180,7 +1180,7 @@ apps/my-saas/
 
 ```json
 {
-  "name": "@yobo/saas-core",
+  "name": "@jetdevs/saas-core",
   "version": "1.0.0",
   "type": "module",
   "main": "./dist/index.js",

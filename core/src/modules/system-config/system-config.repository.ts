@@ -4,16 +4,16 @@
  * Generic repository for system configuration management with schema injection.
  * Apps inject their schema to use this repository.
  *
- * @module @yobolabs/core/system-config
+ * @module @jetdevs/core/system-config
  */
 
-import { eq, asc } from 'drizzle-orm';
-import type { PgTable, PgColumn } from 'drizzle-orm/pg-core';
+import { asc, eq } from 'drizzle-orm';
+import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type {
-  SystemConfigRecord,
-  SystemConfigCreateData,
-  SystemConfigUpdateData,
+    SystemConfigCreateData,
+    SystemConfigRecord,
+    SystemConfigUpdateData,
 } from './types';
 
 /**
@@ -46,7 +46,7 @@ export interface SystemConfigRepositoryConfig {
  * Creates a System Config Repository with injected schema
  *
  * @example
- * import { createSystemConfigRepository } from '@yobolabs/core/system-config';
+ * import { createSystemConfigRepository } from '@jetdevs/core/system-config';
  * import { systemConfig } from '@/db/schema';
  *
  * const repo = createSystemConfigRepository({
@@ -292,8 +292,8 @@ export interface CachingSystemConfigRepositoryDeps {
  * import {
  *   createCachingSystemConfigRepository,
  *   type CachingSystemConfigRepositoryDeps
- * } from '@yobolabs/core/system-config';
- * import { withCache, withTelemetry, auditLog } from '@yobolabs/framework';
+ * } from '@jetdevs/core/system-config';
+ * import { withCache, withTelemetry, auditLog } from '@jetdevs/framework';
  * import { systemConfig } from '@/db/schema';
  *
  * const deps: CachingSystemConfigRepositoryDeps = {
@@ -472,14 +472,14 @@ export type CachingSystemConfigRepository = ReturnType<typeof createCachingSyste
  * SDK System Config Repository Class
  *
  * A class wrapper that can be used with createRouterWithActor's repository pattern.
- * Uses the SDK's systemConfig schema from @yobolabs/core/db/schema.
+ * Uses the SDK's systemConfig schema from @jetdevs/core/db/schema.
  *
  * Includes caching, telemetry, and audit logging when framework dependencies are available.
  *
  * @example
  * // Zero-config usage in root.ts
- * import { SDKSystemConfigRepository } from '@yobolabs/core/system-config';
- * import { systemConfigRouterConfig } from '@yobolabs/core/system-config';
+ * import { SDKSystemConfigRepository } from '@jetdevs/core/system-config';
+ * import { systemConfigRouterConfig } from '@jetdevs/core/system-config';
  *
  * const systemConfigRouterConfigWithRepo = Object.fromEntries(
  *   Object.entries(systemConfigRouterConfig).map(([key, route]) => [
@@ -501,7 +501,7 @@ export class SDKSystemConfigRepository {
     let deps: CachingSystemConfigRepositoryDeps = {};
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const framework = require('@yobolabs/framework');
+      const framework = require('@jetdevs/framework');
       deps = {
         withCache: framework.withCache,
         withTelemetry: framework.withTelemetry,

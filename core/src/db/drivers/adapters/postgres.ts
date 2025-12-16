@@ -7,19 +7,19 @@
  * - Local development
  * - Long-running processes
  *
- * @module @yobolabs/core/db/drivers/adapters/postgres
+ * @module @jetdevs/core/db/drivers/adapters/postgres
  */
 
 import type { SQL } from 'drizzle-orm';
 import type {
-  DriverAdapter,
-  DatabaseDriver,
-  DatabaseDialect,
-  DriverCapabilities,
-  PostgresDriverConfig,
-  QueryResult,
-  TransactionOptions,
-  ConnectionStats,
+    ConnectionStats,
+    DatabaseDialect,
+    DatabaseDriver,
+    DriverAdapter,
+    DriverCapabilities,
+    PostgresDriverConfig,
+    QueryResult,
+    TransactionOptions,
 } from '../types';
 
 // Type for postgres.js client - using any to avoid import type complexities

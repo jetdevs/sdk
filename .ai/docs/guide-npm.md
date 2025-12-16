@@ -2,7 +2,7 @@
 
 ## Registry
 
-All `@yobolabs/*` packages publish to **GitHub Packages** (not public npm).
+All `@jetdevs/*` packages publish to **GitHub Packages** (not public npm).
 
 ```
 https://npm.pkg.github.com
@@ -15,13 +15,13 @@ https://npm.pkg.github.com
 Create `/monorepo/.npmrc`:
 
 ```
-@yobolabs:registry=https://npm.pkg.github.com
+@jetdevs:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
 ```
 
 Or use environment variable:
 ```
-@yobolabs:registry=https://npm.pkg.github.com
+@jetdevs:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 ```
 
@@ -29,7 +29,7 @@ Or use environment variable:
 
 ```json
 {
-  "name": "@yobolabs/package-name",
+  "name": "@jetdevs/package-name",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
@@ -63,7 +63,7 @@ pnpm publish:packages
 pnpm publish:dry-run
 
 # Publish single package
-pnpm --filter @yobolabs/core publish --no-git-checks
+pnpm --filter @jetdevs/core publish --no-git-checks
 ```
 
 ## Version Bumping
@@ -82,7 +82,7 @@ Or manually edit `"version"` in `package.json`.
 
 ## Package Dependencies
 
-`@yobolabs/core` depends on `@yobolabs/framework`. Publishing order matters:
+`@jetdevs/core` depends on `@jetdevs/framework`. Publishing order matters:
 
 1. Publish `framework` first
 2. Then publish `core`
@@ -115,11 +115,11 @@ Workflow at `.github/workflows/publish-packages.yml`:
 Consumers need `.npmrc` with read access:
 
 ```
-@yobolabs:registry=https://npm.pkg.github.com
+@jetdevs:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=YOUR_READ_TOKEN
 ```
 
 Then install normally:
 ```bash
-pnpm add @yobolabs/core @yobolabs/framework
+pnpm add @jetdevs/core @jetdevs/framework
 ```

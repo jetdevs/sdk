@@ -11,19 +11,19 @@
  * - Edge runtimes
  * - Serverless functions
  *
- * @module @yobolabs/core/db/drivers/adapters/neon
+ * @module @jetdevs/core/db/drivers/adapters/neon
  */
 
 import type { SQL } from 'drizzle-orm';
 import type {
-  DriverAdapter,
-  DatabaseDriver,
-  DatabaseDialect,
-  DriverCapabilities,
-  NeonDriverConfig,
-  QueryResult,
-  TransactionOptions,
-  ConnectionStats,
+    ConnectionStats,
+    DatabaseDialect,
+    DatabaseDriver,
+    DriverAdapter,
+    DriverCapabilities,
+    NeonDriverConfig,
+    QueryResult,
+    TransactionOptions,
 } from '../types';
 
 // =============================================================================

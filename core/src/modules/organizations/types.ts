@@ -3,7 +3,7 @@
  *
  * Type definitions for organization management operations.
  *
- * @module @yobolabs/core/organizations
+ * @module @jetdevs/core/organizations
  */
 
 // =============================================================================

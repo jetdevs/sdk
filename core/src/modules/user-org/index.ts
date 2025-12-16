@@ -8,7 +8,7 @@
  * @example
  * ```ts
  * // In your app, create the repository with your schema
- * import { createUserOrgRepository } from '@yobolabs/core/user-org';
+ * import { createUserOrgRepository } from '@jetdevs/core/user-org';
  * import * as schema from '@/db/schema';
  *
  * const UserOrgRepository = createUserOrgRepository({
@@ -30,100 +30,50 @@
 
 // Types
 export type {
-  UserRoleData,
-  OrganizationInfo,
-  RoleInfo,
-  UserOrgData,
-  RoleAssignmentData,
-  UserOrgContext,
-  UserOrgMembership,
-  UserOrgPermission,
-  OrgUser,
-  AssignableRole,
-  AssignableOrganization,
-  UserRoleAllOrgs,
-  RoleAssignmentResult as TypesRoleAssignmentResult,
-  CreateRoleAssignmentInput,
+    AssignableOrganization, AssignableRole, CreateRoleAssignmentInput, OrgUser, OrganizationInfo, RoleAssignmentData, RoleInfo, RoleAssignmentResult as TypesRoleAssignmentResult, UserOrgContext, UserOrgData, UserOrgMembership,
+    UserOrgPermission, UserRoleAllOrgs, UserRoleData
 } from './types';
 
 // Schemas
 export {
-  // Input schemas
-  getCurrentOrgSchema,
-  switchOrgSchema,
-  validateOrgAccessSchema,
-  assignRoleSchema,
-  removeRoleSchema,
-  getUsersByRoleSchema,
-  getAvailableRolesSchema,
-  getUserRolesAllOrgsSchema,
-  // Output schemas
-  userOrgContextSchema,
-  userOrgMembershipSchema,
-  switchOrgResultSchema,
-  roleAssignmentResultSchema,
-  orgAccessResultSchema,
-  userOrgPermissionSchema,
-  orgUserSchema,
-  assignableRoleSchema,
-  assignableOrganizationSchema,
+    assignRoleSchema, assignableOrganizationSchema, assignableRoleSchema, getAvailableRolesSchema,
+    // Input schemas
+    getCurrentOrgSchema, getUserRolesAllOrgsSchema, getUsersByRoleSchema, orgAccessResultSchema, orgUserSchema, removeRoleSchema, roleAssignmentResultSchema, switchOrgResultSchema, switchOrgSchema,
+    // Output schemas
+    userOrgContextSchema,
+    userOrgMembershipSchema, userOrgPermissionSchema, validateOrgAccessSchema
 } from './schemas';
 
 export type {
-  GetCurrentOrgInput,
-  SwitchOrgInput,
-  ValidateOrgAccessInput,
-  AssignRoleInput,
-  RemoveRoleInput,
-  GetUsersByRoleInput,
-  GetAvailableRolesInput,
-  GetUserRolesAllOrgsInput,
-  UserOrgContextOutput,
-  UserOrgMembershipOutput,
-  SwitchOrgResult as SchemaSwitchOrgResult,
-  RoleAssignmentResultOutput,
-  OrgAccessResult,
+    AssignRoleInput, GetAvailableRolesInput, GetCurrentOrgInput, GetUserRolesAllOrgsInput, GetUsersByRoleInput, OrgAccessResult, RemoveRoleInput, RoleAssignmentResultOutput, SwitchOrgResult as SchemaSwitchOrgResult, SwitchOrgInput, UserOrgContextOutput,
+    UserOrgMembershipOutput, ValidateOrgAccessInput
 } from './schemas';
 
 // Repository
 export {
-  createUserOrgRepository,
+    createUserOrgRepository
 } from './user-org.repository';
 
 export type {
-  UserOrgRepositoryConfig,
+    UserOrgRepositoryConfig
 } from './user-org.repository';
 
 // Router Config
 export {
-  createUserOrgRouterConfig,
-  userOrgRouterConfig,
-  SDKUserOrgRepository,
+    SDKUserOrgRepository, createUserOrgRouterConfig,
+    userOrgRouterConfig
 } from './user-org.router-config';
 
 export type {
-  UserOrgRouterContext,
-  UserOrgServiceContext as UserOrgRouterServiceContext,
-  UserOrgRouterConfig,
-  UserOrgRouterFactoryDeps,
-  TRPCErrorConstructor,
+    TRPCErrorConstructor, UserOrgRouterConfig, UserOrgRouterContext, UserOrgRouterFactoryDeps, UserOrgServiceContext as UserOrgRouterServiceContext
 } from './user-org.router-config';
 
 // Service
 export {
-  createUserOrgService,
-  UserOrgService,
+    UserOrgService, createUserOrgService
 } from './service';
 
 export type {
-  GetCurrentOrgResult,
-  UserOrganization,
-  SwitchOrgResult as ServiceSwitchOrgResult,
-  RoleAssignmentResult as ServiceRoleAssignmentResult,
-  AvailableRole as ServiceAvailableRole,
-  UserRoleAllOrgsResult,
-  UserOrgServiceContext,
-  ServiceErrorConstructor,
-  UserOrgServiceHooks,
-  UserOrgServiceDeps,
+    GetCurrentOrgResult, AvailableRole as ServiceAvailableRole, ServiceErrorConstructor, RoleAssignmentResult as ServiceRoleAssignmentResult, SwitchOrgResult as ServiceSwitchOrgResult, UserOrgServiceContext, UserOrgServiceDeps, UserOrgServiceHooks, UserOrganization, UserRoleAllOrgsResult
 } from './service';
+

@@ -4,16 +4,16 @@
  * Central registry for all database driver adapters. Drivers are lazily loaded
  * to avoid bundling unnecessary dependencies.
  *
- * @module @yobolabs/core/db/drivers
+ * @module @jetdevs/core/db/drivers
  */
 
 import type {
-  DatabaseDriver,
-  DatabaseDialect,
-  DriverCapabilities,
-  DriverRegistryEntry,
-  BaseDriverConfig,
-  DriverAdapter,
+    BaseDriverConfig,
+    DatabaseDialect,
+    DatabaseDriver,
+    DriverAdapter,
+    DriverCapabilities,
+    DriverRegistryEntry,
 } from './types';
 
 // =============================================================================
