@@ -318,18 +318,24 @@ export class WhatsAppClient {
   /**
    * Send a template message
    * Uses /api/v1/whatsapp/send/template API
-   * Uses image URL directly (no pre-upload needed)
+   * Uses media URL directly (no pre-upload needed)
+   * Supports both image and video media types
    *
    * @param params - Send template message request with optional WABA config
    */
   async sendTemplateMessage(params: SendTemplateMessageRequest): Promise<SendMessageResponse> {
-    const { templateId, phoneNumber, imageUrl, metadata, bodyParameters, wabaId, senderLabel } =
+    const { templateId, phoneNumber, imageUrl, metadata, bodyParameters, wabaId, senderLabel, mediaType } =
       params;
+
+    // Determine effective media type (default to 'image' for backwards compatibility)
+    const effectiveMediaType = mediaType || 'image';
+    const isVideo = effectiveMediaType === 'video';
 
     log.debug('Sending template message', {
       templateId,
       phoneNumber,
-      hasImage: !!imageUrl,
+      hasMedia: !!imageUrl,
+      mediaType: effectiveMediaType,
       wabaId,
     });
 
@@ -340,24 +346,39 @@ export class WhatsAppClient {
         text: value,
       })) || [];
 
+    // Build header parameters based on media type
+    const headerParameters = imageUrl
+      ? [
+          isVideo
+            ? {
+                type: 'video',
+                video: {
+                  link: imageUrl,
+                },
+              }
+            : {
+                type: 'image',
+                image: {
+                  link: imageUrl,
+                },
+              },
+        ]
+      : [];
+
     const baseRequestBody = {
       provider_template_id: templateId,
       recipient_phone_number: phoneNumber,
       metadata: metadata || {},
       components: [
-        {
-          type: 'header',
-          parameters: imageUrl
-            ? [
-                {
-                  type: 'image',
-                  image: {
-                    link: imageUrl, // Use image URL directly
-                  },
-                },
-              ]
-            : [],
-        },
+        // Only include header component if there's media
+        ...(imageUrl
+          ? [
+              {
+                type: 'header',
+                parameters: headerParameters,
+              },
+            ]
+          : []),
         {
           type: 'body',
           parameters: bodyParams,
@@ -367,6 +388,8 @@ export class WhatsAppClient {
 
     // Add WABA config
     const requestBody = withWabaConfig(baseRequestBody, { wabaId, senderLabel });
+
+    log.debug('Template message request payload', { requestBody: JSON.stringify(requestBody) });
 
     const response = (await this.request('POST', '/api/v1/whatsapp/send/template', requestBody)) as {
       ProviderMessageID?: string;
@@ -411,17 +434,25 @@ export class WhatsAppClient {
     const carouselCards = cards.map((card, index) => {
       const cardComponents: Array<{ type: string; parameters: unknown[] }> = [];
 
-      // Add HEADER with image if available
+      // Add HEADER with media (image or video) if available
       if (card.imageUrl) {
+        const isVideo = card.mediaType === 'video';
         cardComponents.push({
           type: 'header',
           parameters: [
-            {
-              type: 'image',
-              image: {
-                link: card.imageUrl,
-              },
-            },
+            isVideo
+              ? {
+                  type: 'video',
+                  video: {
+                    link: card.imageUrl,
+                  },
+                }
+              : {
+                  type: 'image',
+                  image: {
+                    link: card.imageUrl,
+                  },
+                },
           ],
         });
       }
@@ -472,6 +503,8 @@ export class WhatsAppClient {
 
     // Add WABA config
     const requestBody = withWabaConfig(baseRequestBody, { wabaId, senderLabel });
+
+    log.debug('Carousel message request payload', { requestBody: JSON.stringify(requestBody) });
 
     const response = (await this.request('POST', '/api/v1/whatsapp/send/template', requestBody)) as {
       ProviderMessageID?: string;

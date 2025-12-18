@@ -124,13 +124,18 @@ export interface SendTemplateMessageRequest extends WabaConfig {
   imageUrl?: string;
   metadata?: Record<string, unknown>;
   bodyParameters?: string[];
+  /** Type of media in header (image or video), defaults to 'image' */
+  mediaType?: 'image' | 'video';
 }
 
 /**
  * Carousel card for carousel messages
  */
 export interface CarouselCard {
+  /** Media URL (image or video) */
   imageUrl: string;
+  /** Type of media (image or video), defaults to 'image' */
+  mediaType?: 'image' | 'video';
   bodyParameters?: string[];
 }
 
