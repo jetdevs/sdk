@@ -1,6 +1,6 @@
 {
   "name": "@yobolabs/packages",
-  "version": "1.0.0",
+  "version": "1.0.4-dev",
   "private": true,
   "description": "YoboLabs SDK Packages",
   "scripts": {
