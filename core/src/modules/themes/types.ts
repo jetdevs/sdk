@@ -22,6 +22,8 @@ export interface Theme {
   cssFile: string;
   isActive: boolean;
   isDefault: boolean;
+  /** When true, this theme is applied to ALL users regardless of their preference */
+  isGlobal: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

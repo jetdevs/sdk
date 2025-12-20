@@ -119,6 +119,7 @@ export function createThemeRouterConfig(deps: RouterFactoryDeps): RouterConfig {
           cssFile: theme.cssFile,
           isActive: theme.isActive,
           isDefault: theme.isDefault,
+          isGlobal: theme.isGlobal,
           createdAt: theme.createdAt,
           updatedAt: theme.updatedAt,
         }));
@@ -278,6 +279,70 @@ export function createThemeRouterConfig(deps: RouterFactoryDeps): RouterConfig {
         }
 
         return repo.toggleActive(input);
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // GET GLOBAL THEME (public - for ALL users to load the fixed theme)
+    // -------------------------------------------------------------------------
+    getGlobal: {
+      type: "query" as const,
+      cache: { ttl: 300, tags: ["themes", "global-theme"] },
+      repository: Repository,
+      handler: async ({ repo }) => {
+        const theme = await repo.findGlobal();
+        if (!theme) {
+          return null;
+        }
+        return {
+          id: theme.id,
+          uuid: theme.uuid,
+          name: theme.name,
+          displayName: theme.displayName,
+          description: theme.description,
+          cssFile: theme.cssFile,
+          isDefault: theme.isDefault,
+          isGlobal: theme.isGlobal,
+        };
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // SET GLOBAL THEME (admin only - sets fixed theme for ALL users)
+    // -------------------------------------------------------------------------
+    setGlobal: {
+      permission: "admin:manage",
+      input: z.string().uuid(),
+      invalidates: ["themes", "global-theme"],
+      entityType: "theme",
+      repository: Repository,
+      handler: async ({ input, service, repo }) => {
+        // Check if theme exists
+        const existing = await repo.findByUuid(input);
+        if (!existing) {
+          throw new Error("NOT_FOUND: Theme not found");
+        }
+
+        // Theme must be active to be set as global
+        if (!existing.isActive) {
+          throw new Error("FORBIDDEN: Cannot set an inactive theme as global");
+        }
+
+        return repo.setGlobal(input);
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // CLEAR GLOBAL THEME (admin only - removes fixed theme, users can choose)
+    // -------------------------------------------------------------------------
+    clearGlobal: {
+      permission: "admin:manage",
+      invalidates: ["themes", "global-theme"],
+      entityType: "theme",
+      repository: Repository,
+      handler: async ({ service, repo }) => {
+        const cleared = await repo.clearGlobal();
+        return { success: cleared };
       },
     },
   };
