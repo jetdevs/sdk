@@ -22,6 +22,7 @@
  */
 
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { auditLog, type AuditAction } from '../audit';
 import type { Actor } from '../auth/actor';
 import { withTelemetry } from '../telemetry';
@@ -503,6 +504,11 @@ export function createRouterWithActor<TDb = any>(
         const telemetryName = route.description || `${name}.public`;
 
         // Create an empty actor for public routes (not authenticated)
+        // INTENTIONAL: userId: 0 is acceptable here because public routes by definition
+        // have no authenticated user. This is different from API key authentication where
+        // we MUST have a valid createdBy to attribute operations to a real user.
+        // Public routes are explicitly marked with `public: true` and are expected to
+        // operate without user context for things like health checks, public data, etc.
         const emptyActor: Actor = {
           userId: 0,
           email: '',
@@ -530,9 +536,46 @@ export function createRouterWithActor<TDb = any>(
 
       // This is the boilerplate we're eliminating:
       const actor = adapter.createActor(ctx);
+
+      // =======================================================================
+      // SECURITY: Locked Org ID Enforcement (STORY-002a)
+      //
+      // When ctx.lockedOrgId is set (e.g., on custom domains), we prevent
+      // input.orgId from overriding the org context. This is a generic
+      // mechanism that apps can use for any org-locking scenario.
+      // =======================================================================
+      const lockedOrgId = (ctx as any).lockedOrgId as number | undefined;
+      let targetOrgId = input?.orgId;
+
+      if (lockedOrgId !== undefined) {
+        if (targetOrgId && targetOrgId !== lockedOrgId) {
+          // SECURITY: Log the attempted bypass
+          console.error('[SECURITY] Attempted org override with locked context:', {
+            inputOrgId: targetOrgId,
+            lockedOrgId,
+            procedureName: name,
+            userId: actor.userId,
+          });
+
+          // Use TRPCError for proper HTTP 403 response (per specs 9.3)
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Organization context cannot be overridden in this context',
+            cause: {
+              type: 'LOCKED_ORG_VIOLATION',
+              inputOrgId: targetOrgId,
+              lockedOrgId,
+            }
+          });
+        }
+
+        // Force targetOrgId to lockedOrgId
+        targetOrgId = lockedOrgId;
+      }
+
       const { dbFunction, effectiveOrgId } = adapter.getDbContext(ctx, actor, {
         crossOrgAccess: route.crossOrg,
-        targetOrgId: input?.orgId,
+        targetOrgId,
       });
 
       // Execute within RLS context

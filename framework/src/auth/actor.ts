@@ -11,9 +11,13 @@
  */
 
 import type { Session } from './types';
+import type { TenantContext } from '../tenant/types';
 
 /**
  * Actor represents an authenticated user with their authorization context
+ *
+ * Extended in v3.0 to support multi-tenant/custom domain scenarios with
+ * OPTIONAL fields for backward compatibility (per specs.md section 9.2).
  */
 export interface Actor {
   // Core identity
@@ -33,6 +37,50 @@ export interface Actor {
 
   // Session metadata
   sessionExpiry: string;
+
+  // ==========================================================================
+  // TENANT CONTEXT FIELDS (v3.0) - All OPTIONAL for backward compatibility
+  // ==========================================================================
+
+  /**
+   * Tenant context if on a custom domain
+   *
+   * Contains information about the custom domain and locked org.
+   * OPTIONAL: Not present for non-tenant contexts (per specs 9.2)
+   */
+  tenantContext?: TenantContext;
+
+  /**
+   * Whether the org context is locked (cannot be overridden by input.orgId)
+   *
+   * When true, the SDK will reject any attempt to override the org context
+   * via input.orgId parameter in tRPC procedures.
+   *
+   * OPTIONAL: Defaults to false for backward compatibility (per specs 9.2)
+   */
+  isOrgLocked?: boolean;
+
+  /**
+   * The effective org ID considering tenant context
+   *
+   * When on custom domain: equals lockedOrgId
+   * Otherwise: equals actor.orgId
+   *
+   * OPTIONAL: Defaults to actor.orgId (per specs 9.2)
+   */
+  effectiveOrgId?: number | null;
+
+  /**
+   * Whether this actor is in a custom domain context
+   * @deprecated Use tenantContext?.isCustomDomain instead
+   */
+  isCustomDomainContext?: boolean;
+
+  /**
+   * The org ID locked by custom domain
+   * @deprecated Use tenantContext?.lockedOrgId instead
+   */
+  customDomainOrgId?: number;
 }
 
 /**
@@ -194,7 +242,11 @@ export function createActor(ctx: ActorContext): Actor {
     isSystemUser,
     isSuperUser,
     permissions,
-    sessionExpiry: ctx.session.expires || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    sessionExpiry: ctx.session.expires || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    // NEW: Optional tenant fields with defaults (per specs 9.2)
+    // These are set by the app-level createActor wrapper when on custom domain
+    isOrgLocked: false,
+    effectiveOrgId: currentOrgId,
   };
 }
 

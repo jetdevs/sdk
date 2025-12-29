@@ -68,6 +68,16 @@
       "types": "./dist/nextjs/index.d.ts",
       "import": "./dist/nextjs/index.mjs",
       "require": "./dist/nextjs/index.js"
+    },
+    "./tenant": {
+      "types": "./dist/tenant/index.d.ts",
+      "import": "./dist/tenant/index.mjs",
+      "require": "./dist/tenant/index.js"
+    },
+    "./tenant/client": {
+      "types": "./dist/tenant/client.d.ts",
+      "import": "./dist/tenant/client.mjs",
+      "require": "./dist/tenant/client.js"
     }
   },
   "scripts": {
@@ -105,10 +115,12 @@
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/react": "^18",
     "@trpc/client": "^11.7.2",
     "@trpc/server": "^11.7.2",
     "@tanstack/react-query": "^5.90.12",
     "next": "^15.1.9",
+    "react": "^19.0.0",
     "tsup": "^8.0.1",
     "typescript": "^5",
     "vitest": "^3.2.3"
