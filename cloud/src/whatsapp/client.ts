@@ -94,6 +94,66 @@ export class WhatsAppClient {
     return response.json();
   }
 
+  /**
+   * Build button components for Quick Reply buttons
+   *
+   * Filters only Quick Reply buttons from the provided array,
+   * sorts them by order, and generates WhatsApp API button components
+   * with correct indices and UUID payloads.
+   *
+   * @param buttons - Button array (may contain URL and Quick Reply buttons)
+   * @returns Array of button components (only Quick Reply buttons)
+   *
+   * @example
+   * const buttons = [
+   *   { type: 'url', text: 'Visit', url: 'https://...', order: 0 },
+   *   { type: 'quickReply', text: 'Yes', order: 1 },
+   *   { type: 'quickReply', text: 'No', order: 2 }
+   * ];
+   *
+   * const components = this.buildButtonComponents(buttons);
+   * // Returns 2 components with indices 1 and 2 (URL button at 0 not included)
+   */
+  private buildButtonComponents(
+    buttons?: Array<{
+      type: 'url' | 'quickReply';
+      text: string;
+      url?: string;
+      order: number;
+    }>
+  ): Array<{
+    type: 'button';
+    sub_type: 'quick_reply';
+    index: number;
+    parameters: [{ type: 'payload'; payload: string }];
+  }> {
+    // Return empty array if no buttons
+    if (!buttons || buttons.length === 0) {
+      return [];
+    }
+
+    // Sort all buttons by order to get correct index positions
+    const sortedButtons = [...buttons].sort((a, b) => a.order - b.order);
+
+    // Build components only for Quick Reply buttons
+    return sortedButtons
+      .filter(btn => btn.type === 'quickReply')
+      .map(btn => {
+        // Find index in the sorted ALL buttons array (includes URL buttons)
+        const index = sortedButtons.findIndex(b => b === btn);
+
+        return {
+          type: 'button' as const,
+          sub_type: 'quick_reply' as const,
+          index,
+          parameters: [{
+            type: 'payload' as const,
+            payload: crypto.randomUUID(), // Generate fresh UUID at send time
+          }],
+        };
+      });
+  }
+
   // ========== Media Upload ==========
 
   /**
@@ -324,7 +384,7 @@ export class WhatsAppClient {
    * @param params - Send template message request with optional WABA config
    */
   async sendTemplateMessage(params: SendTemplateMessageRequest): Promise<SendMessageResponse> {
-    const { templateId, phoneNumber, imageUrl, metadata, bodyParameters, wabaId, senderLabel, mediaType } =
+    const { templateId, phoneNumber, imageUrl, metadata, bodyParameters, wabaId, senderLabel, mediaType, buttons } =
       params;
 
     // Determine effective media type (default to 'image' for backwards compatibility)
@@ -336,6 +396,8 @@ export class WhatsAppClient {
       phoneNumber,
       hasMedia: !!imageUrl,
       mediaType: effectiveMediaType,
+      hasButtons: !!buttons && buttons.length > 0,
+      buttonCount: buttons?.length || 0,
       wabaId,
     });
 
@@ -365,6 +427,9 @@ export class WhatsAppClient {
         ]
       : [];
 
+    // Build button components (only Quick Reply buttons)
+    const buttonComponents = this.buildButtonComponents(buttons);
+
     const baseRequestBody = {
       provider_template_id: templateId,
       recipient_phone_number: phoneNumber,
@@ -383,6 +448,8 @@ export class WhatsAppClient {
           type: 'body',
           parameters: bodyParams,
         },
+        // Add button components (only if Quick Reply buttons exist)
+        ...buttonComponents,
       ],
     };
 
@@ -431,7 +498,7 @@ export class WhatsAppClient {
     });
 
     // Build carousel cards
-    const carouselCards = cards.map((card, index) => {
+    const carouselCards = cards.map((card, cardIndex) => {
       const cardComponents: Array<{ type: string; parameters: unknown[] }> = [];
 
       // Add HEADER with media (image or video) if available
@@ -458,19 +525,33 @@ export class WhatsAppClient {
       }
 
       // Add BODY with variables if available for this card
-      if (cardBodyParameters && cardBodyParameters[index]?.length > 0) {
+      if (cardBodyParameters && cardBodyParameters[cardIndex]?.length > 0) {
         cardComponents.push({
           type: 'body',
-          parameters: cardBodyParameters[index].map((value) => ({
+          parameters: cardBodyParameters[cardIndex].map((value) => ({
             type: 'text',
             text: value,
           })),
         });
       }
 
+      // Build button components for this card (only Quick Reply buttons)
+      const cardButtonComponents = this.buildButtonComponents(card.buttons);
+
+      log.debug('Building carousel card', {
+        cardIndex,
+        hasButtons: !!card.buttons && card.buttons.length > 0,
+        buttonCount: card.buttons?.length || 0,
+        buttonComponentCount: cardButtonComponents.length,
+      });
+
       return {
-        card_index: index,
-        components: cardComponents,
+        card_index: cardIndex,
+        components: [
+          ...cardComponents,
+          // Add button components for this card (only if Quick Reply buttons exist)
+          ...cardButtonComponents,
+        ],
       };
     });
 

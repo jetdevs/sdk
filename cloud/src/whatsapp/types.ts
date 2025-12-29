@@ -126,6 +126,13 @@ export interface SendTemplateMessageRequest extends WabaConfig {
   bodyParameters?: string[];
   /** Type of media in header (image or video), defaults to 'image' */
   mediaType?: 'image' | 'video';
+  /** Buttons for the message (URL and Quick Reply) */
+  buttons?: Array<{
+    type: 'url' | 'quickReply';
+    text: string;
+    url?: string;
+    order: number;
+  }>;
 }
 
 /**
@@ -137,6 +144,13 @@ export interface CarouselCard {
   /** Type of media (image or video), defaults to 'image' */
   mediaType?: 'image' | 'video';
   bodyParameters?: string[];
+  /** Buttons for this carousel card (max 2) */
+  buttons?: Array<{
+    type: 'url' | 'quickReply';
+    text: string;
+    url?: string;
+    order: number;
+  }>;
 }
 
 /**
