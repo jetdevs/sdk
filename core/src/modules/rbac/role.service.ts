@@ -664,8 +664,9 @@ export class RoleService {
     }
 
     try {
-      // Soft delete all roles
-      const deletedCount = await repo.bulkUpdate(roleIds, { isActive: false });
+      // Hard delete all roles - permanently removes from database
+      // This matches user expectations when they click "Delete" in the UI
+      const deletedCount = await repo.bulkHardDelete(roleIds);
 
       return {
         success: true,

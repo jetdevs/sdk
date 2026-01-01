@@ -69,7 +69,9 @@ export interface OrgServiceHooks {
   onOrgDeleted?: (orgId: number, ctx: OrgServiceContext) => Promise<void>;
 
   /**
-   * Copies role templates for a new organization
+   * @deprecated Roles are now global (orgId = null, isGlobalRole = true).
+   * Org-specific role templates are no longer needed. This hook is kept
+   * for backward compatibility but will be ignored.
    */
   copyRoleTemplates?: (orgId: number) => Promise<void>;
 
@@ -608,10 +610,8 @@ export function createOrgServiceClass(
             { initialData: params }
           );
 
-          // Copy role templates if hook is provided
-          if (this._hooks?.copyRoleTemplates) {
-            await this._hooks.copyRoleTemplates(newOrg.id);
-          }
+          // NOTE: copyRoleTemplates hook is deprecated and no longer called.
+          // Roles are now global (orgId = null, isGlobalRole = true) and shared across all organizations.
 
           // Call onOrgCreated hook if provided
           if (this._hooks?.onOrgCreated) {
@@ -1114,10 +1114,8 @@ export function createOrgServiceClass(
 
             console.log('Created default org:', { orgId: defaultOrg.id });
 
-            // Copy role templates if hook is provided
-            if (this._hooks?.copyRoleTemplates) {
-              await this._hooks.copyRoleTemplates(defaultOrg.id);
-            }
+            // NOTE: copyRoleTemplates hook is deprecated and no longer called.
+            // Roles are now global (orgId = null, isGlobalRole = true) and shared across all organizations.
 
             return defaultOrg;
           }

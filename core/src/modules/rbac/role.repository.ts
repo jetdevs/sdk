@@ -744,6 +744,20 @@ export class RoleRepository {
   }
 
   /**
+   * Bulk hard delete roles (permanently removes from database)
+   */
+  async bulkHardDelete(roleIds: number[]): Promise<number> {
+    if (roleIds.length === 0) return 0;
+
+    const result = await this.db
+      .delete(this.roles)
+      .where(inArray(this.roles.id, roleIds))
+      .returning({ id: this.roles.id });
+
+    return result.length;
+  }
+
+  /**
    * Get system roles
    */
   async getSystemRoles(): Promise<RoleWithStats[]> {

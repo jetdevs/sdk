@@ -397,10 +397,12 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
       }: RoleHandlerContext<number>) => {
         const serviceCtx = createServiceContext(db, actor, service.orgId);
 
+        // Use hard delete (force: true) to actually remove the record from the database
+        // This matches user expectations when they click "Delete" in the UI
         return Service.delete(
           {
             id: input,
-            force: false,
+            force: true,
           },
           serviceCtx
         );

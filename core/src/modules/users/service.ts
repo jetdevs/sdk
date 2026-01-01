@@ -244,15 +244,9 @@ export interface UserServiceHooks {
   broadcastPermissionUpdate?: (userIds: number[]) => Promise<void>;
 
   /**
-   * Copy organization role templates for a new organization.
-   * Used when creating the first user in an org to ensure default roles exist.
-   *
-   * @example
-   * ```typescript
-   * copyOrgRoleTemplates: async (orgId) => {
-   *   await seedDefaultRoles(orgId);
-   * }
-   * ```
+   * @deprecated Roles are now global (orgId = null, isGlobalRole = true).
+   * Org-specific role templates are no longer needed. This hook is kept
+   * for backward compatibility but will be ignored.
    */
   copyOrgRoleTemplates?: (orgId: number) => Promise<void>;
 
@@ -1255,6 +1249,9 @@ export function createUserService(deps: UserServiceDeps): IUserService {
 
     /**
      * Assign standard user role to a user (private helper)
+     *
+     * Finds the global Standard User role (orgId = null, isGlobalRole = true)
+     * and assigns it to the user for the specified organization.
      */
     async assignStandardUserRole(
       userId: number,
@@ -1263,28 +1260,43 @@ export function createUserService(deps: UserServiceDeps): IUserService {
       hooks: UserServiceHooks
     ) {
       try {
-        // Find Standard User role for this org
-        let standardUserRole = await hooks.withPrivilegedDb(async (db) => {
+        // Find the global Standard User role
+        // Global roles have: name = 'Standard User', isGlobalRole = true, orgId IS NULL
+        const standardUserRole = await hooks.withPrivilegedDb(async (db) => {
           const repo = getRepo(db);
-          // Try to find Standard User role by querying roles in org
-          // This is a simplified version - apps may want to provide their own implementation
-          const roles = await repo.getUserRoles(db, userId, orgId);
-          return roles.find(r => r.name === 'Standard User');
+          return await repo.findGlobalStandardUserRole(db);
         });
 
-        // If role doesn't exist and we have the copy templates hook, use it
-        if (!standardUserRole && hooks.copyOrgRoleTemplates) {
-          await hooks.copyOrgRoleTemplates(orgId);
+        if (!standardUserRole) {
+          console.warn('[assignStandardUserRole] Global Standard User role not found. Ensure the role is seeded with isGlobalRole=true and orgId=null.');
+          return;
         }
 
-        // Try to assign the role using the hook if provided
+        // Assign the global role to the user
+        // Use the hook if provided for centralized role assignment
         if (hooks.assignUserRole) {
           await hooks.assignUserRole({
             userId,
             orgId,
+            roleId: standardUserRole.id,
             assignedBy,
           });
+        } else {
+          // Fallback: use repository directly
+          await hooks.withPrivilegedDb(async (db) => {
+            const repo = getRepo(db);
+            await repo.assignRole(db, {
+              userId,
+              roleId: standardUserRole.id,
+              orgId,
+              isActive: true,
+              assignedBy,
+              assignedAt: new Date(),
+            });
+          });
         }
+
+        console.log(`[assignStandardUserRole] Assigned global Standard User role (id: ${standardUserRole.id}) to user ${userId} in org ${orgId}`);
       } catch (error) {
         console.error('Error assigning default role:', error);
         // Don't fail the invite if role assignment fails

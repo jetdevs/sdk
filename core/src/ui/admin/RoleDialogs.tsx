@@ -392,10 +392,10 @@ export function createDeleteRoleDialogFactory(
                         <strong>What happens when you delete this role:</strong>
                       </p>
                       <ul className="mt-1 space-y-1 list-disc list-inside">
-                        <li>The role will be marked as inactive (soft delete)</li>
+                        <li>The role will be permanently deleted from the database</li>
                         <li>Users will lose access to permissions from this role</li>
                         <li>Role assignments will be removed</li>
-                        <li>Historical data will be preserved</li>
+                        <li>This action cannot be undone</li>
                       </ul>
                     </div>
                   </>
