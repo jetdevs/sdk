@@ -1307,33 +1307,50 @@ export function createUserService(deps: UserServiceDeps): IUserService {
 import { SDKUserRepository } from './router-config';
 
 /**
- * Default password hasher using simple approach
- * Apps should provide their own bcrypt implementation for production
+ * Default password hasher - THROWS ERROR in production
+ *
+ * This function exists only to prevent runtime crashes when apps don't configure
+ * password hashing. It will throw an error to force apps to provide proper bcrypt.
+ *
+ * @deprecated Always provide your own bcrypt implementation via createUserService
  */
 async function defaultHashPassword(password: string, _rounds?: number): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  // SECURITY: Throw error to prevent weak password hashing
+  // Apps MUST provide bcrypt implementation
+  throw new Error(
+    '[SECURITY ERROR] Password hashing not configured! ' +
+    'You must provide hashPassword and comparePassword functions using bcrypt. ' +
+    'Example: createUserService({ hooks: { hashPassword: (p) => bcrypt.hash(p, 12), comparePassword: bcrypt.compare } })'
+  );
 }
 
 /**
- * Default password comparator
+ * Default password comparator - THROWS ERROR in production
+ *
+ * @deprecated Always provide your own bcrypt implementation via createUserService
  */
 async function defaultComparePassword(password: string, hash: string): Promise<boolean> {
-  const hashed = await defaultHashPassword(password);
-  return hashed === hash;
+  // SECURITY: Throw error to prevent weak password comparison
+  // Apps MUST provide bcrypt implementation
+  throw new Error(
+    '[SECURITY ERROR] Password comparison not configured! ' +
+    'You must provide hashPassword and comparePassword functions using bcrypt. ' +
+    'Example: createUserService({ hooks: { hashPassword: (p) => bcrypt.hash(p, 12), comparePassword: bcrypt.compare } })'
+  );
 }
 
 /**
  * Create a default user service with minimal configuration.
  *
- * NOTE: This creates a service with basic password hashing (SHA-256).
- * For production, you should use createUserService with proper bcrypt:
+ * @deprecated DO NOT USE IN PRODUCTION - This will throw an error when password
+ * operations are attempted. Always use createUserService with bcrypt hooks.
+ *
+ * This function creates a service with NO password hashing configured.
+ * Any password operation will throw a security error.
  *
  * @example
  * ```typescript
+ * // REQUIRED: Production usage with bcrypt
  * import { createUserService, SDKUserRepository } from '@jetdevs/core/users';
  * import { withPrivilegedDb } from '@/db/clients';
  * import bcrypt from 'bcrypt';

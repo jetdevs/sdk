@@ -730,44 +730,50 @@ export const SDKUserRepository = createUserRepositoryClass({
 // =============================================================================
 
 /**
- * Default password hasher using simple approach
- * Apps should provide their own bcrypt implementation for production
+ * Default password hasher - THROWS ERROR in production
+ *
+ * This function exists only to prevent runtime crashes when apps don't configure
+ * password hashing. It will throw an error to force apps to provide proper bcrypt.
+ *
+ * @deprecated Always provide your own bcrypt implementation via createUserRouterConfig
  */
 async function defaultHashPassword(password: string, _rounds?: number): Promise<string> {
-  // Simple hash for development - apps should override with bcrypt
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  // SECURITY: Throw error to prevent weak password hashing
+  // Apps MUST provide bcrypt implementation
+  throw new Error(
+    '[SECURITY ERROR] Password hashing not configured! ' +
+    'You must provide hashPassword and comparePassword functions using bcrypt. ' +
+    'Example: createUserRouterConfig({ hashPassword: (p) => bcrypt.hash(p, 10), comparePassword: bcrypt.compare })'
+  );
 }
 
 /**
- * Default password comparator
+ * Default password comparator - THROWS ERROR in production
+ *
+ * @deprecated Always provide your own bcrypt implementation via createUserRouterConfig
  */
 async function defaultComparePassword(password: string, hash: string): Promise<boolean> {
-  const hashed = await defaultHashPassword(password);
-  return hashed === hash;
+  // SECURITY: Throw error to prevent weak password comparison
+  // Apps MUST provide bcrypt implementation
+  throw new Error(
+    '[SECURITY ERROR] Password comparison not configured! ' +
+    'You must provide hashPassword and comparePassword functions using bcrypt. ' +
+    'Example: createUserRouterConfig({ hashPassword: (p) => bcrypt.hash(p, 10), comparePassword: bcrypt.compare })'
+  );
 }
 
 /**
  * Pre-built user router configuration
  *
- * Uses the SDK's own UserRepository and schema.
- * Apps can use this directly without creating their own repository.
+ * @deprecated DO NOT USE IN PRODUCTION - This will throw an error when password
+ * operations are attempted. Always use createUserRouterConfig with bcrypt.
  *
- * NOTE: This uses a simple SHA-256 hash for passwords. For production,
- * you should use createUserRouterConfig with bcrypt:
+ * Uses the SDK's own UserRepository and schema but has NO password hashing
+ * configured. Any password operation will throw a security error.
  *
  * @example
  * ```typescript
- * // Option 1: Simple usage with SDK defaults (development only)
- * import { userRouterConfig } from '@jetdevs/core/users';
- * import { createRouterWithActor } from '@jetdevs/framework/router';
- *
- * export const userRouter = createRouterWithActor(userRouterConfig);
- *
- * // Option 2: Production usage with bcrypt
+ * // REQUIRED: Production usage with bcrypt
  * import { createUserRouterConfig, SDKUserRepository } from '@jetdevs/core/users';
  * import { createRouterWithActor } from '@jetdevs/framework/router';
  * import bcrypt from 'bcrypt';
