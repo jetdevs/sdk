@@ -679,10 +679,14 @@ export function createManagePermissionsMatrix(
       setIsSubmitting(true);
 
       try {
+        // For global/system roles (orgId = null), we pass undefined to use the role's own orgId
+        // The router handler will use role.orgId ?? null to determine the target org context
+        // crossOrgAccess: true is required to access roles with org_id = NULL
         await assignPermissionsMutation.mutateAsync({
           roleId: role.id,
           permissionIds: Array.from(selectedPermissionIds),
-          orgId: targetOrgId === null ? undefined : targetOrgId,
+          // Pass orgId only if it's a valid number, otherwise let the service determine from the role
+          orgId: typeof targetOrgId === 'number' ? targetOrgId : undefined,
           crossOrgAccess: forceCrossOrg || isSuperuser,
         });
 
@@ -691,7 +695,7 @@ export function createManagePermissionsMatrix(
           utils.role.getWithPermissions.invalidate({
             roleId: role.id,
             crossOrgAccess: forceCrossOrg || isSuperuser,
-            orgId: targetOrgId === null ? undefined : targetOrgId
+            orgId: typeof targetOrgId === 'number' ? targetOrgId : undefined
           }),
         ]);
 

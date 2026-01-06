@@ -59,10 +59,11 @@ export interface UserRouterDeps {
 
 /**
  * Service context from createRouterWithActor
+ * orgId can be null for system users accessing global data
  */
 export interface UserServiceContext {
   db: any;
-  orgId: number;
+  orgId: number | null;
   userId: string;
 }
 
@@ -135,7 +136,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             search: input.search,
             isActive: input.isActive,
             roleId: input.roleId,
-            orgId: input.orgId || service.orgId,
+            // Convert null to undefined for repository compatibility
+            orgId: input.orgId ?? (service.orgId ?? undefined),
           },
         });
 
@@ -143,12 +145,13 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           search: input.search,
           isActive: input.isActive,
           roleId: input.roleId,
-          orgId: input.orgId || service.orgId,
+          orgId: input.orgId ?? (service.orgId ?? undefined),
         });
 
         // Get roles for users
         const userIds = users.map(u => u.id);
-        const rolesByUser = await repo.getUserRolesBatch(db, userIds, service.orgId);
+        // Convert null to undefined for repository compatibility
+        const rolesByUser = await repo.getUserRolesBatch(db, userIds, service.orgId ?? undefined);
 
         const usersWithRoles = users.map(user => ({
           ...user,
@@ -174,7 +177,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         return repo.findAll(db, {
           limit: 100,
           offset: 0,
-          filters: { isActive: true, orgId: service.orgId },
+          // Convert null to undefined for repository compatibility
+          filters: { isActive: true, orgId: service.orgId ?? undefined },
         });
       },
     },
@@ -238,7 +242,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('NOT_FOUND', `User with ID ${input} not found`);
         }
 
-        const roles = await repo.getUserRoles(db, input, service.orgId);
+        // Convert null to undefined for repository compatibility
+        const roles = await repo.getUserRoles(db, input, service.orgId ?? undefined);
         return { ...user, roles };
       },
     },
@@ -414,7 +419,22 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       entityType: 'user',
       repository: deps.Repository,
       handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userUpdateSchema>>) => {
-        const { id, ...updateData } = input;
+        // DEBUG: Log incoming input to trace password flow
+        console.log('[SDK User Update] Input received:', JSON.stringify({
+          id: input.id,
+          hasPassword: !!input.password,
+          passwordLength: input.password?.length,
+          allKeys: Object.keys(input),
+        }));
+
+        const { id, password, ...updateData } = input;
+
+        // DEBUG: Log after destructuring
+        console.log('[SDK User Update] After destructuring:', JSON.stringify({
+          hasPassword: !!password,
+          passwordLength: password?.length,
+          updateDataKeys: Object.keys(updateData),
+        }));
 
         // Verify user exists
         const existing = await repo.findById(db, id);
@@ -422,7 +442,20 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('NOT_FOUND', `User with ID ${id} not found`);
         }
 
-        return repo.update(db, id, updateData);
+        // Hash password if provided
+        const finalUpdateData = { ...updateData } as typeof updateData & { password?: string };
+        if (password) {
+          finalUpdateData.password = await deps.hashPassword(password, 10);
+          console.log('[SDK User Update] Password hashed and added to finalUpdateData');
+        }
+
+        // DEBUG: Log final update data
+        console.log('[SDK User Update] Final update data:', JSON.stringify({
+          hasPassword: !!finalUpdateData.password,
+          allKeys: Object.keys(finalUpdateData),
+        }));
+
+        return repo.update(db, id, finalUpdateData);
       },
     },
 
@@ -601,7 +634,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       repository: deps.Repository,
       handler: async ({ service, repo, db }: UserHandlerContext) => {
         const userId = parseInt(service.userId);
-        return repo.getUserPermissions(db, userId, service.orgId);
+        // Convert null to undefined for repository compatibility
+        return repo.getUserPermissions(db, userId, service.orgId ?? undefined);
       },
     },
 

@@ -52,7 +52,11 @@ export function getDbContext<TDb = any>(
   } = options;
 
   // Determine the effective org ID
-  const effectiveOrgId = targetOrgId || actor.orgId;
+  // Use nullish coalescing (??) to distinguish between:
+  // - undefined: not provided, use actor.orgId
+  // - null: explicitly null (global/system roles), keep as null
+  // - number: use the provided number
+  const effectiveOrgId = targetOrgId !== undefined ? targetOrgId : actor.orgId;
 
   // System users requesting cross-org access or bypass RLS
   if (actor.isSystemUser && (crossOrgAccess || bypassRLS)) {
@@ -164,7 +168,8 @@ export async function createServiceContextWithDb<TDb = any>(
   withRLS: DbContext<TDb>;
 }> {
   const dbExecutor = getDbContext(ctx, actor, options, sql);
-  const effectiveOrgId = options.targetOrgId || actor.orgId;
+  // Use same logic as getDbContext for consistency
+  const effectiveOrgId = options.targetOrgId !== undefined ? options.targetOrgId : actor.orgId;
 
   return {
     db: ctx.db,

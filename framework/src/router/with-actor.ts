@@ -80,7 +80,7 @@ export type InferRouterFromConfig<TConfig extends RouterConfig<any>> = {
 export interface ServiceContext<TDb = any> {
   db: TDb;
   actor: Actor;
-  orgId: number;
+  orgId: number | null;
   userId: string;
   [key: string]: any;
 }
@@ -197,10 +197,10 @@ export interface ActorContextAdapter<TDb = any, TRouterFn = (procedures: Record<
   getDbContext: (
     ctx: any,
     actor: Actor,
-    options?: { crossOrgAccess?: boolean; targetOrgId?: number }
+    options?: { crossOrgAccess?: boolean; targetOrgId?: number | null }
   ) => {
     dbFunction: (callback: (db: TDb) => Promise<any>) => Promise<any>;
-    effectiveOrgId: number;
+    effectiveOrgId: number | null;
   };
 
   /**
@@ -210,15 +210,17 @@ export interface ActorContextAdapter<TDb = any, TRouterFn = (procedures: Record<
   createServiceContext: (
     db: TDb,
     actor: Actor,
-    orgId: number
+    orgId: number | null
   ) => ServiceContext<TDb>;
 
   /**
    * Get the base procedure (with or without permission)
    * @param permission - Permission slug or undefined for no permission check
    * @param isPublic - If true, returns public procedure (no auth required)
+   * @param crossOrg - If true, should use procedure without org-locking checks
+   *                   (for routes that need to access data across organizations)
    */
-  getProcedure: (permission?: string, isPublic?: boolean) => any;
+  getProcedure: (permission?: string, isPublic?: boolean, crossOrg?: boolean) => any;
 
   /**
    * Create the tRPC router.
@@ -253,10 +255,12 @@ let globalActorAdapter: ActorContextAdapter | null = null;
  *   createActor,
  *   getDbContext,
  *   createServiceContext,
- *   getProcedure: (permission) =>
- *     permission
- *       ? orgProtectedProcedureWithPermission(permission)
- *       : orgProtectedProcedure,
+ *   getProcedure: (permission, isPublic, crossOrg) =>
+ *     isPublic
+ *       ? publicProcedure
+ *       : crossOrg
+ *         ? (permission ? protectedProcedureWithPermission(permission) : protectedProcedure)
+ *         : (permission ? orgProtectedProcedureWithPermission(permission) : orgProtectedProcedure),
  *   createTRPCRouter,
  * });
  * ```
@@ -459,7 +463,8 @@ export function createRouterWithActor<TDb = any>(
 
   for (const [name, route] of Object.entries(config)) {
     // 1. Start with the appropriate procedure type (public or protected)
-    let procedure = adapter.getProcedure(route.permission, route.public);
+    // For crossOrg routes, use a procedure without org-locking checks
+    let procedure = adapter.getProcedure(route.permission, route.public, route.crossOrg);
 
     // 2. Add input validation
     if (route.input) {
@@ -553,32 +558,42 @@ export function createRouterWithActor<TDb = any>(
       const lockedOrgId = (ctx as any).lockedOrgId as number | undefined;
       let targetOrgId = input?.orgId;
 
-      // Skip lockedOrgId enforcement for crossOrg routes
-      // These routes are explicitly designed to access data across organizations
-      if (lockedOrgId !== undefined && !route.crossOrg) {
-        if (targetOrgId && targetOrgId !== lockedOrgId) {
-          // SECURITY: Log the attempted bypass
-          console.error('[SECURITY] Attempted org override with locked context:', {
-            inputOrgId: targetOrgId,
-            lockedOrgId,
-            procedureName: name,
-            userId: actor.userId,
-          });
-
-          // Use TRPCError for proper HTTP 403 response (per specs 9.3)
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Organization context cannot be overridden in this context',
-            cause: {
-              type: 'LOCKED_ORG_VIOLATION',
+      // Handle lockedOrgId enforcement based on route type
+      if (lockedOrgId !== undefined) {
+        if (!route.crossOrg) {
+          // For non-crossOrg routes: strict enforcement - reject any override attempt
+          if (targetOrgId && targetOrgId !== lockedOrgId) {
+            // SECURITY: Log the attempted bypass
+            console.error('[SECURITY] Attempted org override with locked context:', {
               inputOrgId: targetOrgId,
               lockedOrgId,
-            }
-          });
-        }
+              procedureName: name,
+              userId: actor.userId,
+            });
 
-        // Force targetOrgId to lockedOrgId
-        targetOrgId = lockedOrgId;
+            // Use TRPCError for proper HTTP 403 response (per specs 9.3)
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Organization context cannot be overridden in this context',
+              cause: {
+                type: 'LOCKED_ORG_VIOLATION',
+                inputOrgId: targetOrgId,
+                lockedOrgId,
+              }
+            });
+          }
+          // Force targetOrgId to lockedOrgId for org-scoped routes
+          targetOrgId = lockedOrgId;
+        } else {
+          // For crossOrg routes: use lockedOrgId as default RLS context, but don't reject
+          // override attempts. This allows the route to access data within the locked org
+          // while still being able to query across orgs if the route logic supports it.
+          // IMPORTANT: If no targetOrgId was provided in input, use lockedOrgId to ensure
+          // RLS context is properly set for the custom domain's organization.
+          if (!targetOrgId) {
+            targetOrgId = lockedOrgId;
+          }
+        }
       }
 
       const { dbFunction, effectiveOrgId } = adapter.getDbContext(ctx, actor, {

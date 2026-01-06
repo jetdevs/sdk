@@ -144,9 +144,15 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
     // -------------------------------------------------------------------------
     // GET SESSION
     // Returns the current user session
+    //
+    // IMPORTANT: crossOrg: true is required because:
+    // 1. This endpoint must work on custom domains even when user's session org
+    //    differs from the locked org (e.g., during login flow)
+    // 2. Session data is not org-scoped, it's user-scoped
     // -------------------------------------------------------------------------
     session: {
       type: 'query' as const,
+      crossOrg: true,
       repository: deps.Repository,
       handler: async ({ ctx }: AuthHandlerContext) => {
         if (process.env.NODE_ENV === 'development') {
@@ -206,11 +212,16 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
     // -------------------------------------------------------------------------
     // UPDATE PROFILE
     // Updates the current user's profile
+    //
+    // IMPORTANT: crossOrg: true is required because:
+    // 1. Profile updates are user-scoped, not org-scoped
+    // 2. Must work on custom domains regardless of org context
     // -------------------------------------------------------------------------
     updateProfile: {
       input: updateProfileSchema,
       invalidates: ['users'],
       entityType: 'user',
+      crossOrg: true,
       repository: deps.Repository,
       handler: async ({ input, service, repo }: AuthHandlerContext<z.infer<typeof updateProfileSchema>>) => {
         const userId = parseInt(service.userId);
@@ -240,9 +251,16 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
     // GET CURRENT USER
     // Returns the current user with all roles, permissions, and available orgs
     // Uses privilegedDb to bypass RLS and fetch ALL user roles
+    //
+    // IMPORTANT: crossOrg: true is required because:
+    // 1. This endpoint must work on custom domains even when user's session org
+    //    differs from the locked org (e.g., during login flow)
+    // 2. We use privilegedDb anyway to bypass RLS
+    // 3. This is an auth endpoint, not an org-scoped data endpoint
     // -------------------------------------------------------------------------
     getCurrentUser: {
       type: 'query' as const,
+      crossOrg: true,
       repository: deps.Repository,
       handler: async ({ ctx }: AuthHandlerContext) => {
         const userId = ctx.session?.user?.id;

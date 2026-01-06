@@ -156,6 +156,13 @@ export const corePermissions: PermissionRegistry = {
           description: "Configure system-wide settings and parameters",
           category: 'admin',
         },
+        "admin:manage": {
+          slug: "admin:manage",
+          name: "Administrative Management",
+          description: "General administrative access for management operations (users, orgs, system)",
+          category: 'admin',
+          critical: true,
+        },
       }
     },
 
@@ -427,7 +434,7 @@ export const corePermissions: PermissionRegistry = {
     version: "1.0.0",
     generated: new Date().toISOString(),
     totalModules: 5,
-    totalPermissions: 33,
+    totalPermissions: 34,
     lastDatabaseSync: undefined,
   }
 };
