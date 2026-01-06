@@ -4,7 +4,7 @@
  * Theme management system for SaaS applications.
  * Provides repository, validation schemas, and type definitions.
  *
- * @module @yobolabs/core/themes
+ * @module @jetdevs/core/themes
  *
  * @example
  * ```typescript
@@ -12,7 +12,7 @@
  *   ThemeRepository,
  *   createThemeSchema,
  *   Theme,
- * } from '@yobolabs/core/themes';
+ * } from '@jetdevs/core/themes';
  *
  * // Create repository with schema injection
  * const themeRepo = new ThemeRepository(db, { themes });
@@ -30,13 +30,9 @@
 // =============================================================================
 
 export type {
-  Theme,
-  ThemeWithStats,
-  ThemeCreateData,
-  ThemeUpdateData,
-  ThemeFilters,
-  ThemeListOptions,
-  ThemeListResult,
+    Theme, ThemeCreateData, ThemeFilters,
+    ThemeListOptions,
+    ThemeListResult, ThemeUpdateData, ThemeWithStats
 } from "./types";
 
 // =============================================================================
@@ -50,17 +46,10 @@ export { ThemeRepository } from "./theme.repository";
 // =============================================================================
 
 export {
-  createThemeSchema,
-  updateThemeSchema,
-  getThemeByUuidSchema,
-  getThemeByIdSchema,
-  themeListOptionsSchema,
-  themeFiltersSchema,
+    createThemeSchema, getThemeByIdSchema, getThemeByUuidSchema, themeFiltersSchema, themeListOptionsSchema, updateThemeSchema
 } from "./schemas";
 
 export type {
-  CreateThemeInput,
-  UpdateThemeInput,
-  ThemeListOptionsInput,
-  ThemeFiltersInput,
+    CreateThemeInput, ThemeFiltersInput, ThemeListOptionsInput, UpdateThemeInput
 } from "./schemas";
+

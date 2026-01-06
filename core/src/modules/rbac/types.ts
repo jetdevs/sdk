@@ -4,7 +4,7 @@
  * Type definitions for Role-Based Access Control system.
  * These are framework-agnostic and can be used across any SaaS application.
  *
- * @module @yobolabs/core/rbac
+ * @module @jetdevs/core/rbac
  */
 
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
@@ -207,7 +207,7 @@ export interface PermissionStats {
 /**
  * Actor performing the operation
  *
- * This type aligns with the framework's Actor type from @yobolabs/framework/auth/actor
+ * This type aligns with the framework's Actor type from @jetdevs/framework/auth/actor
  */
 export interface Actor {
   userId: number;

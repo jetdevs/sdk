@@ -2,7 +2,7 @@
 
 ## Overview
 
-Successfully implemented Phase 1 of the @yobo/framework SDK package - core infrastructure abstractions that protect IP while enabling developer productivity.
+Successfully implemented Phase 1 of the @jetdevs/framework SDK package - core infrastructure abstractions that protect IP while enabling developer productivity.
 
 ## Location
 
@@ -127,11 +127,11 @@ export const campaignRouter = createRouter({
 ### 5. Main Package Exports (`src/index.ts`)
 
 Provides clean, modular exports:
-- `@yobo/framework` - All exports
-- `@yobo/framework/db` - Database only
-- `@yobo/framework/permissions` - Permissions only
-- `@yobo/framework/auth` - Auth only
-- `@yobo/framework/router` - Router only
+- `@jetdevs/framework` - All exports
+- `@jetdevs/framework/db` - Database only
+- `@jetdevs/framework/permissions` - Permissions only
+- `@jetdevs/framework/auth` - Auth only
+- `@jetdevs/framework/router` - Router only
 
 ### 6. Build Configuration
 
@@ -189,8 +189,8 @@ export const campaignRouter = createTRPCRouter({
 
 ### After (Framework SDK)
 ```typescript
-import { createRouter } from '@yobo/framework/router';
-import { createRepository } from '@yobo/framework/db';
+import { createRouter } from '@jetdevs/framework/router';
+import { createRepository } from '@jetdevs/framework/db';
 
 export const campaignRouter = createRouter({
   list: {
@@ -284,13 +284,13 @@ CLI Building entry: {
 
 ## Next Steps
 
-### Phase 2: Cloud Services SDK (@yobo/cloud)
+### Phase 2: Cloud Services SDK (@jetdevs/cloud)
 - Create `packages/cloud/` package
 - Implement S3, SQS, SES service wrappers
 - Build microservices in `services-cloud/`
 - SDK calls microservices over HTTPS
 
-### Phase 3: Platform Services SDK (@yobo/platform)
+### Phase 3: Platform Services SDK (@jetdevs/platform)
 - Create `packages/platform/` package
 - Implement user, org, WhatsApp, config service clients
 - Build microservices in `services-platform/`
@@ -325,7 +325,7 @@ CLI Building entry: {
 ## Testing Strategy
 
 Developers should:
-1. Import from `@yobo/framework`
+1. Import from `@jetdevs/framework`
 2. Use repositories instead of direct DB access
 3. Use router factory for new routers
 4. Verify RLS is automatic

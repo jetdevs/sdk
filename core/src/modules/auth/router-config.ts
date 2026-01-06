@@ -5,12 +5,12 @@
  * This factory pattern allows apps to inject their own dependencies while
  * reusing the core auth logic.
  *
- * @module @yobolabs/core/auth
+ * @module @jetdevs/core/auth
  */
 
 import { z } from 'zod';
+import type { IAuthRepository } from './repository';
 import { registerSchema, updateProfileSchema } from './schemas';
-import type { IAuthRepository, AuthUserRecord } from './repository';
 
 // =============================================================================
 // TYPES
@@ -121,8 +121,8 @@ export class AuthRouterError extends Error {
  *
  * @example
  * ```typescript
- * import { createAuthRouterConfig } from '@yobolabs/core/auth';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createAuthRouterConfig } from '@jetdevs/core/auth';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  * import { AuthRepository } from '@/server/repos/auth.repository';
  * import { privilegedDb } from '@/db/clients';
  * import bcrypt from 'bcrypt';
@@ -144,9 +144,15 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
     // -------------------------------------------------------------------------
     // GET SESSION
     // Returns the current user session
+    //
+    // IMPORTANT: crossOrg: true is required because:
+    // 1. This endpoint must work on custom domains even when user's session org
+    //    differs from the locked org (e.g., during login flow)
+    // 2. Session data is not org-scoped, it's user-scoped
     // -------------------------------------------------------------------------
     session: {
       type: 'query' as const,
+      crossOrg: true,
       repository: deps.Repository,
       handler: async ({ ctx }: AuthHandlerContext) => {
         if (process.env.NODE_ENV === 'development') {
@@ -206,11 +212,16 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
     // -------------------------------------------------------------------------
     // UPDATE PROFILE
     // Updates the current user's profile
+    //
+    // IMPORTANT: crossOrg: true is required because:
+    // 1. Profile updates are user-scoped, not org-scoped
+    // 2. Must work on custom domains regardless of org context
     // -------------------------------------------------------------------------
     updateProfile: {
       input: updateProfileSchema,
       invalidates: ['users'],
       entityType: 'user',
+      crossOrg: true,
       repository: deps.Repository,
       handler: async ({ input, service, repo }: AuthHandlerContext<z.infer<typeof updateProfileSchema>>) => {
         const userId = parseInt(service.userId);
@@ -240,9 +251,16 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
     // GET CURRENT USER
     // Returns the current user with all roles, permissions, and available orgs
     // Uses privilegedDb to bypass RLS and fetch ALL user roles
+    //
+    // IMPORTANT: crossOrg: true is required because:
+    // 1. This endpoint must work on custom domains even when user's session org
+    //    differs from the locked org (e.g., during login flow)
+    // 2. We use privilegedDb anyway to bypass RLS
+    // 3. This is an auth endpoint, not an org-scoped data endpoint
     // -------------------------------------------------------------------------
     getCurrentUser: {
       type: 'query' as const,
+      crossOrg: true,
       repository: deps.Repository,
       handler: async ({ ctx }: AuthHandlerContext) => {
         const userId = ctx.session?.user?.id;
@@ -372,10 +390,27 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
           }
         });
 
+        // Debug logging for permission resolution
+        if (process.env.NODE_ENV === 'development' || process.env.DEBUG_AUTH === 'true') {
+          console.log(`getCurrentUser: Found ${userRoleAssignments.length} role assignments for user ${numericUserId}`);
+          userRoleAssignments.forEach((assignment: any, idx: number) => {
+            const rolePermsCount = assignment.role?.rolePermissions?.length ?? 0;
+            const adminPerms = assignment.role?.rolePermissions?.filter((rp: any) =>
+              rp.permission?.slug?.startsWith('admin:')
+            ).length ?? 0;
+            console.log(`  Role ${idx + 1}: ${assignment.role?.name ?? 'unknown'} - ${rolePermsCount} total permissions, ${adminPerms} admin permissions`);
+          });
+        }
+
         // Aggregate all unique permissions
         const allPermissions = userRoleAssignments.flatMap((assignment: any) => {
           if (!assignment.role || !assignment.role.rolePermissions) {
-            console.warn('Role or rolePermissions missing for assignment:', assignment);
+            console.warn('Role or rolePermissions missing for assignment:', JSON.stringify({
+              roleId: assignment.roleId,
+              roleName: assignment.role?.name,
+              hasRole: !!assignment.role,
+              hasRolePermissions: !!assignment.role?.rolePermissions
+            }));
             return [];
           }
 
@@ -439,8 +474,12 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
           updatedAt: user.updatedAt,
         };
 
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`getCurrentUser successful: ${result.email}, permissions: ${result.permissions.length}, roles: ${result.roles.length}, orgs: ${result.availableOrgs.length}`);
+        if (process.env.NODE_ENV === 'development' || process.env.DEBUG_AUTH === 'true') {
+          const adminPerms = result.permissions.filter((p: any) => p.slug?.startsWith('admin:'));
+          console.log(`getCurrentUser successful: ${result.email}, permissions: ${result.permissions.length} (${adminPerms.length} admin), roles: ${result.roles.length}, orgs: ${result.availableOrgs.length}`);
+          if (adminPerms.length > 0) {
+            console.log(`  Admin permissions: ${adminPerms.map((p: any) => p.slug).join(', ')}`);
+          }
         }
 
         return result;
@@ -457,7 +496,7 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
  *
  * @example
  * ```typescript
- * import { createGetCurrentUserHandler } from '@yobolabs/core/auth';
+ * import { createGetCurrentUserHandler } from '@jetdevs/core/auth';
  * import { privilegedDb } from '@/db/clients';
  * import { users, userRoles } from '@/db/schema';
  *

@@ -6,11 +6,11 @@
  * Creates a drop-in admin page for permission catalogue/registry viewing.
  * Apps provide their tRPC client and UI components via factory.
  *
- * @module @yobolabs/core/ui/admin
+ * @module @jetdevs/core/ui/admin
  *
  * @example
  * ```typescript
- * import { createPermissionManagementPage } from '@yobolabs/core/ui/admin';
+ * import { createPermissionManagementPage } from '@jetdevs/core/ui/admin';
  * import { api } from '@/utils/trpc';
  *
  * export const PermissionManagementPage = createPermissionManagementPage({ api, ui });

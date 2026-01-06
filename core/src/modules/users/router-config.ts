@@ -5,26 +5,26 @@
  * This factory pattern allows apps to inject their own dependencies while
  * reusing the core user management logic.
  *
- * @module @yobolabs/core/users
+ * @module @jetdevs/core/users
  */
 
-import { z } from 'zod';
 import { and, ilike, isNull } from 'drizzle-orm';
-import {
-  userFiltersSchema,
-  userCreateSchema,
-  userUpdateSchema,
-  assignRoleSchema,
-  removeRoleSchema,
-  removeFromOrgSchema,
-  changePasswordSchema,
-  updateSessionPreferenceSchema,
-  updateThemePreferenceSchema,
-  checkUsernameSchema,
-  userBulkUpdateSchema,
-  userBulkDeleteSchema,
-} from './schemas';
+import { z } from 'zod';
 import type { IUserRepository } from './repository';
+import {
+    assignRoleSchema,
+    changePasswordSchema,
+    checkUsernameSchema,
+    removeFromOrgSchema,
+    removeRoleSchema,
+    updateSessionPreferenceSchema,
+    updateThemePreferenceSchema,
+    userBulkDeleteSchema,
+    userBulkUpdateSchema,
+    userCreateSchema,
+    userFiltersSchema,
+    userUpdateSchema,
+} from './schemas';
 
 // =============================================================================
 // TYPES
@@ -59,10 +59,11 @@ export interface UserRouterDeps {
 
 /**
  * Service context from createRouterWithActor
+ * orgId can be null for system users accessing global data
  */
 export interface UserServiceContext {
   db: any;
-  orgId: number;
+  orgId: number | null;
   userId: string;
 }
 
@@ -103,8 +104,8 @@ export class UserRouterError extends Error {
  *
  * @example
  * ```typescript
- * import { createUserRouterConfig } from '@yobolabs/core/users';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createUserRouterConfig } from '@jetdevs/core/users';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  * import { UserRepository } from '@/server/repos/user.repository';
  * import bcrypt from 'bcrypt';
  *
@@ -135,7 +136,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             search: input.search,
             isActive: input.isActive,
             roleId: input.roleId,
-            orgId: input.orgId || service.orgId,
+            // Convert null to undefined for repository compatibility
+            orgId: input.orgId ?? (service.orgId ?? undefined),
           },
         });
 
@@ -143,12 +145,13 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           search: input.search,
           isActive: input.isActive,
           roleId: input.roleId,
-          orgId: input.orgId || service.orgId,
+          orgId: input.orgId ?? (service.orgId ?? undefined),
         });
 
         // Get roles for users
         const userIds = users.map(u => u.id);
-        const rolesByUser = await repo.getUserRolesBatch(db, userIds, service.orgId);
+        // Convert null to undefined for repository compatibility
+        const rolesByUser = await repo.getUserRolesBatch(db, userIds, service.orgId ?? undefined);
 
         const usersWithRoles = users.map(user => ({
           ...user,
@@ -174,7 +177,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         return repo.findAll(db, {
           limit: 100,
           offset: 0,
-          filters: { isActive: true, orgId: service.orgId },
+          // Convert null to undefined for repository compatibility
+          filters: { isActive: true, orgId: service.orgId ?? undefined },
         });
       },
     },
@@ -185,6 +189,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
     getAllUsersSystem: {
       type: 'query' as const,
       permission: 'admin:manage',
+      crossOrg: true, // Required to see user roles across ALL organizations, not just current org
       input: userFiltersSchema,
       repository: deps.Repository,
       handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userFiltersSchema>>) => {
@@ -237,7 +242,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('NOT_FOUND', `User with ID ${input} not found`);
         }
 
-        const roles = await repo.getUserRoles(db, input, service.orgId);
+        // Convert null to undefined for repository compatibility
+        const roles = await repo.getUserRoles(db, input, service.orgId ?? undefined);
         return { ...user, roles };
       },
     },
@@ -319,6 +325,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           return existing;
         }
 
+        // Hash password before storing
+        const hashedPassword = input.password
+          ? await deps.hashPassword(input.password, 10)
+          : undefined;
+
         // Create new user
         const newUser = await repo.create(db, {
           name: input.name,
@@ -327,7 +338,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           email: input.email,
           phone: input.phone,
           username: input.username,
-          password: input.password,
+          password: hashedPassword,
           isActive: input.isActive,
           currentOrgId: service.orgId,
         });
@@ -367,6 +378,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('CONFLICT', 'User with this email already exists');
         }
 
+        // Hash password before storing
+        const hashedPassword = input.password
+          ? await deps.hashPassword(input.password, 10)
+          : undefined;
+
         // Create new user
         const newUser = await repo.create(db, {
           name: input.name,
@@ -375,7 +391,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           email: input.email,
           phone: input.phone,
           username: input.username,
-          password: input.password,
+          password: hashedPassword,
           isActive: input.isActive,
           currentOrgId: input.orgId,
         });
@@ -403,7 +419,22 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       entityType: 'user',
       repository: deps.Repository,
       handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userUpdateSchema>>) => {
-        const { id, ...updateData } = input;
+        // DEBUG: Log incoming input to trace password flow
+        console.log('[SDK User Update] Input received:', JSON.stringify({
+          id: input.id,
+          hasPassword: !!input.password,
+          passwordLength: input.password?.length,
+          allKeys: Object.keys(input),
+        }));
+
+        const { id, password, ...updateData } = input;
+
+        // DEBUG: Log after destructuring
+        console.log('[SDK User Update] After destructuring:', JSON.stringify({
+          hasPassword: !!password,
+          passwordLength: password?.length,
+          updateDataKeys: Object.keys(updateData),
+        }));
 
         // Verify user exists
         const existing = await repo.findById(db, id);
@@ -411,7 +442,20 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('NOT_FOUND', `User with ID ${id} not found`);
         }
 
-        return repo.update(db, id, updateData);
+        // Hash password if provided
+        const finalUpdateData = { ...updateData } as typeof updateData & { password?: string };
+        if (password) {
+          finalUpdateData.password = await deps.hashPassword(password, 10);
+          console.log('[SDK User Update] Password hashed and added to finalUpdateData');
+        }
+
+        // DEBUG: Log final update data
+        console.log('[SDK User Update] Final update data:', JSON.stringify({
+          hasPassword: !!finalUpdateData.password,
+          allKeys: Object.keys(finalUpdateData),
+        }));
+
+        return repo.update(db, id, finalUpdateData);
       },
     },
 
@@ -590,7 +634,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       repository: deps.Repository,
       handler: async ({ service, repo, db }: UserHandlerContext) => {
         const userId = parseInt(service.userId);
-        return repo.getUserPermissions(db, userId, service.orgId);
+        // Convert null to undefined for repository compatibility
+        return repo.getUserPermissions(db, userId, service.orgId ?? undefined);
       },
     },
 
@@ -680,15 +725,15 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
 // SDK PRE-BUILT REPOSITORY
 // =============================================================================
 
-import { createUserRepositoryClass } from './repository';
 import {
-  users,
-  userRoles,
-  roles,
-  orgs,
-  permissions,
-  rolePermissions,
+    orgs,
+    permissions,
+    rolePermissions,
+    roles,
+    userRoles,
+    users,
 } from '../../db/schema';
+import { createUserRepositoryClass } from './repository';
 
 /**
  * SDK User Repository
@@ -698,7 +743,7 @@ import {
  *
  * @example
  * ```typescript
- * import { SDKUserRepository } from '@yobolabs/core/users';
+ * import { SDKUserRepository } from '@jetdevs/core/users';
  *
  * // Create repository instance
  * const repo = new SDKUserRepository(db);
@@ -719,46 +764,52 @@ export const SDKUserRepository = createUserRepositoryClass({
 // =============================================================================
 
 /**
- * Default password hasher using simple approach
- * Apps should provide their own bcrypt implementation for production
+ * Default password hasher - THROWS ERROR in production
+ *
+ * This function exists only to prevent runtime crashes when apps don't configure
+ * password hashing. It will throw an error to force apps to provide proper bcrypt.
+ *
+ * @deprecated Always provide your own bcrypt implementation via createUserRouterConfig
  */
 async function defaultHashPassword(password: string, _rounds?: number): Promise<string> {
-  // Simple hash for development - apps should override with bcrypt
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  // SECURITY: Throw error to prevent weak password hashing
+  // Apps MUST provide bcrypt implementation
+  throw new Error(
+    '[SECURITY ERROR] Password hashing not configured! ' +
+    'You must provide hashPassword and comparePassword functions using bcrypt. ' +
+    'Example: createUserRouterConfig({ hashPassword: (p) => bcrypt.hash(p, 10), comparePassword: bcrypt.compare })'
+  );
 }
 
 /**
- * Default password comparator
+ * Default password comparator - THROWS ERROR in production
+ *
+ * @deprecated Always provide your own bcrypt implementation via createUserRouterConfig
  */
 async function defaultComparePassword(password: string, hash: string): Promise<boolean> {
-  const hashed = await defaultHashPassword(password);
-  return hashed === hash;
+  // SECURITY: Throw error to prevent weak password comparison
+  // Apps MUST provide bcrypt implementation
+  throw new Error(
+    '[SECURITY ERROR] Password comparison not configured! ' +
+    'You must provide hashPassword and comparePassword functions using bcrypt. ' +
+    'Example: createUserRouterConfig({ hashPassword: (p) => bcrypt.hash(p, 10), comparePassword: bcrypt.compare })'
+  );
 }
 
 /**
  * Pre-built user router configuration
  *
- * Uses the SDK's own UserRepository and schema.
- * Apps can use this directly without creating their own repository.
+ * @deprecated DO NOT USE IN PRODUCTION - This will throw an error when password
+ * operations are attempted. Always use createUserRouterConfig with bcrypt.
  *
- * NOTE: This uses a simple SHA-256 hash for passwords. For production,
- * you should use createUserRouterConfig with bcrypt:
+ * Uses the SDK's own UserRepository and schema but has NO password hashing
+ * configured. Any password operation will throw a security error.
  *
  * @example
  * ```typescript
- * // Option 1: Simple usage with SDK defaults (development only)
- * import { userRouterConfig } from '@yobolabs/core/users';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
- *
- * export const userRouter = createRouterWithActor(userRouterConfig);
- *
- * // Option 2: Production usage with bcrypt
- * import { createUserRouterConfig, SDKUserRepository } from '@yobolabs/core/users';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * // REQUIRED: Production usage with bcrypt
+ * import { createUserRouterConfig, SDKUserRepository } from '@jetdevs/core/users';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  * import bcrypt from 'bcrypt';
  *
  * const userRouterConfig = createUserRouterConfig({

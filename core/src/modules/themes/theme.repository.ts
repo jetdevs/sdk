@@ -4,19 +4,18 @@
  * Handles all database operations for theme-related data.
  * Provides a clean data access layer for theme management.
  *
- * @module @yobolabs/core/themes
+ * @module @jetdevs/core/themes
  */
 
 import { asc, count, eq } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import type {
-  Theme,
-  ThemeCreateData,
-  ThemeListOptions,
-  ThemeListResult,
-  ThemeUpdateData,
-  ThemeWithStats,
+    Theme,
+    ThemeCreateData,
+    ThemeListOptions,
+    ThemeListResult,
+    ThemeUpdateData
 } from "./types";
 
 // =============================================================================
@@ -30,7 +29,7 @@ import type {
  *
  * @example
  * ```typescript
- * import { ThemeRepository } from '@yobolabs/core/themes';
+ * import { ThemeRepository } from '@jetdevs/core/themes';
  *
  * const repo = new ThemeRepository(db, { themes });
  * const themes = await repo.findAll();
@@ -281,5 +280,55 @@ export class ThemeRepository {
     }
 
     return !!existing;
+  }
+
+  /**
+   * Get the global theme (the fixed theme for ALL users)
+   */
+  async findGlobal(): Promise<Theme | null> {
+    const [theme] = (await this.db
+      .select()
+      .from(this.themes)
+      .where(eq(this.themes.isGlobal, true))
+      .limit(1)) as Theme[];
+
+    return theme || null;
+  }
+
+  /**
+   * Set theme as global (the fixed theme for ALL users)
+   * This removes global status from all other themes first.
+   */
+  async setGlobal(uuid: string): Promise<Theme | null> {
+    // Remove global from all themes
+    await this.db
+      .update(this.themes)
+      .set({ isGlobal: false })
+      .where(eq(this.themes.isGlobal, true));
+
+    // Set new global theme
+    const [theme] = (await this.db
+      .update(this.themes)
+      .set({
+        isGlobal: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(this.themes.uuid, uuid))
+      .returning()) as Theme[];
+
+    return theme || null;
+  }
+
+  /**
+   * Clear global theme (no fixed theme - users can choose)
+   */
+  async clearGlobal(): Promise<boolean> {
+    const result = await this.db
+      .update(this.themes)
+      .set({ isGlobal: false })
+      .where(eq(this.themes.isGlobal, true))
+      .returning();
+
+    return result.length > 0;
   }
 }

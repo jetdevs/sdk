@@ -5,43 +5,38 @@
  * This factory pattern allows apps to inject their own schema while
  * reusing the repository logic from core.
  *
- * @module @yobolabs/core/organizations
+ * @module @jetdevs/core/organizations
  */
 
 import {
-  and,
-  asc,
-  desc,
-  eq,
-  gte,
-  inArray,
-  like,
-  lte,
-  or,
-  count,
-  sql,
-  type SQL,
+    and,
+    asc,
+    desc,
+    eq,
+    gte,
+    inArray,
+    lte,
+    or,
+    sql,
+    type SQL
 } from 'drizzle-orm';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { PgTable } from 'drizzle-orm/pg-core';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import type {
-  OrgRecord,
-  OrgWithStats,
-  OrgStats,
-  OrgFilters,
-  OrgListOptions,
-  OrgListResult,
-  OrgCreateData,
-  OrgUpdateData,
-  OrgSetting,
-  OrgSettingUpdate,
-  AuditLogFilters,
-  AuditLogOptions,
-  AuditLogListResult,
-  OrgAuditLogRecord,
-  OrgAnalytics,
-  OrgUser,
+    AuditLogListResult,
+    AuditLogOptions,
+    OrgAnalytics,
+    OrgAuditLogRecord,
+    OrgCreateData,
+    OrgListOptions,
+    OrgListResult,
+    OrgRecord,
+    OrgSetting,
+    OrgSettingUpdate,
+    OrgStats,
+    OrgUpdateData,
+    OrgUser
 } from './types';
 
 // =============================================================================
@@ -85,10 +80,16 @@ export interface OrgRepositorySchema {
     orgId: any;
     isActive: any;
     createdAt: any;
+    updatedAt: any;   // Used by addUser handler for reactivation
+    assignedBy: any;  // Used by addUser handler for audit trail
   };
   roles: PgTable & {
     id: any;
     name: any;
+    orgId: any;        // Used by addUser for org-specific role lookup
+    isActive: any;     // Used by addUser to filter active roles only
+    isGlobalRole: any; // Used by addUser for global role lookup
+    isSystemRole: any; // Used for system role identification
   };
   orgAuditLogs: PgTable & {
     id: any;
@@ -177,7 +178,7 @@ export interface IOrgRepository {
  *
  * @example
  * ```typescript
- * import { createOrgRepositoryClass } from '@yobolabs/core/organizations';
+ * import { createOrgRepositoryClass } from '@jetdevs/core/organizations';
  * import { orgs, users, userRoles, roles, orgAuditLogs, orgSettings } from '@/db/schema';
  *
  * const OrgRepositoryBase = createOrgRepositoryClass({

@@ -7,30 +7,30 @@
  * Also exports pre-built router configurations using the SDK's own repository
  * for apps that don't need customization.
  *
- * @module @yobolabs/core/trpc/routers
+ * @module @jetdevs/core/trpc/routers
  *
  * @example
  * ```typescript
  * // Option 1: Use factory with custom repository
- * import { createThemeRouterConfig } from '@yobolabs/core/trpc/routers';
+ * import { createThemeRouterConfig } from '@jetdevs/core/trpc/routers';
  * import { ThemeRepository } from '@/server/repos/theme.repository';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * const config = createThemeRouterConfig({ Repository: ThemeRepository });
  * export const themeRouter = createRouterWithActor(config);
  *
  * // Option 2: Use pre-built router config (simpler, no customization)
- * import { themeRouterConfig, SDKThemeRepository } from '@yobolabs/core/trpc/routers';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { themeRouterConfig, SDKThemeRepository } from '@jetdevs/core/trpc/routers';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * export const themeRouter = createRouterWithActor(themeRouterConfig);
  * ```
  */
 
 import { z } from "zod";
-import type { RouterConfig, RouterFactoryDeps } from "./types";
-import { ThemeRepository } from "../../modules/themes/theme.repository";
 import { themes } from "../../db/schema/themes";
+import { ThemeRepository } from "../../modules/themes/theme.repository";
+import type { RouterConfig, RouterFactoryDeps } from "./types";
 
 // =============================================================================
 // INPUT SCHEMAS
@@ -119,6 +119,7 @@ export function createThemeRouterConfig(deps: RouterFactoryDeps): RouterConfig {
           cssFile: theme.cssFile,
           isActive: theme.isActive,
           isDefault: theme.isDefault,
+          isGlobal: theme.isGlobal,
           createdAt: theme.createdAt,
           updatedAt: theme.updatedAt,
         }));
@@ -280,6 +281,70 @@ export function createThemeRouterConfig(deps: RouterFactoryDeps): RouterConfig {
         return repo.toggleActive(input);
       },
     },
+
+    // -------------------------------------------------------------------------
+    // GET GLOBAL THEME (public - for ALL users to load the fixed theme)
+    // -------------------------------------------------------------------------
+    getGlobal: {
+      type: "query" as const,
+      cache: { ttl: 300, tags: ["themes", "global-theme"] },
+      repository: Repository,
+      handler: async ({ repo }) => {
+        const theme = await repo.findGlobal();
+        if (!theme) {
+          return null;
+        }
+        return {
+          id: theme.id,
+          uuid: theme.uuid,
+          name: theme.name,
+          displayName: theme.displayName,
+          description: theme.description,
+          cssFile: theme.cssFile,
+          isDefault: theme.isDefault,
+          isGlobal: theme.isGlobal,
+        };
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // SET GLOBAL THEME (admin only - sets fixed theme for ALL users)
+    // -------------------------------------------------------------------------
+    setGlobal: {
+      permission: "admin:manage",
+      input: z.string().uuid(),
+      invalidates: ["themes", "global-theme"],
+      entityType: "theme",
+      repository: Repository,
+      handler: async ({ input, service, repo }) => {
+        // Check if theme exists
+        const existing = await repo.findByUuid(input);
+        if (!existing) {
+          throw new Error("NOT_FOUND: Theme not found");
+        }
+
+        // Theme must be active to be set as global
+        if (!existing.isActive) {
+          throw new Error("FORBIDDEN: Cannot set an inactive theme as global");
+        }
+
+        return repo.setGlobal(input);
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // CLEAR GLOBAL THEME (admin only - removes fixed theme, users can choose)
+    // -------------------------------------------------------------------------
+    clearGlobal: {
+      permission: "admin:manage",
+      invalidates: ["themes", "global-theme"],
+      entityType: "theme",
+      repository: Repository,
+      handler: async ({ service, repo }) => {
+        const cleared = await repo.clearGlobal();
+        return { success: cleared };
+      },
+    },
   };
 }
 
@@ -295,7 +360,7 @@ export function createThemeRouterConfig(deps: RouterFactoryDeps): RouterConfig {
  *
  * @example
  * ```typescript
- * import { SDKThemeRepository } from '@yobolabs/core/trpc/routers';
+ * import { SDKThemeRepository } from '@jetdevs/core/trpc/routers';
  *
  * // Create repository with app's database client
  * const repo = new SDKThemeRepository(db);
@@ -320,8 +385,8 @@ export class SDKThemeRepository extends ThemeRepository {
  *
  * @example
  * ```typescript
- * import { themeRouterConfig } from '@yobolabs/core/trpc/routers';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { themeRouterConfig } from '@jetdevs/core/trpc/routers';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * // One-liner to create a theme router
  * export const themeRouter = createRouterWithActor(themeRouterConfig);

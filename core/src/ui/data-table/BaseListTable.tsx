@@ -1,18 +1,18 @@
 'use client';
 
+import {
+    ColumnDef,
+    flexRender,
+    getCoreRowModel,
+    getFilteredRowModel,
+    getPaginationRowModel,
+    getSortedRowModel,
+    SortingState,
+    useReactTable,
+    VisibilityState,
+} from '@tanstack/react-table';
 import * as React from 'react';
 import { useMemo, useState } from 'react';
-import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  SortingState,
-  VisibilityState,
-  useReactTable,
-} from '@tanstack/react-table';
 import { cn } from '../../lib';
 
 // =============================================================================
@@ -144,7 +144,7 @@ export interface BaseListTableProps<TData> {
  *
  * @example
  * ```typescript
- * import { createBaseListTable } from '@yobolabs/core/ui/data-table';
+ * import { createBaseListTable } from '@jetdevs/core/ui/data-table';
  * import {
  *   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
  * } from '@/components/ui/table';

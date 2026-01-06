@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document consolidates the migration of `apps/saas-core-v2/` from a monolithic app to a minimal reference implementation that demonstrates SDK usage. The goal is to move reusable code to `@yobolabs/core` and reduce the app to app-specific business logic only.
+This document consolidates the migration of `apps/saas-core-v2/` from a monolithic app to a minimal reference implementation that demonstrates SDK usage. The goal is to move reusable code to `@jetdevs/core` and reduce the app to app-specific business logic only.
 
 ### Progress Overview
 
@@ -78,13 +78,13 @@ The entire `src/framework/` directory was deleted as all functionality was dupli
 
 | Old Import | New SDK Import |
 |------------|----------------|
-| `~/framework/hooks/useTable` | `@yobolabs/core/hooks` |
-| `~/framework/hooks/useModalState` | `@yobolabs/core/hooks` |
-| `~/framework/hooks/useIsClient` | `@yobolabs/core/hooks` |
-| `~/framework/store/auth.store` | `@yobolabs/core/stores` |
-| `~/framework/store/ui.store` | `@yobolabs/core/stores` |
-| `~/framework/lib/utils` | `@yobolabs/core/lib` |
-| `~/framework/types/*` | `@yobolabs/core/types` |
+| `~/framework/hooks/useTable` | `@jetdevs/core/hooks` |
+| `~/framework/hooks/useModalState` | `@jetdevs/core/hooks` |
+| `~/framework/hooks/useIsClient` | `@jetdevs/core/hooks` |
+| `~/framework/store/auth.store` | `@jetdevs/core/stores` |
+| `~/framework/store/ui.store` | `@jetdevs/core/stores` |
+| `~/framework/lib/utils` | `@jetdevs/core/lib` |
+| `~/framework/types/*` | `@jetdevs/core/types` |
 
 ---
 
@@ -98,10 +98,10 @@ The entire `src/framework/` directory was deleted as all functionality was dupli
 
 | File | SDK Replacement |
 |------|-----------------|
-| `useHorizontalScroll.ts` | `@yobolabs/core/hooks` |
-| `use-debounce.ts` | `@yobolabs/core/hooks` -> useDebounce |
-| `useMediaQuery.ts` | `@yobolabs/core/hooks` -> useMediaQuery, BREAKPOINT_QUERIES |
-| `useViewToggle.ts` | `@yobolabs/core/hooks` -> useViewToggle |
+| `useHorizontalScroll.ts` | `@jetdevs/core/hooks` |
+| `use-debounce.ts` | `@jetdevs/core/hooks` -> useDebounce |
+| `useMediaQuery.ts` | `@jetdevs/core/hooks` -> useMediaQuery, BREAKPOINT_QUERIES |
+| `useViewToggle.ts` | `@jetdevs/core/hooks` -> useViewToggle |
 
 ### Files Kept (App-Specific)
 
@@ -125,7 +125,7 @@ The entire `src/framework/` directory was deleted as all functionality was dupli
 
 | File | SDK Replacement |
 |------|-----------------|
-| `theme.store.ts` | `@yobolabs/core/stores` -> useThemeStore |
+| `theme.store.ts` | `@jetdevs/core/stores` -> useThemeStore |
 
 ### Files Kept (App-Specific)
 
@@ -147,11 +147,11 @@ The entire `src/framework/` directory was deleted as all functionality was dupli
 
 | File | SDK Replacement |
 |------|-----------------|
-| `country-codes.ts` | `@yobolabs/core/lib` -> countryCodes |
-| `formatDate.ts` | `@yobolabs/core/lib` -> formatDate |
-| `generate-id.ts` | `@yobolabs/core/lib` -> generateId |
-| `theme-manager.ts` | `@yobolabs/core/lib` |
-| `token-blacklist.ts` | `@yobolabs/core/auth` -> tokenBlacklist |
+| `country-codes.ts` | `@jetdevs/core/lib` -> countryCodes |
+| `formatDate.ts` | `@jetdevs/core/lib` -> formatDate |
+| `generate-id.ts` | `@jetdevs/core/lib` -> generateId |
+| `theme-manager.ts` | `@jetdevs/core/lib` |
+| `token-blacklist.ts` | `@jetdevs/core/auth` -> tokenBlacklist |
 | `logger.ts` | Unused |
 | `theme-loader.ts` | SDK provides theme utilities |
 
@@ -192,7 +192,7 @@ The entire `src/framework/` directory was deleted as all functionality was dupli
 
 | File | SDK Replacement |
 |------|-----------------|
-| `formatters.ts` | `@yobolabs/core/lib` -> formatCurrency, formatDate, formatNumber |
+| `formatters.ts` | `@jetdevs/core/lib` -> formatCurrency, formatDate, formatNumber |
 | `org.ts` | Empty/trivial (4 lines of comments) |
 
 ### Files Kept (App-Specific)
@@ -317,7 +317,7 @@ Features:
 
 ### SDK Component Used
 
-**Component:** `createDataTableWithToolbar` from `@yobolabs/core/ui/data-table`
+**Component:** `createDataTableWithToolbar` from `@jetdevs/core/ui/data-table`
 
 Features:
 - Generic data table with toolbar
@@ -380,7 +380,7 @@ Both RoleDataTable components (backoffice and settings) migrated to use the SDK 
 
 ## SDK Components Now Available
 
-### Hooks (from @yobolabs/core/hooks)
+### Hooks (from @jetdevs/core/hooks)
 
 - `useTable`, `useTableState`, `useTableSort`, `useTableFilter`, `useTableSearch`
 - `useTableSelection`, `useTableExport`, `useTablePagination`, `useTableVisibility`
@@ -388,18 +388,18 @@ Both RoleDataTable components (backoffice and settings) migrated to use the SDK 
 - `useDebounce`, `useMediaQuery`, `useViewToggle`, `BREAKPOINT_QUERIES`
 - `useHorizontalScroll`
 
-### Stores (from @yobolabs/core/stores)
+### Stores (from @jetdevs/core/stores)
 
 - `useThemeStore`
 - `useUIStore`
 - `useAuthStore` (factory)
 
-### UI Components (from @yobolabs/core/ui)
+### UI Components (from @jetdevs/core/ui)
 
 - `ThemeToggle`, `ThemeToggleThreeState`
 - `createDataTableWithToolbar`
 
-### Admin Page Factories (from @yobolabs/core/ui/admin)
+### Admin Page Factories (from @jetdevs/core/ui/admin)
 
 - `createThemeManagementPage`
 - `createPermissionManagementPage`
@@ -409,11 +409,11 @@ Both RoleDataTable components (backoffice and settings) migrated to use the SDK 
 - `createManagePermissionsMatrixFactory`
 - `createManagePermissionsDialogFactory`
 
-### Router Configs (from @yobolabs/core/trpc/routers)
+### Router Configs (from @jetdevs/core/trpc/routers)
 
 - `themeRouterConfig`
 
-### Utilities (from @yobolabs/core/lib)
+### Utilities (from @jetdevs/core/lib)
 
 - `cn`, `generateId`
 - `formatDate`, `formatCurrency`, `formatNumber`
@@ -457,7 +457,7 @@ interface ComponentProps {
 **Problem:** SDK's main export bundles client and server code together. When layout.tsx (server component) imports from SDK, it pulls in client-side React hooks.
 
 **Solution:**
-- Use specific import paths: `@yobolabs/core/stores` instead of `@yobolabs/core`
+- Use specific import paths: `@jetdevs/core/stores` instead of `@jetdevs/core`
 - Keep thin client wrappers with `"use client"` for server layouts
 
 ### 4. next-themes Compatibility
@@ -519,18 +519,18 @@ import {
   useIsClient, useModalState,
   useDebounce, useMediaQuery, useViewToggle, BREAKPOINT_QUERIES,
   useHorizontalScroll,
-} from '@yobolabs/core/hooks';
+} from '@jetdevs/core/hooks';
 
 // ========== STORES ==========
 import {
   useAuthStore, usePermissionStore, useUIStore, useThemeStore,
-} from '@yobolabs/core/stores';
+} from '@jetdevs/core/stores';
 
 // ========== UI COMPONENTS ==========
 import {
   ThemeToggle, ThemeToggleThreeState,
   createDataTableWithToolbar,
-} from '@yobolabs/core/ui';
+} from '@jetdevs/core/ui';
 
 // ========== ADMIN PAGES ==========
 import {
@@ -539,20 +539,20 @@ import {
   createDeleteRoleDialogFactory,
   createBulkDeleteDialogFactory,
   createCreateRoleDialogFactory,
-} from '@yobolabs/core/ui/admin';
+} from '@jetdevs/core/ui/admin';
 
 // ========== UTILITIES ==========
 import {
   cn, generateId, logger,
   formatDate, formatCurrency, formatNumber,
   countryCodes,
-} from '@yobolabs/core/lib';
+} from '@jetdevs/core/lib';
 
 // ========== tRPC ROUTERS ==========
 import {
   themeRouterConfig,
   SDKThemeRepository,
-} from '@yobolabs/core/trpc/routers';
+} from '@jetdevs/core/trpc/routers';
 ```
 
 ---

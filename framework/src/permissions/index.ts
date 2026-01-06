@@ -5,7 +5,7 @@
  *
  * @example
  * ```typescript
- * import { requirePermission, checkPermission } from '@yobolabs/framework/permissions';
+ * import { requirePermission, checkPermission } from '@jetdevs/framework/permissions';
  *
  * // Decorator pattern
  * const handler = requirePermission('campaign:create', async (ctx, input) => {

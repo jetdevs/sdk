@@ -1,8 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { cn } from "../../lib";
-import type { CardSkeletonUIComponents, CardSkeletonProps } from "./types";
+import type { CardSkeletonProps, CardSkeletonUIComponents } from "./types";
 
 /**
  * Factory function to create a CardSkeleton component.
@@ -12,7 +11,7 @@ import type { CardSkeletonUIComponents, CardSkeletonProps } from "./types";
  *
  * @example
  * ```tsx
- * import { createCardSkeleton } from '@yobolabs/core/ui/skeletons';
+ * import { createCardSkeleton } from '@jetdevs/core/ui/skeletons';
  * import { Skeleton } from '@/components/ui/skeleton';
  * import { Card, CardHeader, CardContent } from '@/components/ui/card';
  *

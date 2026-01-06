@@ -8,7 +8,7 @@
  * - createOrgProtectedProcedure: Authentication + org context + RLS
  * - createOrgProtectedProcedureWithPermission: Full org + permission protection
  *
- * @module @yobolabs/framework/trpc
+ * @module @jetdevs/framework/trpc
  *
  * @example
  * ```typescript
@@ -18,7 +18,7 @@
  *   createWithPermission,
  *   createOrgProtectedProcedure,
  *   createOrgProtectedProcedureWithPermission,
- * } from '@yobolabs/framework/trpc';
+ * } from '@jetdevs/framework/trpc';
  *
  * // Create procedures with your tRPC instance
  * const protectedProcedure = createProtectedProcedure(t);
@@ -30,41 +30,24 @@
 
 // Procedure factories (NEW - main API)
 export {
-  createProtectedProcedure,
-  createAdminOnlyProcedure,
-  createWithPermission,
-  createOrgProtectedProcedure,
-  createOrgProtectedProcedureWithPermission,
+    createAdminOnlyProcedure, createOrgProtectedProcedure,
+    createOrgProtectedProcedureWithPermission, createProtectedProcedure, createWithPermission
 } from './procedures';
 
 // Middleware factories
 export {
-  createAuthMiddleware,
-  createOrgContextMiddleware,
-  createAdminOnlyMiddleware,
-  createPermissionMiddleware,
+    createAdminOnlyMiddleware, createAuthMiddleware,
+    createOrgContextMiddleware, createPermissionMiddleware
 } from './procedures';
 
 // Legacy exports (for backward compatibility)
 export {
-  authMiddleware,
-  orgContextMiddleware,
-  adminOnlyMiddleware,
-  permissionMiddleware,
-  createTRPCProcedures,
-  createTRPCRouter,
+    adminOnlyMiddleware, authMiddleware, createTRPCProcedures,
+    createTRPCRouter, orgContextMiddleware, permissionMiddleware
 } from './procedures';
 
 // Types
 export type {
-  TRPCContext,
-  AuthenticatedContext,
-  AdminOnlyProcedureOptions,
-  WithPermissionOptions,
-  OrgProtectedProcedureOptions,
-  OrgProtectedContext,
-  PublicProcedure,
-  ProtectedProcedure,
-  OrgProtectedProcedure,
-  AdminOnlyProcedure,
+    AdminOnlyProcedure, AdminOnlyProcedureOptions, AuthenticatedContext, OrgProtectedContext, OrgProtectedProcedure, OrgProtectedProcedureOptions, ProtectedProcedure, PublicProcedure, TRPCContext, WithPermissionOptions
 } from './procedures';
+

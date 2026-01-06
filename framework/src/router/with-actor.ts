@@ -18,13 +18,14 @@
  *
  * This allows full type inference for `api.router.procedure.useQuery()` calls.
  *
- * @module @yobo/framework/router/with-actor
+ * @module @jetdevs/framework/router/with-actor
  */
 
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
+import { auditLog, type AuditAction } from '../audit';
 import type { Actor } from '../auth/actor';
 import { withTelemetry } from '../telemetry';
-import { auditLog, type AuditAction } from '../audit';
 
 // =============================================================================
 // TYPE INFERENCE SYSTEM
@@ -79,7 +80,7 @@ export type InferRouterFromConfig<TConfig extends RouterConfig<any>> = {
 export interface ServiceContext<TDb = any> {
   db: TDb;
   actor: Actor;
-  orgId: number;
+  orgId: number | null;
   userId: string;
   [key: string]: any;
 }
@@ -196,10 +197,10 @@ export interface ActorContextAdapter<TDb = any, TRouterFn = (procedures: Record<
   getDbContext: (
     ctx: any,
     actor: Actor,
-    options?: { crossOrgAccess?: boolean; targetOrgId?: number }
+    options?: { crossOrgAccess?: boolean; targetOrgId?: number | null }
   ) => {
     dbFunction: (callback: (db: TDb) => Promise<any>) => Promise<any>;
-    effectiveOrgId: number;
+    effectiveOrgId: number | null;
   };
 
   /**
@@ -209,15 +210,17 @@ export interface ActorContextAdapter<TDb = any, TRouterFn = (procedures: Record<
   createServiceContext: (
     db: TDb,
     actor: Actor,
-    orgId: number
+    orgId: number | null
   ) => ServiceContext<TDb>;
 
   /**
    * Get the base procedure (with or without permission)
    * @param permission - Permission slug or undefined for no permission check
    * @param isPublic - If true, returns public procedure (no auth required)
+   * @param crossOrg - If true, should use procedure without org-locking checks
+   *                   (for routes that need to access data across organizations)
    */
-  getProcedure: (permission?: string, isPublic?: boolean) => any;
+  getProcedure: (permission?: string, isPublic?: boolean, crossOrg?: boolean) => any;
 
   /**
    * Create the tRPC router.
@@ -240,7 +243,7 @@ let globalActorAdapter: ActorContextAdapter | null = null;
  * @example
  * ```typescript
  * // In src/server/api/trpc.ts or similar initialization file
- * import { configureActorAdapter } from '@yobo/framework/router/with-actor';
+ * import { configureActorAdapter } from '@jetdevs/framework/router/with-actor';
  * import { createActor, getDbContext, createServiceContext } from '@/server/domain/auth/actor';
  * import {
  *   createTRPCRouter,
@@ -252,10 +255,12 @@ let globalActorAdapter: ActorContextAdapter | null = null;
  *   createActor,
  *   getDbContext,
  *   createServiceContext,
- *   getProcedure: (permission) =>
- *     permission
- *       ? orgProtectedProcedureWithPermission(permission)
- *       : orgProtectedProcedure,
+ *   getProcedure: (permission, isPublic, crossOrg) =>
+ *     isPublic
+ *       ? publicProcedure
+ *       : crossOrg
+ *         ? (permission ? protectedProcedureWithPermission(permission) : protectedProcedure)
+ *         : (permission ? orgProtectedProcedureWithPermission(permission) : orgProtectedProcedure),
  *   createTRPCRouter,
  * });
  * ```
@@ -458,7 +463,8 @@ export function createRouterWithActor<TDb = any>(
 
   for (const [name, route] of Object.entries(config)) {
     // 1. Start with the appropriate procedure type (public or protected)
-    let procedure = adapter.getProcedure(route.permission, route.public);
+    // For crossOrg routes, use a procedure without org-locking checks
+    let procedure = adapter.getProcedure(route.permission, route.public, route.crossOrg);
 
     // 2. Add input validation
     if (route.input) {
@@ -503,6 +509,11 @@ export function createRouterWithActor<TDb = any>(
         const telemetryName = route.description || `${name}.public`;
 
         // Create an empty actor for public routes (not authenticated)
+        // INTENTIONAL: userId: 0 is acceptable here because public routes by definition
+        // have no authenticated user. This is different from API key authentication where
+        // we MUST have a valid createdBy to attribute operations to a real user.
+        // Public routes are explicitly marked with `public: true` and are expected to
+        // operate without user context for things like health checks, public data, etc.
         const emptyActor: Actor = {
           userId: 0,
           email: '',
@@ -530,9 +541,64 @@ export function createRouterWithActor<TDb = any>(
 
       // This is the boilerplate we're eliminating:
       const actor = adapter.createActor(ctx);
+
+      // =======================================================================
+      // SECURITY: Locked Org ID Enforcement (STORY-002a)
+      //
+      // When ctx.lockedOrgId is set (e.g., on custom domains), we prevent
+      // input.orgId from overriding the org context. This is a generic
+      // mechanism that apps can use for any org-locking scenario.
+      //
+      // EXCEPTION: Routes with crossOrg: true are exempt from this enforcement.
+      // These routes explicitly need to access data across organizations
+      // (e.g., getAvailableRoles needs to see global roles with orgId=null,
+      // getUserOrganizations needs to see all orgs a user belongs to).
+      // The crossOrg flag already handles RLS bypass appropriately.
+      // =======================================================================
+      const lockedOrgId = (ctx as any).lockedOrgId as number | undefined;
+      let targetOrgId = input?.orgId;
+
+      // Handle lockedOrgId enforcement based on route type
+      if (lockedOrgId !== undefined) {
+        if (!route.crossOrg) {
+          // For non-crossOrg routes: strict enforcement - reject any override attempt
+          if (targetOrgId && targetOrgId !== lockedOrgId) {
+            // SECURITY: Log the attempted bypass
+            console.error('[SECURITY] Attempted org override with locked context:', {
+              inputOrgId: targetOrgId,
+              lockedOrgId,
+              procedureName: name,
+              userId: actor.userId,
+            });
+
+            // Use TRPCError for proper HTTP 403 response (per specs 9.3)
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Organization context cannot be overridden in this context',
+              cause: {
+                type: 'LOCKED_ORG_VIOLATION',
+                inputOrgId: targetOrgId,
+                lockedOrgId,
+              }
+            });
+          }
+          // Force targetOrgId to lockedOrgId for org-scoped routes
+          targetOrgId = lockedOrgId;
+        } else {
+          // For crossOrg routes: use lockedOrgId as default RLS context, but don't reject
+          // override attempts. This allows the route to access data within the locked org
+          // while still being able to query across orgs if the route logic supports it.
+          // IMPORTANT: If no targetOrgId was provided in input, use lockedOrgId to ensure
+          // RLS context is properly set for the custom domain's organization.
+          if (!targetOrgId) {
+            targetOrgId = lockedOrgId;
+          }
+        }
+      }
+
       const { dbFunction, effectiveOrgId } = adapter.getDbContext(ctx, actor, {
         crossOrgAccess: route.crossOrg,
-        targetOrgId: input?.orgId,
+        targetOrgId,
       });
 
       // Execute within RLS context

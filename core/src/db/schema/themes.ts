@@ -31,6 +31,8 @@ export const themes = pgTable(
     cssFile: varchar("css_file", { length: 255 }).notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     isDefault: boolean("is_default").default(false).notNull(),
+    // Global theme - the fixed theme applied to ALL users (overrides user preferences)
+    isGlobal: boolean("is_global").default(false).notNull(),
     createdAt: timestamp("created_at", {
       withTimezone: true,
       mode: "date",

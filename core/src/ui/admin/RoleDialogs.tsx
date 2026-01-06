@@ -6,12 +6,12 @@
  * Provides factory functions for creating role management dialogs.
  * Apps create dialog components using factory functions that accept their tRPC client and UI components.
  *
- * @module @yobolabs/core/ui/admin
+ * @module @jetdevs/core/ui/admin
  *
  * @example
  * ```typescript
  * // Create delete role dialog
- * import { createDeleteRoleDialogFactory } from '@yobolabs/core/ui/admin';
+ * import { createDeleteRoleDialogFactory } from '@jetdevs/core/ui/admin';
  * import { api } from '@/utils/trpc';
  * import { toast } from 'sonner';
  * import * as UI from '@/components/ui';
@@ -392,10 +392,10 @@ export function createDeleteRoleDialogFactory(
                         <strong>What happens when you delete this role:</strong>
                       </p>
                       <ul className="mt-1 space-y-1 list-disc list-inside">
-                        <li>The role will be marked as inactive (soft delete)</li>
+                        <li>The role will be permanently deleted from the database</li>
                         <li>Users will lose access to permissions from this role</li>
                         <li>Role assignments will be removed</li>
-                        <li>Historical data will be preserved</li>
+                        <li>This action cannot be undone</li>
                       </ul>
                     </div>
                   </>

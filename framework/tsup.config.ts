@@ -8,6 +8,10 @@ export default defineConfig({
     'auth/index': 'src/auth/index.ts',
     'router/index': 'src/router/index.ts',
     'trpc/index': 'src/trpc/index.ts',
+    // Tenant module for custom domain support (server-safe)
+    'tenant/index': 'src/tenant/index.ts',
+    // Tenant client module for React hooks (client-only)
+    'tenant/client': 'src/tenant/client.ts',
   },
   format: ['cjs', 'esm'],
   dts: {
@@ -20,6 +24,10 @@ export default defineConfig({
       'auth/index': 'src/auth/index.ts',
       'router/index': 'src/router/index.ts',
       'trpc/index': 'src/trpc/index.ts',
+      // Tenant module for custom domain support (server-safe)
+      'tenant/index': 'src/tenant/index.ts',
+      // Tenant client module for React hooks (client-only)
+      'tenant/client': 'src/tenant/client.ts',
     },
   },
   sourcemap: true,
@@ -30,11 +38,16 @@ export default defineConfig({
   external: [
     'drizzle-orm',
     '@trpc/server',
+    '@trpc/server/observable',
+    '@trpc/client',
+    '@tanstack/react-query',
     'next-auth',
     'zod',
     'next/cache',
     'next/headers',
     'next/navigation',
+    // React - keep external as peer dependency
+    'react',
     // Node.js built-in modules - keep external to avoid bundling issues
     'async_hooks',
   ],

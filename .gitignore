@@ -39,3 +39,7 @@ yarn-error.log*
 .temp/
 *.tsbuildinfo.npmrc
 .npmrc
+
+#cloud 
+cloud/.npmrc
+cloud/.serena

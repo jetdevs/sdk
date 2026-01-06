@@ -3,7 +3,7 @@
  *
  * Type definitions for system configuration management.
  *
- * @module @yobolabs/core/system-config
+ * @module @jetdevs/core/system-config
  */
 
 /**

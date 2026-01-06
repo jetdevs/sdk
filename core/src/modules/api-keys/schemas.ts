@@ -3,7 +3,7 @@
  *
  * Zod schemas for API key validation.
  *
- * @module @yobolabs/core/api-keys
+ * @module @jetdevs/core/api-keys
  */
 
 import { z } from 'zod';

@@ -1,13 +1,31 @@
 /**
  * S3 Storage Operations
  *
- * Provides a complete set of S3 operations for file management:
- * - Upload files (binary, base64)
- * - Download files
- * - Delete files (single and batch)
- * - Generate presigned URLs for temporary access
+ * @deprecated This module is deprecated. Please migrate to the new storage module:
  *
- * Supports configuration via environment variables or explicit config.
+ * ```typescript
+ * // Old way (deprecated)
+ * import { uploadFileToS3, downloadFileFromS3 } from '@jetdevs/cloud/s3';
+ *
+ * // New way (recommended)
+ * import { storage } from '@jetdevs/cloud/storage';
+ *
+ * // Migration guide:
+ * // uploadFileToS3(params)        -> storage.uploadBuffer(buffer, filename, options)
+ * // uploadBase64Image(data, name) -> storage.uploadBase64(data, filename, options)
+ * // downloadFileFromS3(key)       -> storage.download(key)
+ * // getPresignedUrl(key, expires) -> storage.getSignedUrl(key, { expiresIn })
+ * // deleteFileFromS3(key)         -> storage.delete(key)
+ * // deleteMultipleFilesFromS3(keys) -> storage.deleteMany(keys)
+ * // isS3Configured()              -> storage.isConfigured()
+ * // S3_CONFIG.publicUrl + key     -> storage.getPublicUrl(key)
+ * ```
+ *
+ * Key differences:
+ * - Old: Uses static AWS credentials from environment variables
+ * - New: Uses STS temporary credentials from credentials-service (more secure)
+ *
+ * This file will be removed in a future version.
  */
 
 import {

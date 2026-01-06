@@ -8,11 +8,11 @@
 import { eq } from 'drizzle-orm';
 import { seedLog } from '../../cli';
 import type {
-  SeedDatabase,
-  PermissionSeedData,
-  PermissionSeedSchema,
-  PermissionSeedOptions,
-  SeedResult,
+    PermissionSeedData,
+    PermissionSeedOptions,
+    PermissionSeedSchema,
+    SeedDatabase,
+    SeedResult,
 } from './types';
 import { createSeedResult } from './types';
 
@@ -27,7 +27,7 @@ import { createSeedResult } from './types';
  *
  * @example
  * ```typescript
- * import { seedPermissions } from '@yobolabs/core/db/seeds';
+ * import { seedPermissions } from '@jetdevs/core/db/seeds';
  * import { permissions } from '@/db/schema';
  * import { getAllPermissions } from '@/permissions/registry';
  *

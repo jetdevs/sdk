@@ -74,8 +74,16 @@ export const coreRlsTables: RlsRegistry = {
     isolation: 'org',
     orgId: true,
     workspaceId: false,
-    description: 'Roles within organizations - isolated by org',
+    description: 'Roles within organizations - isolated by org. Global roles (org_id IS NULL, is_global_role = true) are readable by all orgs.',
     rlsEnabled: true,
+    // Custom policy to allow reading global roles (assignable to any org)
+    // Global roles have: org_id IS NULL, is_global_role = true, is_system_role = false
+    // System roles should NOT be included (they're assigned via backoffice with privileged access)
+    customPolicy: `(
+      current_setting('app.is_superuser', true) = 'true'
+      OR org_id = get_current_org_id()
+      OR (org_id IS NULL AND is_global_role = true AND is_system_role = false)
+    )`,
   },
 
   role_permissions: {

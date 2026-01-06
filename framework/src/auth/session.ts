@@ -22,7 +22,7 @@ let authAdapter: AuthAdapter | null = null;
  * @example
  * ```typescript
  * // In your app initialization (e.g., src/server/auth.ts or src/app/api/auth/[...nextauth]/route.ts)
- * import { configureAuth } from '@yobolabs/framework/auth';
+ * import { configureAuth } from '@jetdevs/framework/auth';
  * import { getServerSession } from 'next-auth';
  * import { authOptions } from './auth-options';
  * import { db } from '@/server/db';
@@ -55,7 +55,7 @@ function getAuthAdapter(): AuthAdapter {
     throw new Error(
       'Auth not configured. Call configureAuth() during app initialization.\n' +
       'Example:\n' +
-      '  import { configureAuth } from \'@yobolabs/framework/auth\';\n' +
+      '  import { configureAuth } from \'@jetdevs/framework/auth\';\n' +
       '  import { getServerSession } from \'next-auth\';\n' +
       '  import { authOptions } from \'./auth-options\';\n' +
       '  configureAuth({\n' +

@@ -1,23 +1,37 @@
 {
-  "name": "@yobolabs/cloud",
-  "version": "1.0.0",
-  "description": "AWS S3 and cloud service integrations for Yobo Platform",
+  "name": "@jetdevs/cloud",
+  "version": "1.0.4-dev",
+  "description": "AWS S3 and cloud service integrations for Jetdevs Platform",
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
   "exports": {
     ".": {
-      "require": "./dist/index.js",
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
-    "./s3": {
-      "require": "./dist/s3.js",
-      "import": "./dist/s3.mjs",
-      "types": "./dist/s3.d.ts"
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "import": "./dist/storage/index.js",
+      "require": "./dist/storage/index.cjs"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "import": "./dist/config/index.js",
+      "require": "./dist/config/index.cjs"
+    },
+    "./lib": {
+      "types": "./dist/lib/index.d.ts",
+      "import": "./dist/lib/index.js",
+      "require": "./dist/lib/index.cjs"
+    },
+    "./whatsapp": {
+      "types": "./dist/whatsapp/index.d.ts",
+      "import": "./dist/whatsapp/index.js",
+      "require": "./dist/whatsapp/index.cjs"
     }
   },
   "scripts": {
@@ -34,30 +48,22 @@
     "cloud",
     "storage"
   ],
-  "author": "Yobo",
+  "author": "Jetdevs",
   "license": "PRIVATE",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.700.0",
-    "@aws-sdk/lib-storage": "^3.700.0",
-    "@aws-sdk/s3-request-presigner": "^3.700.0"
+    "@aws-sdk/client-s3": "^3.940.0",
+    "@aws-sdk/lib-storage": "^3.940.0",
+    "@aws-sdk/s3-request-presigner": "^3.940.0",
+    "axios": "^1.7.9",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "dotenv": "^17.2.3",
     "tsup": "^8.0.1",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^3.2.3"
-  },
-  "peerDependencies": {
-    "@aws-sdk/client-s3": "^3.0.0",
-    "@aws-sdk/s3-request-presigner": "^3.0.0"
-  },
-  "peerDependenciesMeta": {
-    "@aws-sdk/client-s3": {
-      "optional": true
-    },
-    "@aws-sdk/s3-request-presigner": {
-      "optional": true
-    }
   },
   "files": [
     "dist",

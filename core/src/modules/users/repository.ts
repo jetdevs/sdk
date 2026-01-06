@@ -5,34 +5,34 @@
  * This factory pattern allows apps to inject their own schema while
  * reusing the repository logic from core.
  *
- * @module @yobolabs/core/users
+ * @module @jetdevs/core/users
  */
 
 import {
-  and,
-  asc,
-  desc,
-  eq,
-  inArray,
-  isNull,
-  like,
-  not,
-  or,
-  count,
-  type SQL,
+    and,
+    asc,
+    count,
+    desc,
+    eq,
+    inArray,
+    isNull,
+    like,
+    not,
+    or,
+    type SQL,
 } from 'drizzle-orm';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { PgTable } from 'drizzle-orm/pg-core';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import type {
-  UserWithRoles,
-  UserRole,
-  UserFilters,
-  UserListOptions,
-  UserCreateData,
-  UserUpdateData,
-  UserRoleAssignment,
-  UserPermissionsData,
+    UserCreateData,
+    UserFilters,
+    UserListOptions,
+    UserPermissionsData,
+    UserRole,
+    UserRoleAssignment,
+    UserUpdateData,
+    UserWithRoles,
 } from './types';
 
 // =============================================================================
@@ -78,6 +78,7 @@ export interface UserRepositorySchema {
     orgId: any;
     isSystemRole: any;
     isGlobalRole: any;
+    isActive: any;
   };
   orgs: PgTable & {
     id: any;
@@ -121,6 +122,7 @@ export interface IUserRepository {
   removeRole(db: any, userId: number, roleId: number, orgId: number): Promise<number>;
   removeAllRolesInOrg(db: any, userId: number, orgId: number): Promise<number>;
   hasRoleInOrg(db: any, userId: number, roleId: number, orgId: number): Promise<boolean>;
+  findGlobalStandardUserRole(db: any): Promise<{ id: number; name: string } | null>;
 
   // Permission operations
   getUserPermissions(db: any, userId: number, orgId?: number): Promise<UserPermissionsData>;
@@ -145,7 +147,7 @@ export interface IUserRepository {
  *
  * @example
  * ```typescript
- * import { createUserRepositoryClass } from '@yobolabs/core/users';
+ * import { createUserRepositoryClass } from '@jetdevs/core/users';
  * import { users, userRoles, roles, orgs, permissions, rolePermissions } from '@/db/schema';
  *
  * const UserRepositoryBase = createUserRepositoryClass({
@@ -317,6 +319,14 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
      * Update user
      */
     async update(db: PostgresJsDatabase<any>, id: number, data: UserUpdateData): Promise<UserWithRoles> {
+      // DEBUG: Log incoming data to repository
+      console.log('[SDK User Repo Update] Data received:', JSON.stringify({
+        id,
+        hasPassword: !!(data as any).password,
+        passwordLength: (data as any).password?.length,
+        allKeys: Object.keys(data),
+      }));
+
       const result = await db
         .update(users)
         .set({
@@ -325,6 +335,11 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
         } as any)
         .where(eq(users.id, id))
         .returning();
+
+      // DEBUG: Log what was returned
+      console.log('[SDK User Repo Update] Result returned:', JSON.stringify({
+        hasPasswordInResult: !!result[0]?.password,
+      }));
 
       return result[0] as unknown as UserWithRoles;
     }
@@ -517,6 +532,29 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
         .limit(1);
 
       return result.length > 0;
+    }
+
+    /**
+     * Find the global Standard User role
+     * Looks for a role where:
+     * - name = 'Standard User'
+     * - isGlobalRole = true
+     * - orgId IS NULL
+     * - isActive = true
+     */
+    async findGlobalStandardUserRole(db: PostgresJsDatabase<any>): Promise<{ id: number; name: string } | null> {
+      const result = await db
+        .select({ id: roles.id, name: roles.name })
+        .from(roles)
+        .where(and(
+          eq(roles.name, 'Standard User'),
+          eq(roles.isGlobalRole, true),
+          isNull(roles.orgId),
+          eq(roles.isActive, true)
+        ))
+        .limit(1);
+
+      return result[0] || null;
     }
 
     // -------------------------------------------------------------------------

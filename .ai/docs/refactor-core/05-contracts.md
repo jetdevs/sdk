@@ -15,7 +15,7 @@ This document defines the **sanctioned patterns** and **contracts** that MUST be
 ```typescript
 // apps/my-saas/src/server/api/root.ts
 
-import { coreRouter, composeRouters } from '@yobo/saas-core/trpc'
+import { coreRouter, composeRouters } from '@jetdevs/saas-core/trpc'
 import config from '../../../saas.config'
 
 const extensionRouters = config.extensions
@@ -64,7 +64,7 @@ router({ ...coreRouter, projects: projectsRouter })
 ```typescript
 // src/extensions/my-feature/router.ts
 
-import { createRouterWithActor } from '@yobo/saas-core/trpc'
+import { createRouterWithActor } from '@jetdevs/saas-core/trpc'
 import { z } from 'zod'
 
 export const myRouter = createRouterWithActor({
@@ -147,7 +147,7 @@ export const myRouter = createRouterWithActor({
 ### Sanctioned Pattern (Manual - for REST/non-tRPC)
 
 ```typescript
-import { withRlsContext } from '@yobo/saas-core/rls'
+import { withRlsContext } from '@jetdevs/saas-core/rls'
 
 export async function GET(req: Request) {
   const session = await getServerSession()
@@ -259,7 +259,7 @@ permissions: {
 // src/extensions/projects/schema.ts
 
 import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core'
-import { schema } from '@yobo/saas-core'
+import { schema } from '@jetdevs/saas-core'
 
 export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -379,7 +379,7 @@ export default {
   content: [
     './src/**/*.{ts,tsx}',
     // Include core UI components
-    './node_modules/@yobo/saas-core/dist/**/*.{js,jsx}',
+    './node_modules/@jetdevs/saas-core/dist/**/*.{js,jsx}',
   ],
 }
 ```

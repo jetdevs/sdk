@@ -5,36 +5,35 @@
  * Provides a clean data access layer with proper type safety and RLS support.
  * Manages role-permission relationships and role hierarchy.
  *
- * @module @yobolabs/core/rbac
+ * @module @jetdevs/core/rbac
  */
 
 import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  inArray,
-  isNull,
-  like,
-  not,
-  or,
-  type SQL,
+    and,
+    asc,
+    count,
+    desc,
+    eq,
+    inArray,
+    isNull,
+    like,
+    not,
+    or,
+    type SQL,
 } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import type {
-  Role,
-  RoleCreateData,
-  RoleFilters,
-  RoleListOptions,
-  RoleListResult,
-  RolePermission,
-  RolePermissionAssignment,
-  RolePermissionStats,
-  RoleUpdateData,
-  RoleWithStats,
-  UserRoleStats,
+    Role,
+    RoleCreateData,
+    RoleFilters,
+    RoleListOptions,
+    RoleListResult,
+    RolePermissionAssignment,
+    RolePermissionStats,
+    RoleUpdateData,
+    RoleWithStats,
+    UserRoleStats
 } from "./types";
 
 // =============================================================================
@@ -46,7 +45,7 @@ import type {
  *
  * @example
  * ```typescript
- * import { RoleRepository } from '@yobolabs/core/rbac';
+ * import { RoleRepository } from '@jetdevs/core/rbac';
  *
  * const repo = new RoleRepository(db, schema);
  * const roles = await repo.list({ limit: 10, offset: 0, filters: {} });
@@ -98,8 +97,14 @@ export class RoleRepository {
       conditions.push(eq(this.roles.isActive, filters.isActive));
     }
 
-    // System role filter
-    if (typeof filters.isSystemRole === "boolean") {
+    // System role filter - CRITICAL: Always exclude system roles for non-system users
+    // This is the primary security gate to prevent system roles from being shown
+    // in tenant UI. The check is applied regardless of what's passed in filters.
+    if (!includeSystemRoles) {
+      // Explicitly exclude system roles when not authorized to view them
+      conditions.push(eq(this.roles.isSystemRole, false));
+    } else if (typeof filters.isSystemRole === "boolean") {
+      // Only apply filter value when user IS authorized to view system roles
       conditions.push(eq(this.roles.isSystemRole, filters.isSystemRole));
     }
 
@@ -118,14 +123,17 @@ export class RoleRepository {
     }
 
     // Default org scope for non-system operations
+    // This ensures tenant users only see:
+    // 1. Org-specific roles (org_id = current_org)
+    // 2. Global roles (org_id IS NULL AND is_global_role = true)
+    // System roles are already excluded by the isSystemRole condition above
     if (!includeSystemRoles && orgId) {
       conditions.push(
         or(
           eq(this.roles.orgId, orgId), // Org-specific roles
           and(
             isNull(this.roles.orgId), // Global roles have null orgId
-            eq(this.roles.isGlobalRole, true), // Must be global role
-            eq(this.roles.isSystemRole, false) // But NOT system role
+            eq(this.roles.isGlobalRole, true) // Must be global role
           )
         )!
       );
@@ -736,6 +744,20 @@ export class RoleRepository {
   }
 
   /**
+   * Bulk hard delete roles (permanently removes from database)
+   */
+  async bulkHardDelete(roleIds: number[]): Promise<number> {
+    if (roleIds.length === 0) return 0;
+
+    const result = await this.db
+      .delete(this.roles)
+      .where(inArray(this.roles.id, roleIds))
+      .returning({ id: this.roles.id });
+
+    return result.length;
+  }
+
+  /**
    * Get system roles
    */
   async getSystemRoles(): Promise<RoleWithStats[]> {
@@ -839,10 +861,10 @@ export class RoleRepository {
 
 // Import SDK schema tables (lazy to avoid circular deps)
 import {
-  roles as sdkRoles,
-  permissions as sdkPermissions,
-  rolePermissions as sdkRolePermissions,
-  userRoles as sdkUserRoles,
+    permissions as sdkPermissions,
+    rolePermissions as sdkRolePermissions,
+    roles as sdkRoles,
+    userRoles as sdkUserRoles,
 } from "../../db/schema/rbac";
 
 /**
@@ -864,8 +886,8 @@ export const sdkRoleRepositorySchema = {
  * @example
  * ```typescript
  * // Zero-boilerplate usage with createRouterWithActor
- * import { SDKRoleRepository, roleRouterConfig } from '@yobolabs/core/rbac';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { SDKRoleRepository, roleRouterConfig } from '@jetdevs/core/rbac';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * const roleRouter = createRouterWithActor(roleRouterConfig);
  * ```
@@ -873,7 +895,7 @@ export const sdkRoleRepositorySchema = {
  * @example
  * ```typescript
  * // Direct usage
- * import { SDKRoleRepository } from '@yobolabs/core/rbac';
+ * import { SDKRoleRepository } from '@jetdevs/core/rbac';
  *
  * const repo = new SDKRoleRepository(db);
  * const roles = await repo.list({ limit: 10, offset: 0, filters: {} });

@@ -27,7 +27,7 @@ let trpcAdapter: TRPCAdapter | null = null;
  * @example
  * ```typescript
  * // In your app initialization (e.g., src/server/api/trpc.ts)
- * import { configureRouterFactory } from '@yobolabs/framework/router';
+ * import { configureRouterFactory } from '@jetdevs/framework/router';
  * import { createTRPCRouter, orgProtectedProcedureWithPermission } from './trpc';
  *
  * configureRouterFactory({
@@ -53,7 +53,7 @@ function getTRPCAdapter(): TRPCAdapter {
     throw new Error(
       'Router factory not configured. Call configureRouterFactory() during app initialization.\n' +
       'Example:\n' +
-      '  import { configureRouterFactory } from \'@yobolabs/framework/router\';\n' +
+      '  import { configureRouterFactory } from \'@jetdevs/framework/router\';\n' +
       '  import { createTRPCRouter, orgProtectedProcedureWithPermission } from \'./trpc\';\n' +
       '  configureRouterFactory({\n' +
       '    createRouter: createTRPCRouter,\n' +
@@ -78,7 +78,7 @@ function getTRPCAdapter(): TRPCAdapter {
  *
  * @example
  * ```typescript
- * import { createRouter } from '@yobolabs/framework/router';
+ * import { createRouter } from '@jetdevs/framework/router';
  * import { z } from 'zod';
  *
  * export const campaignRouter = createRouter({
@@ -209,7 +209,7 @@ export function createRouteGroup(
  * @example
  * ```typescript
  * // In your app (src/server/api/sdk-router.ts)
- * import { createRouterFactory } from '@yobolabs/framework/router';
+ * import { createRouterFactory } from '@jetdevs/framework/router';
  * import { createTRPCRouter, orgProtectedProcedureWithPermission } from './trpc';
  *
  * export const createSDKRouter = createRouterFactory({

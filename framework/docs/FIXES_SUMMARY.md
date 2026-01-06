@@ -206,7 +206,7 @@ Deprecated functions issue warnings but still function:
 
 1. **Configure Router Factory** (one-time):
 ```typescript
-import { configureRouterFactory } from '@yobo/framework/router';
+import { configureRouterFactory } from '@jetdevs/framework/router';
 
 configureRouterFactory({
   createRouter: createTRPCRouter,
@@ -216,7 +216,7 @@ configureRouterFactory({
 
 2. **Configure Auth** (one-time):
 ```typescript
-import { configureAuth } from '@yobo/framework/auth';
+import { configureAuth } from '@jetdevs/framework/auth';
 
 configureAuth({
   getSession: async () => await getServerSession(authOptions),
@@ -226,9 +226,9 @@ configureAuth({
 
 3. **Use Framework APIs**:
 ```typescript
-import { createRouter } from '@yobo/framework/router';
-import { createRepository } from '@yobo/framework/db';
-import { getCurrentOrgId } from '@yobo/framework/auth';
+import { createRouter } from '@jetdevs/framework/router';
+import { createRepository } from '@jetdevs/framework/db';
+import { getCurrentOrgId } from '@jetdevs/framework/auth';
 ```
 
 ---

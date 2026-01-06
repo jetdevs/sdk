@@ -5,27 +5,23 @@
  * This factory pattern allows apps to inject their own implementations
  * for privileged database access and role template copying.
  *
- * @module @yobolabs/core/organizations
+ * @module @jetdevs/core/organizations
  */
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import type {
-  OrgRecord,
-  OrgWithStats,
-  OrgStats,
-  OrgListOptions,
-  OrgListResult,
-  OrgCreateData,
-  OrgUpdateData,
-  OrgDeleteResult,
-  OrgSetting,
-  OrgSettingUpdate,
-  AuditLogOptions,
-  AuditLogListResult,
-  OrgAuditLogRecord,
-  OrgAnalytics,
-  OrgUser,
+    AuditLogListResult,
+    OrgAnalytics,
+    OrgAuditLogRecord,
+    OrgCreateData,
+    OrgDeleteResult,
+    OrgListResult,
+    OrgRecord,
+    OrgSetting,
+    OrgSettingUpdate,
+    OrgStats,
+    OrgUser
 } from './types';
 
 import type { IOrgRepository } from './repository';
@@ -73,7 +69,9 @@ export interface OrgServiceHooks {
   onOrgDeleted?: (orgId: number, ctx: OrgServiceContext) => Promise<void>;
 
   /**
-   * Copies role templates for a new organization
+   * @deprecated Roles are now global (orgId = null, isGlobalRole = true).
+   * Org-specific role templates are no longer needed. This hook is kept
+   * for backward compatibility but will be ignored.
    */
   copyRoleTemplates?: (orgId: number) => Promise<void>;
 
@@ -271,7 +269,7 @@ export class OrgServiceError extends Error {
  *
  * @example
  * ```typescript
- * import { createOrgServiceClass } from '@yobolabs/core/organizations';
+ * import { createOrgServiceClass } from '@jetdevs/core/organizations';
  * import { OrgRepository } from './org.repository';
  * import { withPrivilegedDb } from '@/db/clients';
  * import { copyOrgRoleTemplates } from '@/db/seeds/seed-rbac';
@@ -612,10 +610,8 @@ export function createOrgServiceClass(
             { initialData: params }
           );
 
-          // Copy role templates if hook is provided
-          if (this._hooks?.copyRoleTemplates) {
-            await this._hooks.copyRoleTemplates(newOrg.id);
-          }
+          // NOTE: copyRoleTemplates hook is deprecated and no longer called.
+          // Roles are now global (orgId = null, isGlobalRole = true) and shared across all organizations.
 
           // Call onOrgCreated hook if provided
           if (this._hooks?.onOrgCreated) {
@@ -1118,10 +1114,8 @@ export function createOrgServiceClass(
 
             console.log('Created default org:', { orgId: defaultOrg.id });
 
-            // Copy role templates if hook is provided
-            if (this._hooks?.copyRoleTemplates) {
-              await this._hooks.copyRoleTemplates(defaultOrg.id);
-            }
+            // NOTE: copyRoleTemplates hook is deprecated and no longer called.
+            // Roles are now global (orgId = null, isGlobalRole = true) and shared across all organizations.
 
             return defaultOrg;
           }

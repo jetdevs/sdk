@@ -10,7 +10,7 @@ This guide explains how to create, structure, and maintain extensions for the Sa
 
 ```typescript
 // ✅ REQUIRED: Use createRouterWithActor
-import { createRouterWithActor } from '@yobo/saas-core/trpc'
+import { createRouterWithActor } from '@jetdevs/saas-core/trpc'
 
 export const myRouter = createRouterWithActor({
   list: {
@@ -109,7 +109,7 @@ Every extension starts with an `index.ts` that registers it with the core:
 ```typescript
 // src/extensions/projects/index.ts
 
-import { defineExtension } from '@yobo/saas-core'
+import { defineExtension } from '@jetdevs/saas-core'
 import * as schema from './schema'
 import { permissions } from './permissions'
 import { projectsRouter } from './router'
@@ -165,7 +165,7 @@ import {
   jsonb,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
-import { schema } from '@yobo/saas-core'
+import { schema } from '@jetdevs/saas-core'
 
 // Main projects table
 export const projects = pgTable('projects', {
@@ -270,7 +270,7 @@ Create permissions for your feature:
 ```typescript
 // src/extensions/projects/permissions.ts
 
-import type { PermissionModule } from '@yobo/saas-core'
+import type { PermissionModule } from '@jetdevs/saas-core'
 
 export const permissions: PermissionModule = {
   name: 'projects',           // Module name (used for grouping)
@@ -357,7 +357,7 @@ Define Row-Level Security policies:
 ```typescript
 // src/extensions/projects/rls.ts
 
-import type { RlsTableConfig } from '@yobo/saas-core'
+import type { RlsTableConfig } from '@jetdevs/saas-core'
 
 export const rlsConfig: RlsTableConfig[] = [
   {
@@ -405,7 +405,7 @@ export const rlsConfig: RlsTableConfig[] = [
 // src/extensions/projects/repository.ts
 
 import { eq, and, desc, sql, inArray } from 'drizzle-orm'
-import type { DbClient } from '@yobo/saas-core'
+import type { DbClient } from '@jetdevs/saas-core'
 import { projects, projectMembers, projectTasks } from './schema'
 
 export interface ProjectFilters {
@@ -573,9 +573,9 @@ export class ProjectRepository {
 ```typescript
 // src/extensions/projects/service.ts
 
-import type { Actor } from '@yobo/saas-core'
+import type { Actor } from '@jetdevs/saas-core'
 import { ProjectRepository } from './repository'
-import type { DbClient } from '@yobo/saas-core'
+import type { DbClient } from '@jetdevs/saas-core'
 
 export class ProjectService {
   private repo: ProjectRepository
@@ -695,7 +695,7 @@ export class ProjectService {
 // src/extensions/projects/router.ts
 
 import { z } from 'zod'
-import { createRouterWithActor, TRPCError } from '@yobo/saas-core/trpc'
+import { createRouterWithActor, TRPCError } from '@jetdevs/saas-core/trpc'
 import { ProjectService } from './service'
 
 // Input validation schemas
@@ -874,7 +874,7 @@ export type ProjectsRouter = typeof projectsRouter
 'use client'
 
 import { trpc } from '@/utils/trpc'
-import { DataTable, Button, usePermissionCheck } from '@yobo/saas-core'
+import { DataTable, Button, usePermissionCheck } from '@jetdevs/saas-core'
 import { columns } from './columns'
 import { CreateProjectDialog } from './CreateProjectDialog'
 
@@ -925,7 +925,7 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-} from '@yobo/saas-core'
+} from '@jetdevs/saas-core'
 
 const formSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -1024,7 +1024,7 @@ export function CreateProjectDialog() {
 'use client'
 
 import { ColumnDef } from '@tanstack/react-table'
-import { Badge, Button, DropdownMenu } from '@yobo/saas-core'
+import { Badge, Button, DropdownMenu } from '@jetdevs/saas-core'
 import { MoreHorizontal, Archive, Trash2, Edit } from 'lucide-react'
 
 type Project = {
@@ -1136,7 +1136,7 @@ Add your extension to the saas config:
 ```typescript
 // saas.config.ts
 
-import { defineSaasConfig } from '@yobo/saas-core'
+import { defineSaasConfig } from '@jetdevs/saas-core'
 import { projectsExtension } from './src/extensions/projects'
 
 export default defineSaasConfig({
@@ -1191,7 +1191,7 @@ RLS context is handled **automatically** for tRPC procedures when you use `creat
 For REST endpoints or other non-tRPC code, manually wrap with `withRlsContext`:
 
 ```typescript
-import { withRlsContext } from '@yobo/saas-core/rls'
+import { withRlsContext } from '@jetdevs/saas-core/rls'
 
 export async function GET(req: Request) {
   const session = await getServerSession()
@@ -1213,7 +1213,7 @@ export async function GET(req: Request) {
 Keep extensions self-contained:
 
 ```
-GOOD: Extension imports from @yobo/saas-core
+GOOD: Extension imports from @jetdevs/saas-core
 BAD:  Extension imports from another extension
 ```
 
@@ -1221,7 +1221,7 @@ If extensions need to communicate, use events:
 
 ```typescript
 // Extension A emits event
-import { events } from '@yobo/saas-core'
+import { events } from '@jetdevs/saas-core'
 events.emit('project:created', project)
 
 // Extension B listens
@@ -1283,7 +1283,7 @@ Write tests for critical paths:
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { ProjectService } from '../service'
-import { createTestDb, createTestActor } from '@yobo/saas-core/testing'
+import { createTestDb, createTestActor } from '@jetdevs/saas-core/testing'
 
 describe('ProjectService', () => {
   let db: TestDb
@@ -1388,5 +1388,5 @@ export const projectsExtension = defineExtension({
 ### Type errors
 
 1. Run `pnpm typecheck`
-2. Ensure imports use `@yobo/saas-core` not relative paths
+2. Ensure imports use `@jetdevs/saas-core` not relative paths
 3. Regenerate types if schema changed

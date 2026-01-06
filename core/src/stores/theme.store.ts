@@ -9,6 +9,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { StoreApi, UseBoundStore } from 'zustand';
 
 // =============================================================================
 // TYPES
@@ -38,7 +39,7 @@ export type ThemeStore = ThemeState & ThemeActions;
 export function createThemeStore(options?: {
   name?: string;
   defaultTheme?: string;
-}) {
+}): UseBoundStore<StoreApi<ThemeStore>> {
   const { name = 'theme-preference', defaultTheme = 'default' } = options ?? {};
 
   return create<ThemeStore>()(

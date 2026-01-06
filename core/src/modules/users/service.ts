@@ -8,22 +8,16 @@
  * - Role templates (copying default roles for new orgs)
  * - Privileged database access (cross-org operations)
  *
- * @module @yobolabs/core/users
+ * @module @jetdevs/core/users
  */
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { IUserRepository } from './repository';
 import type {
-  UserRecord,
-  UserWithRoles,
-  UserWithStats,
-  UserRole,
-  UserFilters,
-  UserListOptions,
-  UserCreateData,
-  UserUpdateData,
-  UserRoleAssignment,
-  UserPermissionsData,
+    UserPermissionsData,
+    UserRecord,
+    UserWithRoles,
+    UserWithStats
 } from './types';
 
 // =============================================================================
@@ -250,15 +244,9 @@ export interface UserServiceHooks {
   broadcastPermissionUpdate?: (userIds: number[]) => Promise<void>;
 
   /**
-   * Copy organization role templates for a new organization.
-   * Used when creating the first user in an org to ensure default roles exist.
-   *
-   * @example
-   * ```typescript
-   * copyOrgRoleTemplates: async (orgId) => {
-   *   await seedDefaultRoles(orgId);
-   * }
-   * ```
+   * @deprecated Roles are now global (orgId = null, isGlobalRole = true).
+   * Org-specific role templates are no longer needed. This hook is kept
+   * for backward compatibility but will be ignored.
    */
   copyOrgRoleTemplates?: (orgId: number) => Promise<void>;
 
@@ -397,7 +385,7 @@ export interface IUserService {
  *
  * @example
  * ```typescript
- * import { createUserService, SDKUserRepository } from '@yobolabs/core/users';
+ * import { createUserService, SDKUserRepository } from '@jetdevs/core/users';
  * import { withPrivilegedDb } from '@/db/clients';
  * import { emailService } from '@/lib/email';
  * import bcrypt from 'bcrypt';
@@ -1261,6 +1249,9 @@ export function createUserService(deps: UserServiceDeps): IUserService {
 
     /**
      * Assign standard user role to a user (private helper)
+     *
+     * Finds the global Standard User role (orgId = null, isGlobalRole = true)
+     * and assigns it to the user for the specified organization.
      */
     async assignStandardUserRole(
       userId: number,
@@ -1269,28 +1260,43 @@ export function createUserService(deps: UserServiceDeps): IUserService {
       hooks: UserServiceHooks
     ) {
       try {
-        // Find Standard User role for this org
-        let standardUserRole = await hooks.withPrivilegedDb(async (db) => {
+        // Find the global Standard User role
+        // Global roles have: name = 'Standard User', isGlobalRole = true, orgId IS NULL
+        const standardUserRole = await hooks.withPrivilegedDb(async (db) => {
           const repo = getRepo(db);
-          // Try to find Standard User role by querying roles in org
-          // This is a simplified version - apps may want to provide their own implementation
-          const roles = await repo.getUserRoles(db, userId, orgId);
-          return roles.find(r => r.name === 'Standard User');
+          return await repo.findGlobalStandardUserRole(db);
         });
 
-        // If role doesn't exist and we have the copy templates hook, use it
-        if (!standardUserRole && hooks.copyOrgRoleTemplates) {
-          await hooks.copyOrgRoleTemplates(orgId);
+        if (!standardUserRole) {
+          console.warn('[assignStandardUserRole] Global Standard User role not found. Ensure the role is seeded with isGlobalRole=true and orgId=null.');
+          return;
         }
 
-        // Try to assign the role using the hook if provided
+        // Assign the global role to the user
+        // Use the hook if provided for centralized role assignment
         if (hooks.assignUserRole) {
           await hooks.assignUserRole({
             userId,
             orgId,
+            roleId: standardUserRole.id,
             assignedBy,
           });
+        } else {
+          // Fallback: use repository directly
+          await hooks.withPrivilegedDb(async (db) => {
+            const repo = getRepo(db);
+            await repo.assignRole(db, {
+              userId,
+              roleId: standardUserRole.id,
+              orgId,
+              isActive: true,
+              assignedBy,
+              assignedAt: new Date(),
+            });
+          });
         }
+
+        console.log(`[assignStandardUserRole] Assigned global Standard User role (id: ${standardUserRole.id}) to user ${userId} in org ${orgId}`);
       } catch (error) {
         console.error('Error assigning default role:', error);
         // Don't fail the invite if role assignment fails
@@ -1313,34 +1319,51 @@ export function createUserService(deps: UserServiceDeps): IUserService {
 import { SDKUserRepository } from './router-config';
 
 /**
- * Default password hasher using simple approach
- * Apps should provide their own bcrypt implementation for production
+ * Default password hasher - THROWS ERROR in production
+ *
+ * This function exists only to prevent runtime crashes when apps don't configure
+ * password hashing. It will throw an error to force apps to provide proper bcrypt.
+ *
+ * @deprecated Always provide your own bcrypt implementation via createUserService
  */
 async function defaultHashPassword(password: string, _rounds?: number): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  // SECURITY: Throw error to prevent weak password hashing
+  // Apps MUST provide bcrypt implementation
+  throw new Error(
+    '[SECURITY ERROR] Password hashing not configured! ' +
+    'You must provide hashPassword and comparePassword functions using bcrypt. ' +
+    'Example: createUserService({ hooks: { hashPassword: (p) => bcrypt.hash(p, 12), comparePassword: bcrypt.compare } })'
+  );
 }
 
 /**
- * Default password comparator
+ * Default password comparator - THROWS ERROR in production
+ *
+ * @deprecated Always provide your own bcrypt implementation via createUserService
  */
 async function defaultComparePassword(password: string, hash: string): Promise<boolean> {
-  const hashed = await defaultHashPassword(password);
-  return hashed === hash;
+  // SECURITY: Throw error to prevent weak password comparison
+  // Apps MUST provide bcrypt implementation
+  throw new Error(
+    '[SECURITY ERROR] Password comparison not configured! ' +
+    'You must provide hashPassword and comparePassword functions using bcrypt. ' +
+    'Example: createUserService({ hooks: { hashPassword: (p) => bcrypt.hash(p, 12), comparePassword: bcrypt.compare } })'
+  );
 }
 
 /**
  * Create a default user service with minimal configuration.
  *
- * NOTE: This creates a service with basic password hashing (SHA-256).
- * For production, you should use createUserService with proper bcrypt:
+ * @deprecated DO NOT USE IN PRODUCTION - This will throw an error when password
+ * operations are attempted. Always use createUserService with bcrypt hooks.
+ *
+ * This function creates a service with NO password hashing configured.
+ * Any password operation will throw a security error.
  *
  * @example
  * ```typescript
- * import { createUserService, SDKUserRepository } from '@yobolabs/core/users';
+ * // REQUIRED: Production usage with bcrypt
+ * import { createUserService, SDKUserRepository } from '@jetdevs/core/users';
  * import { withPrivilegedDb } from '@/db/clients';
  * import bcrypt from 'bcrypt';
  *

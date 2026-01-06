@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { cn } from "../../lib";
 import type { FullScreenLoadingProps } from "./types";
 
@@ -12,7 +11,7 @@ import type { FullScreenLoadingProps } from "./types";
  *
  * @example
  * ```tsx
- * import { FullScreenLoading } from '@yobolabs/core/ui/skeletons';
+ * import { FullScreenLoading } from '@jetdevs/core/ui/skeletons';
  *
  * <FullScreenLoading message="Loading your data..." />
  * ```
@@ -47,7 +46,7 @@ export function FullScreenLoading({
  *
  * @example
  * ```tsx
- * import { CenteredSpinner } from '@yobolabs/core/ui/skeletons';
+ * import { CenteredSpinner } from '@jetdevs/core/ui/skeletons';
  *
  * {isLoading ? <CenteredSpinner /> : <Content />}
  * ```

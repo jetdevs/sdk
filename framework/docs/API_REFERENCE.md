@@ -1,4 +1,4 @@
-# @yobolabs/framework API Reference - Phase 3 Complete
+# @jetdevs/framework API Reference - Phase 3 Complete
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ The Phase 3 SDK implementation is production-ready with:
 ### Install the Package
 
 ```bash
-pnpm add @yobolabs/framework
+pnpm add @jetdevs/framework
 ```
 
 ### Initial Configuration
@@ -39,7 +39,7 @@ import {
   configureRouterFactory,
   configureDatabaseContext,
   configurePermissions
-} from '@yobolabs/framework';
+} from '@jetdevs/framework';
 
 export function initializeFramework() {
   // Configure router factory
@@ -136,12 +136,12 @@ interface HandlerContext<TInput> {
 #### Example - Phase 3 Usage
 
 ```typescript
-import { createRouterWithActor } from '@yobolabs/framework/router';
+import { createRouterWithActor } from '@jetdevs/framework/router';
 import { ProductsRepository } from '@/server/repos/products.repository';
 import { z } from 'zod';
 
 // One-time configuration in trpc.ts
-import { configureActorAdapter } from '@yobolabs/framework/router';
+import { configureActorAdapter } from '@jetdevs/framework/router';
 configureActorAdapter({
   createActor,
   getDbContext,
@@ -354,7 +354,7 @@ interface CheckOptions {
 #### Example
 
 ```typescript
-import { checkPermission } from '@yobolabs/framework/permissions';
+import { checkPermission } from '@jetdevs/framework/permissions';
 
 // Check with exception
 await checkPermission(ctx, 'product:delete');
@@ -454,7 +454,7 @@ interface AuthContext {
 #### Example
 
 ```typescript
-import { createAuthContext } from '@yobolabs/framework/auth';
+import { createAuthContext } from '@jetdevs/framework/auth';
 
 const authContext = createAuthContext(session);
 
@@ -498,7 +498,7 @@ import {
   configureRouterFactory,
   configureDatabaseContext,
   configurePermissions
-} from '@yobolabs/framework';
+} from '@jetdevs/framework';
 
 import { createTRPCRouter, orgProtectedProcedureWithPermission } from './trpc';
 import { db } from '@/db';
@@ -608,7 +608,7 @@ export const productsRouter = createTRPCRouter({
 #### After (Phase 3 SDK - 8 lines per procedure, 62% reduction)
 
 ```typescript
-import { createRouterWithActor } from '@yobolabs/framework/router';
+import { createRouterWithActor } from '@jetdevs/framework/router';
 import { ProductsRepository } from '@/server/repos/products.repository';
 
 export const productsRouter = createRouterWithActor({
@@ -642,7 +642,7 @@ export const productsRouter = createRouterWithActor({
 1. **Configure Adapter (One-Time)**
    ```typescript
    // In src/server/api/trpc.ts
-   import { configureActorAdapter } from '@yobolabs/framework/router';
+   import { configureActorAdapter } from '@jetdevs/framework/router';
 
    configureActorAdapter({
      createActor,
@@ -662,7 +662,7 @@ export const productsRouter = createRouterWithActor({
    import { createTRPCRouter } from '../trpc';
 
    // After
-   import { createRouterWithActor } from '@yobolabs/framework/router';
+   import { createRouterWithActor } from '@jetdevs/framework/router';
    ```
 
 3. **Convert Procedures**

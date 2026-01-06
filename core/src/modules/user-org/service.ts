@@ -8,18 +8,18 @@
  * This is a factory function that creates a service class with optional
  * app-specific hooks for real-time updates and other integrations.
  *
- * @module @yobolabs/core/user-org
+ * @module @jetdevs/core/user-org
  *
  * @example
  * ```typescript
  * // Option 1: Zero-config usage (no hooks)
- * import { UserOrgService } from '@yobolabs/core/user-org';
+ * import { UserOrgService } from '@jetdevs/core/user-org';
  *
  * const service = new UserOrgService();
  * const result = await service.getCurrentOrg(userId, currentOrgId, ctx);
  *
  * // Option 2: With custom hooks for real-time updates
- * import { createUserOrgService } from '@yobolabs/core/user-org';
+ * import { createUserOrgService } from '@jetdevs/core/user-org';
  *
  * const UserOrgServiceWithHooks = createUserOrgService({
  *   hooks: {
@@ -35,8 +35,8 @@
  */
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { orgs, roles, userRoles, users } from '../../db/schema';
 import { createUserOrgRepository, type UserOrgRepositoryConfig } from './user-org.repository';
-import { userRoles, users, roles, orgs } from '../../db/schema';
 
 // =============================================================================
 // SERVICE TYPES
@@ -955,7 +955,7 @@ export function createUserOrgService(deps?: UserOrgServiceDeps) {
  *
  * @example
  * ```typescript
- * import { UserOrgService } from '@yobolabs/core/user-org';
+ * import { UserOrgService } from '@jetdevs/core/user-org';
  *
  * const service = new UserOrgService();
  * const result = await service.getCurrentOrg(userId, currentOrgId, ctx);

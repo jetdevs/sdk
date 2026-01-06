@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { cn } from "../../lib";
 import type { CircularProgressProps } from "./types";
 import { CIRCULAR_PROGRESS_COLOR_VARIANTS } from "./types";
@@ -13,7 +12,7 @@ import { CIRCULAR_PROGRESS_COLOR_VARIANTS } from "./types";
  *
  * @example
  * ```tsx
- * import { CircularProgress } from '@yobolabs/core/ui/feedback';
+ * import { CircularProgress } from '@jetdevs/core/ui/feedback';
  *
  * // Basic usage
  * <CircularProgress value={75} />

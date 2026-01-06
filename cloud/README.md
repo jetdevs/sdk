@@ -1,4 +1,4 @@
-# @yobolabs/cloud
+# @jetdevs/cloud
 
 AWS S3 storage SDK for Yobo Platform. Provides a clean, typed interface for S3 file operations.
 
@@ -13,7 +13,7 @@ AWS S3 storage SDK for Yobo Platform. Provides a clean, typed interface for S3 f
 ## Installation
 
 ```bash
-pnpm add @yobolabs/cloud
+pnpm add @jetdevs/cloud
 ```
 
 ## Configuration
@@ -36,7 +36,7 @@ S3_ENDPOINT=https://custom-endpoint.com  # For S3-compatible services
 ### Upload Files
 
 ```typescript
-import { uploadFileToS3 } from '@yobolabs/cloud';
+import { uploadFileToS3 } from '@jetdevs/cloud';
 
 const result = await uploadFileToS3({
   file: buffer,
@@ -58,7 +58,7 @@ if (result.success) {
 ### Upload Base64 Images
 
 ```typescript
-import { uploadBase64Image } from '@yobolabs/cloud';
+import { uploadBase64Image } from '@jetdevs/cloud';
 
 const result = await uploadBase64Image(
   'data:image/png;base64,iVBORw0KGgo...',
@@ -70,7 +70,7 @@ const result = await uploadBase64Image(
 ### Download Files
 
 ```typescript
-import { downloadFileFromS3 } from '@yobolabs/cloud';
+import { downloadFileFromS3 } from '@jetdevs/cloud';
 
 const result = await downloadFileFromS3('org-123/documents/file.pdf');
 
@@ -83,7 +83,7 @@ if (result.success && result.data) {
 ### Generate Presigned URLs
 
 ```typescript
-import { getPresignedUrl } from '@yobolabs/cloud';
+import { getPresignedUrl } from '@jetdevs/cloud';
 
 // URL valid for 1 hour (default)
 const url = await getPresignedUrl('org-123/documents/file.pdf');
@@ -95,7 +95,7 @@ const longUrl = await getPresignedUrl('org-123/documents/file.pdf', 86400);
 ### Delete Files
 
 ```typescript
-import { deleteFileFromS3, deleteMultipleFilesFromS3 } from '@yobolabs/cloud';
+import { deleteFileFromS3, deleteMultipleFilesFromS3 } from '@jetdevs/cloud';
 
 // Delete single file
 const result = await deleteFileFromS3('org-123/documents/file.pdf');
@@ -110,7 +110,7 @@ const batchResult = await deleteMultipleFilesFromS3([
 ### Check Configuration
 
 ```typescript
-import { isS3Configured, S3_CONFIG } from '@yobolabs/cloud';
+import { isS3Configured, S3_CONFIG } from '@jetdevs/cloud';
 
 if (isS3Configured()) {
   console.log('Bucket:', S3_CONFIG.bucket);
@@ -128,7 +128,7 @@ import type {
   DownloadResult,
   DeleteResult,
   S3ClientConfig,
-} from '@yobolabs/cloud';
+} from '@jetdevs/cloud';
 ```
 
 ## Multi-Tenant Pattern

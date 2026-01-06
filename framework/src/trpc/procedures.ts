@@ -11,7 +11,7 @@
  * These factories accept a tRPC instance and dependencies, returning configured procedures.
  * This allows apps to inject their own DB clients, permission tables, and RLS setup.
  *
- * @module @yobolabs/framework/trpc/procedures
+ * @module @jetdevs/framework/trpc/procedures
  */
 
 import { TRPCError } from '@trpc/server';

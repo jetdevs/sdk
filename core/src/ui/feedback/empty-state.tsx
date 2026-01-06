@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { cn } from "../../lib";
 import type { EmptyStateProps } from "./types";
 
@@ -12,7 +11,7 @@ import type { EmptyStateProps } from "./types";
  *
  * @example
  * ```tsx
- * import { EmptyState } from '@yobolabs/core/ui/feedback';
+ * import { EmptyState } from '@jetdevs/core/ui/feedback';
  * import { Inbox } from 'lucide-react';
  *
  * <EmptyState

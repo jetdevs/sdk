@@ -1,5 +1,5 @@
 /**
- * @yobo/core
+ * @jetdevs/core
  *
  * Core SaaS platform package providing:
  * - Multi-tenant database schema
@@ -10,7 +10,7 @@
  *
  * @example
  * ```ts
- * import { defineSaasConfig, corePermissions, createDbClient } from '@yobo/core';
+ * import { defineSaasConfig, corePermissions, createDbClient } from '@jetdevs/core';
  *
  * const config = defineSaasConfig({
  *   app: { name: 'My App' },
@@ -26,21 +26,15 @@
 // =============================================================================
 
 export {
-  defineSaasConfig,
-  defineExtension,
-  loadExtensions,
-  runExtensionHooks,
-  runExtensionSeeds,
+    defineExtension, defineSaasConfig, loadExtensions,
+    runExtensionHooks,
+    runExtensionSeeds
 } from './config';
 
 export type {
-  SaasConfig,
-  Extension,
-  AuthConfig,
-  DatabaseConfig,
-  UIConfig,
-  FeaturesConfig,
-  LoadedExtensions,
+    AuthConfig,
+    DatabaseConfig, Extension, FeaturesConfig,
+    LoadedExtensions, SaasConfig, UIConfig
 } from './config';
 
 // =============================================================================
@@ -48,14 +42,13 @@ export type {
 // =============================================================================
 
 export {
-  createDbClient,
-  createExtendedDbClient,
-  createRawClient,
+    createDbClient,
+    createExtendedDbClient,
+    createRawClient
 } from './db';
 
 export type {
-  DbConfig,
-  DbClient,
+    DbClient, DbConfig
 } from './db';
 
 export * as schema from './db/schema';
@@ -65,29 +58,20 @@ export * as schema from './db/schema';
 // =============================================================================
 
 export {
-  corePermissions,
-  mergePermissions,
-  mergePermissionsWithResult,
-  validatePermissionNamespacing,
-  getAllPermissions,
-  getPermissionsByCategory,
-  getPermissionsByModule,
-  getPermissionBySlug,
-  isValidPermissionSlug,
-  getAllPermissionSlugs,
-  getCriticalPermissions,
-  getOrgRequiredPermissions,
-  getRegistrySummary,
+    corePermissions, getAllPermissionSlugs, getAllPermissions, getCriticalPermissions,
+    getOrgRequiredPermissions, getPermissionBySlug, getPermissionsByCategory,
+    getPermissionsByModule, getRegistrySummary, isValidPermissionSlug, mergePermissions,
+    mergePermissionsWithResult,
+    validatePermissionNamespacing
 } from './modules/permissions';
 
 export type {
-  PermissionCategory,
-  PermissionDefinition,
-  PermissionModule,
-  PermissionRegistry,
-  PermissionSlug,
-  MergeOptions,
-  MergeResult,
+    MergeOptions,
+    MergeResult, PermissionCategory,
+    PermissionDefinition,
+    PermissionModule,
+    PermissionRegistry,
+    PermissionSlug
 } from './modules/permissions';
 
 // =============================================================================
@@ -95,35 +79,15 @@ export type {
 // =============================================================================
 
 export {
-  coreRlsTables,
-  createRlsRegistry,
-  mergeRlsRegistries,
-  getAllTableNames,
-  getTablesByIsolation,
-  getOrgIsolatedTables,
-  getPublicTables,
-  getTablesWithRLS,
-  getTablesWithOrgId,
-  getTablesWithWorkspaceId,
-  validateTableConfig,
-  validateRegistry,
-  getRegistryStats,
-  setRlsContext,
-  clearRlsContext,
-  withRlsContext,
-  hasRlsContext,
-  getRlsContext,
-  RLS_ORG_VAR,
-  RLS_USER_VAR,
+    RLS_ORG_VAR,
+    RLS_USER_VAR, clearRlsContext, coreRlsTables,
+    createRlsRegistry, getAllTableNames, getOrgIsolatedTables,
+    getPublicTables, getRegistryStats, getRlsContext, getTablesByIsolation, getTablesWithOrgId, getTablesWithRLS, getTablesWithWorkspaceId, hasRlsContext, mergeRlsRegistries, setRlsContext, validateRegistry, validateTableConfig, withRlsContext
 } from './rls';
 
 export type {
-  RlsIsolation,
-  RlsPolicy,
-  RlsTableConfig,
-  RlsRegistry,
-  TableValidationResult,
-  RlsRegistryStats,
+    RlsIsolation,
+    RlsPolicy, RlsRegistry, RlsRegistryStats, RlsTableConfig, TableValidationResult
 } from './rls';
 
 // =============================================================================
@@ -132,22 +96,18 @@ export type {
 
 // NOTE: tRPC server utilities (router, middleware, procedures, createRouterWithActor, etc.)
 // are NOT exported from the main entry point to prevent them from being bundled
-// into client-side code. Import them from '@yobolabs/core/trpc' instead.
+// into client-side code. Import them from '@jetdevs/core/trpc' instead.
 //
 // For example:
-//   import { router, createRouterWithActor } from '@yobolabs/core/trpc';
+//   import { router, createRouterWithActor } from '@jetdevs/core/trpc';
 //
 // Only context utilities and types that don't pull in @trpc/server are exported here.
 
 // Re-export only types (these don't pull in runtime code)
 export type {
-  Actor,
-  Session,
-  TRPCContext,
-  AuthenticatedContext,
-  CreateContextOptions,
-  RouterProcedureConfig,
-  ExtensionRouter,
+    Actor, AuthenticatedContext,
+    CreateContextOptions, ExtensionRouter, RouterProcedureConfig, Session,
+    TRPCContext
 } from './trpc';
 
 // =============================================================================
@@ -155,19 +115,12 @@ export type {
 // =============================================================================
 
 export {
-  createAuthConfig,
-  tokenBlacklist,
-  getTokenId,
-  blacklistToken,
-  blacklistUserTokens,
-  isTokenValid,
-  BLACKLIST_REASONS,
+    BLACKLIST_REASONS, blacklistToken,
+    blacklistUserTokens, createAuthConfig, getTokenId, isTokenValid, tokenBlacklist
 } from './modules/auth';
 
 export type {
-  AuthConfig as CoreAuthConfig,
-  BlacklistReason,
-  JWTTokenLike,
+    BlacklistReason, AuthConfig as CoreAuthConfig, JWTTokenLike
 } from './modules/auth';
 
 // =============================================================================
@@ -175,44 +128,21 @@ export type {
 // =============================================================================
 
 export {
-  cn,
-  generateId,
-  sleep,
-  logger,
-  // Formatters
-  formatDate,
-  formatISODate,
-  formatLocalDate,
-  formatLocalDateTime,
-  formatRelativeTime,
-  formatNumber,
-  formatCurrency,
-  formatPercent,
-  formatBytes,
-  truncate,
-  toTitleCase,
-  slugToTitle,
-  toKebabCase,
-  toCamelCase,
-  pluralize,
-  // ID Generation
-  generateUniqueId,
-  generatePrefixedId,
-  generateShortId,
-  generateNanoId,
-  // Country Codes
-  countryCodes,
-  getCountryByCode,
-  getCountryByISO,
-  getDefaultCountry,
-  formatPhoneWithCountry,
-  parsePhoneNumber,
-  // Theme Manager
-  getStoredTheme,
-  setStoredTheme,
-  applyTheme,
-  initializeTheme,
-  getThemePreloadScript,
+    applyTheme, cn,
+    // Country Codes
+    countryCodes, formatBytes, formatCurrency,
+    // Formatters
+    formatDate,
+    formatISODate,
+    formatLocalDate,
+    formatLocalDateTime, formatNumber, formatPercent, formatPhoneWithCountry, formatRelativeTime, generateId, generateNanoId, generatePrefixedId,
+    generateShortId,
+    // ID Generation
+    generateUniqueId, getCountryByCode,
+    getCountryByISO,
+    getDefaultCountry,
+    // Theme Manager
+    getStoredTheme, getThemePreloadScript, initializeTheme, logger, parsePhoneNumber, pluralize, setStoredTheme, sleep, slugToTitle, toCamelCase, toKebabCase, toTitleCase, truncate
 } from './lib';
 
 export type { CountryCode } from './lib';
@@ -222,56 +152,21 @@ export type { CountryCode } from './lib';
 // =============================================================================
 
 export {
-  // Auth Store
-  createAuthStore,
-  useAuthStore,
-  isAuthenticated as isAuthStoreAuthenticated,
-  isSigningOut,
-  hasPermission as authStoreHasPermission,
-  getUserPermissions,
-  getCurrentUser,
-  getCurrentRole,
-  // Permission Store
-  createPermissionStore,
-  usePermissionStore,
-  updatePermissionCacheOrg,
-  clearPermissionCache,
-  getPermissions,
-  getRoles,
-  checkPermission,
-  checkAnyPermission,
-  checkAllPermissions,
-  // UI Store
-  createUIStore,
-  useUIStore,
-  isSidebarOpen,
-  getTheme,
-  toggleSidebar,
-  setTheme,
-  // Theme Store
-  createThemeStore,
-  useThemeStore,
-  getThemePreference,
-  setThemePreference,
+    hasPermission as authStoreHasPermission, checkAllPermissions, checkAnyPermission, checkPermission, clearPermissionCache,
+    // Auth Store
+    createAuthStore,
+    // Permission Store
+    createPermissionStore,
+    // Theme Store
+    createThemeStore,
+    // UI Store
+    createUIStore, getCurrentRole, getCurrentUser, getPermissions,
+    getRoles, getTheme, getThemePreference, getUserPermissions, isAuthenticated as isAuthStoreAuthenticated, isSidebarOpen, isSigningOut, setTheme, setThemePreference, toggleSidebar, updatePermissionCacheOrg, useAuthStore, usePermissionStore, useThemeStore, useUIStore
 } from './stores';
 
 export type {
-  AuthState,
-  AuthActions,
-  AuthStore,
-  UserProfile,
-  UserRole,
-  PermissionObject,
-  SessionInfo,
-  PermissionState,
-  PermissionActions,
-  PermissionStore,
-  UIState,
-  UIActions,
-  UIStore,
-  ThemeState,
-  ThemeActions,
-  ThemeStore,
+    AuthActions, AuthState, AuthStore, PermissionActions, PermissionObject, PermissionState, PermissionStore, SessionInfo, ThemeActions, ThemeState, ThemeStore, UIActions, UIState, UIStore, UserProfile,
+    UserRole
 } from './stores';
 
 // =============================================================================
@@ -279,58 +174,31 @@ export type {
 // =============================================================================
 
 export {
-  // Auth hook factories
-  createUseAuthSession,
-  createUsePermission,
-  createUsePermissions,
-  createUseCurrentUser,
-  createUsePermissionCheck,
-  createUsePermissionConnectionStatus,
-  usePermissionSSE,
-  AuthUtils,
-  // Utility hooks
-  useIsClient,
-  useModalState,
-  // Table hooks
-  useTable,
-  useTableSelection,
-  useTableFilter,
-  useTableSearch,
-  useTableVisibility,
-  useTableExport,
-  useTableSort,
-  useTableState,
+    AuthUtils,
+    // Auth hook factories
+    createUseAuthSession, createUseCurrentUser, createUsePermission, createUsePermissionCheck,
+    createUsePermissionConnectionStatus, createUsePermissions,
+    // Utility hooks
+    useIsClient,
+    useModalState, usePermissionSSE,
+    // Table hooks
+    useTable, useTableExport, useTableFilter,
+    useTableSearch, useTableSelection, useTableSort,
+    useTableState, useTableVisibility
 } from './hooks';
 
 export type {
-  AuthSessionData,
-  UseAuthSessionResult,
-  UsePermissionsResult,
-  UseCurrentUserResult,
-  PermissionCheckOptions,
-  SSEPermissionMessage,
-  UsePermissionCheckResult,
-  ModalState,
-  UseModalStateReturn,
-  SortingState,
-  UseTableProps,
-  UseTableReturn,
-  UseTableSelectionProps,
-  UseTableSelectionReturn,
-  UseTableFilterProps,
-  UseTableFilterReturn,
-  UseTableSearchProps,
-  UseTableSearchReturn,
-  UseTableVisibilityProps,
-  UseTableVisibilityReturn,
-  UseTableExportProps,
-  UseTableExportReturn,
-  SortDirection,
-  SortConfig,
-  UseTableSortProps,
-  UseTableSortReturn,
-  UseTableStateProps,
-  UseTableStateReturn,
+    AuthSessionData, ModalState, PermissionCheckOptions,
+    SSEPermissionMessage, SortConfig, SortDirection, SortingState, UseAuthSessionResult, UseCurrentUserResult, UseModalStateReturn, UsePermissionCheckResult, UsePermissionsResult, UseTableExportProps,
+    UseTableExportReturn, UseTableFilterProps,
+    UseTableFilterReturn, UseTableProps,
+    UseTableReturn, UseTableSearchProps,
+    UseTableSearchReturn, UseTableSelectionProps,
+    UseTableSelectionReturn, UseTableSortProps,
+    UseTableSortReturn,
+    UseTableStateProps,
+    UseTableStateReturn, UseTableVisibilityProps,
+    UseTableVisibilityReturn
 } from './hooks';
 
 // =============================================================================
@@ -338,26 +206,18 @@ export type {
 // =============================================================================
 
 export {
-  // Theme Providers
-  ThemeProvider,
-  useTheme,
-  UserThemeProvider,
-  useUserTheme,
-  // tRPC Provider Factory
-  createTRPCProvider,
-  createTRPCQueryClient,
-  getBaseUrl,
-  getTRPCUrl,
+    // Theme Providers
+    ThemeProvider, UserThemeProvider,
+    // tRPC Provider Factory
+    createTRPCProvider,
+    createTRPCQueryClient,
+    getBaseUrl,
+    getTRPCUrl, useTheme, useUserTheme
 } from './providers';
 
 export type {
-  ThemeMode,
-  ThemeContextValue,
-  ThemeProviderProps,
-  UserThemeProviderProps,
-  TRPCProviderConfig,
-  QueryClientConfig,
-  TRPCProviderProps,
+    QueryClientConfig, TRPCProviderConfig, TRPCProviderProps, ThemeContextValue, ThemeMode, ThemeProviderProps,
+    UserThemeProviderProps
 } from './providers';
 
 // =============================================================================
@@ -365,74 +225,41 @@ export type {
 // =============================================================================
 
 export {
-  // Permission Context
-  PermissionContext,
-  PermissionProvider,
-  usePermissionContext,
-  // WithPermission factories
-  createUsePermissionGate,
-  createWithPermission,
-  createWithPermissionHOC,
-  // Secure component factory
-  createSecure,
-  useFormDisabledContext,
-  // Theme components
-  ThemeToggle,
-  ThemeToggleThreeState,
-  // Admin page factories
-  createThemeManagementPage,
-  createPermissionManagementPage,
-  // Role dialog factories
-  createDeleteRoleDialogFactory,
-  createBulkDeleteDialogFactory,
-  createCreateRoleDialogFactory,
+    // Permission Context
+    PermissionContext,
+    PermissionProvider,
+    // Theme components
+    ThemeToggle,
+    ThemeToggleThreeState, createBulkDeleteDialogFactory,
+    createCreateRoleDialogFactory,
+    // Role dialog factories
+    createDeleteRoleDialogFactory, createPermissionManagementPage,
+    // Secure component factory
+    createSecure,
+    // Admin page factories
+    createThemeManagementPage,
+    // WithPermission factories
+    createUsePermissionGate,
+    createWithPermission,
+    createWithPermissionHOC, useFormDisabledContext, usePermissionContext
 } from './ui';
 
 export type {
-  PermissionContextValue,
-  PermissionProviderProps,
-  PermissionAction,
-  WithPermissionConfig,
-  WithPermissionProps,
-  PermissionGateResult,
-  SecureAction,
-  SecureConfig,
-  SecureContainerProps,
-  SecureButtonProps,
-  SecureFormProps,
-  SecureInputProps,
-  SecureDropdownMenuItemProps,
-  ThemeToggleProps,
-  // Theme Management admin page types
-  Theme,
-  ThemeFormData,
-  ThemeApi,
-  ThemeManagementUIComponents,
-  ThemeManagementPageProps,
-  ThemeManagementPageFactoryConfig,
-  // Permission Management admin page types
-  Permission,
-  PermissionRoleRef,
-  CategoryCount,
-  PermissionStats,
-  PermissionApi,
-  PermissionManagementUIComponents,
-  PermissionManagementPageProps,
-  PermissionManagementPageFactoryConfig,
-  // Role dialog types
-  RoleWithStats,
-  ToastInterface,
-  DeleteRoleDialogUIComponents,
-  DeleteRoleDialogApi,
-  DeleteRoleDialogFactoryConfig,
-  DeleteRoleDialogProps,
-  BulkDeleteDialogUIComponents,
-  BulkDeleteDialogFactoryConfig,
-  BulkDeleteDialogProps,
-  CreateRoleDialogUIComponents,
-  CreateRoleDialogApi,
-  CreateRoleDialogFactoryConfig,
-  CreateRoleDialogProps,
+    BulkDeleteDialogFactoryConfig,
+    BulkDeleteDialogProps, BulkDeleteDialogUIComponents, CategoryCount, CreateRoleDialogApi,
+    CreateRoleDialogFactoryConfig,
+    CreateRoleDialogProps, CreateRoleDialogUIComponents, DeleteRoleDialogApi,
+    DeleteRoleDialogFactoryConfig,
+    DeleteRoleDialogProps, DeleteRoleDialogUIComponents,
+    // Permission Management admin page types
+    Permission, PermissionAction, PermissionApi, PermissionContextValue, PermissionGateResult, PermissionManagementPageFactoryConfig, PermissionManagementPageProps, PermissionManagementUIComponents, PermissionProviderProps, PermissionRoleRef, PermissionStats,
+    // Role dialog types
+    RoleWithStats, SecureAction, SecureButtonProps, SecureConfig,
+    SecureContainerProps, SecureDropdownMenuItemProps, SecureFormProps,
+    SecureInputProps,
+    // Theme Management admin page types
+    Theme, ThemeApi, ThemeFormData, ThemeManagementPageFactoryConfig, ThemeManagementPageProps, ThemeManagementUIComponents, ThemeToggleProps, ToastInterface, WithPermissionConfig,
+    WithPermissionProps
 } from './ui';
 
 // =============================================================================
@@ -440,28 +267,27 @@ export type {
 // =============================================================================
 
 export {
-  createDbClients,
-  createDbClientsFromEnv,
+    createDbClients,
+    createDbClientsFromEnv
 } from './db';
 
 export type {
-  PoolConfig,
-  DbClientFactoryConfig,
-  DbClients,
+    DbClientFactoryConfig,
+    DbClients, PoolConfig
 } from './db';
 
 // =============================================================================
-// CLI (exported separately via @yobo/core/cli)
+// CLI (exported separately via @jetdevs/core/cli)
 // =============================================================================
 
-// CLI utilities are available via '@yobo/core/cli' import path
+// CLI utilities are available via '@jetdevs/core/cli' import path
 // See packages/core/src/cli/index.ts for available exports
 
 // =============================================================================
-// USER-ORG MODULE (exported separately via @yobo/core/user-org)
+// USER-ORG MODULE (exported separately via @jetdevs/core/user-org)
 // =============================================================================
 
-// User-organization relationship management is available via '@yobo/core/user-org'
+// User-organization relationship management is available via '@jetdevs/core/user-org'
 // See packages/core/src/user-org/index.ts for available exports
 //
 // Key exports:
@@ -471,10 +297,10 @@ export type {
 // - Schemas: switchOrgSchema, assignRoleSchema, etc.
 
 // =============================================================================
-// SECURITY MIDDLEWARE (exported separately via @yobo/core/middleware)
+// SECURITY MIDDLEWARE (exported separately via @jetdevs/core/middleware)
 // =============================================================================
 
-// Security middleware factories are available via '@yobo/core/middleware'
+// Security middleware factories are available via '@jetdevs/core/middleware'
 // See packages/core/src/middleware/index.ts for available exports
 //
 // Key exports:

@@ -3,7 +3,7 @@
  *
  * Type definitions for user management operations.
  *
- * @module @yobolabs/core/users
+ * @module @jetdevs/core/users
  */
 
 // =============================================================================

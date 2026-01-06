@@ -5,14 +5,13 @@
  * Uses schema injection pattern - apps pass their schema tables.
  */
 
-import { and, eq } from 'drizzle-orm';
 import { seedLog } from '../../cli';
 import type {
-  SeedDatabase,
-  RoleSeedData,
-  RoleSeedSchema,
-  RoleSeedOptions,
-  SeedResult,
+    RoleSeedData,
+    RoleSeedOptions,
+    RoleSeedSchema,
+    SeedDatabase,
+    SeedResult,
 } from './types';
 import { createSeedResult } from './types';
 
@@ -27,7 +26,7 @@ import { createSeedResult } from './types';
  *
  * @example
  * ```typescript
- * import { seedRoles } from '@yobolabs/core/db/seeds';
+ * import { seedRoles } from '@jetdevs/core/db/seeds';
  * import { roles, permissions, rolePermissions } from '@/db/schema';
  * import { DEFAULT_ROLES } from '@/constants/roles';
  *
@@ -112,10 +111,13 @@ export async function seedRoles(
 
           const mappingKey = `${roleId}-${permission.id}`;
           if (!existingMappingSet.has(mappingKey)) {
+            // For system/global roles (roleOrgId === null), keep org_id as null
+            // For org-specific roles, use the role's org_id or default
+            const mappingOrgId = roleOrgId === null ? null : (roleOrgId ?? defaultOrgId);
             mappingsToInsert.push({
               roleId,
               permissionId: permission.id,
-              orgId: roleOrgId ?? defaultOrgId,
+              orgId: mappingOrgId,
             });
           }
         }
@@ -154,10 +156,13 @@ export async function seedRoles(
             continue;
           }
 
+          // For system/global roles (newRole.orgId === null), keep org_id as null
+          // For org-specific roles, use the role's org_id or default
+          const mappingOrgId = newRole.orgId === null ? null : (newRole.orgId ?? defaultOrgId);
           mappingsToInsert.push({
             roleId: newRole.id,
             permissionId: permission.id,
-            orgId: newRole.orgId ?? defaultOrgId,
+            orgId: mappingOrgId,
           });
         }
       }

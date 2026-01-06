@@ -1,22 +1,20 @@
 'use client';
 
-import * as React from 'react';
-import { useState, useMemo } from 'react';
 import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  SortingState,
-  ColumnFiltersState,
-  VisibilityState,
-  RowSelectionState,
-  useReactTable,
-  Table as TanstackTable,
+    ColumnDef,
+    ColumnFiltersState,
+    flexRender,
+    getCoreRowModel,
+    getFilteredRowModel,
+    getPaginationRowModel,
+    getSortedRowModel,
+    RowSelectionState,
+    SortingState,
+    useReactTable,
+    VisibilityState
 } from '@tanstack/react-table';
-import { cn } from '../../lib';
+import * as React from 'react';
+import { useState } from 'react';
 
 // =============================================================================
 // SVG ICONS - Built-in to avoid lucide-react dependency in this component
@@ -229,6 +227,8 @@ export interface DataTableWithToolbarConfig<TData> {
   pageSizeOptions?: number[];
   /** Default page size */
   defaultPageSize?: number;
+  /** Initial column visibility state (e.g., { columnId: false } to hide a column by default) */
+  initialColumnVisibility?: VisibilityState;
 }
 
 /**
@@ -276,7 +276,7 @@ export interface DataTableWithToolbarFactoryConfig<TData> {
  *
  * @example
  * ```typescript
- * import { createDataTableWithToolbar } from '@yobolabs/core/ui/data-table';
+ * import { createDataTableWithToolbar } from '@jetdevs/core/ui/data-table';
  *
  * const RoleDataTable = createDataTableWithToolbar({
  *   config: {
@@ -320,6 +320,7 @@ export function createDataTableWithToolbar<TData>(
     renderSelectionInfo,
     pageSizeOptions = [10, 20, 30, 40, 50],
     defaultPageSize = 10,
+    initialColumnVisibility = {},
   } = config;
 
   const {
@@ -393,7 +394,7 @@ export function createDataTableWithToolbar<TData>(
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(initialColumnVisibility);
     const [density, setDensity] = useState<'compact' | 'comfortable' | 'spacious'>('comfortable');
     const [dialogOpen, setDialogOpen] = useState(false);
     const [dialogAction, setDialogAction] = useState<string | null>(null);

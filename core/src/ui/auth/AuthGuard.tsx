@@ -128,24 +128,25 @@ export function createAuthGuard(config: AuthGuardConfig) {
       const statusChanged = prevStatusRef.current !== status;
       const userIdChanged = prevUserIdRef.current !== userId;
 
+      // Only log on actual changes, not every render
       if (statusChanged || userIdChanged) {
-        console.log('AuthGuard status change:', {
-          status,
-          hasSession,
-          userId: userId || 'none',
-          changed: { status: statusChanged, userId: userIdChanged },
-        });
-
+        // Update refs first to prevent duplicate logs
         prevStatusRef.current = status;
         prevUserIdRef.current = userId;
+
+        // Only log in development and only for meaningful changes
+        if (process.env.NODE_ENV === 'development' && (statusChanged || (userIdChanged && userId))) {
+          console.log('AuthGuard status change:', {
+            status,
+            hasSession,
+            userId: userId || 'none',
+          });
+        }
       }
 
       if (status === 'loading') return;
 
       if (status === 'unauthenticated') {
-        if (statusChanged) {
-          console.log('AuthGuard: not authenticated - clearing session cookies');
-        }
 
         // Clear expired/invalid cookies to prevent auth loops
         if (!signOutCalledRef.current) {
@@ -188,7 +189,6 @@ export function createAuthGuard(config: AuthGuardConfig) {
       }
 
       if (status === 'authenticated' && userId && userIdChanged) {
-        console.log('AuthGuard: User authenticated', { userId });
         // Reset flags when user is authenticated again
         signOutCalledRef.current = false;
         toastShownRef.current = false;

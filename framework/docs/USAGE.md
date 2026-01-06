@@ -1,8 +1,8 @@
-# @yobolabs/framework Usage Guide
+# @jetdevs/framework Usage Guide
 
 ## Overview
 
-The `@yobolabs/framework` package provides core infrastructure abstractions that hide security-critical implementation details while enabling rapid feature development.
+The `@jetdevs/framework` package provides core infrastructure abstractions that hide security-critical implementation details while enabling rapid feature development.
 
 ## Installation
 
@@ -11,7 +11,7 @@ The package is already included in the monorepo. In `apps/merchant-portal/packag
 ```json
 {
   "dependencies": {
-    "@yobolabs/framework": "workspace:*"
+    "@jetdevs/framework": "workspace:*"
   }
 }
 ```
@@ -30,7 +30,7 @@ Creates type-safe repositories with automatic RLS enforcement.
 
 **What Developers Get:**
 ```typescript
-import { createRepository } from '@yobolabs/framework/db';
+import { createRepository } from '@jetdevs/framework/db';
 import type { Campaign } from '@/db/schema';
 
 // Create org-scoped repository
@@ -76,7 +76,7 @@ import {
   checkPermission,
   requireAnyPermission,
   requireAllPermissions
-} from '@yobolabs/framework/permissions';
+} from '@jetdevs/framework/permissions';
 
 // Decorator pattern - automatic permission check
 export const deleteCampaign = requirePermission(
@@ -121,7 +121,7 @@ Standardized router creation with built-in security.
 
 **What Developers Get:**
 ```typescript
-import { createRouter, createRouteGroup } from '@yobolabs/framework/router';
+import { createRouter, createRouteGroup } from '@jetdevs/framework/router';
 import { z } from 'zod';
 
 export const campaignRouter = createRouter({
@@ -211,7 +211,7 @@ Clean wrappers around NextAuth session management.
 
 **What Developers Get:**
 ```typescript
-import { getSession, switchOrg, requireAuth } from '@yobolabs/framework/auth';
+import { getSession, switchOrg, requireAuth } from '@jetdevs/framework/auth';
 
 // Get current session
 const session = await getSession();
@@ -239,8 +239,8 @@ const handler = requireAuth(async (session, request) => {
 
 ```typescript
 // apps/merchant-portal/src/campaigns/router.ts
-import { createRouter } from '@yobolabs/framework/router';
-import { createRepository } from '@yobolabs/framework/db';
+import { createRouter } from '@jetdevs/framework/router';
+import { createRepository } from '@jetdevs/framework/db';
 import { z } from 'zod';
 import type { Campaign } from '@/db/schema';
 
@@ -369,7 +369,7 @@ export const campaignRouter = createRouter({
 The framework provides full TypeScript type safety:
 
 ```typescript
-import type { Repository, Permission, Session } from '@yobolabs/framework';
+import type { Repository, Permission, Session } from '@jetdevs/framework';
 
 // Repository is fully typed
 const repo: Repository<Campaign> = createRepository('campaigns', {
@@ -413,8 +413,8 @@ export const campaignRouter = createTRPCRouter({
 
 ### After (Framework SDK)
 ```typescript
-import { createRouter } from '@yobolabs/framework/router';
-import { createRepository } from '@yobolabs/framework/db';
+import { createRouter } from '@jetdevs/framework/router';
+import { createRepository } from '@jetdevs/framework/db';
 
 export const campaignRouter = createRouter({
   list: {
@@ -446,8 +446,8 @@ export const campaignRouter = createRouter({
 ## Next Steps
 
 1. ✅ Phase 1 Complete: Framework SDK with database, permissions, auth, and router abstractions
-2. 🔜 Phase 2: Cloud Services SDK (`@yobo/cloud`) for S3, SQS, SES operations
-3. 🔜 Phase 3: Platform Services SDK (`@yobo/platform`) for user, org, WhatsApp, config operations
+2. 🔜 Phase 2: Cloud Services SDK (`@jetdevs/cloud`) for S3, SQS, SES operations
+3. 🔜 Phase 3: Platform Services SDK (`@jetdevs/platform`) for user, org, WhatsApp, config operations
 4. 🔜 Phase 4: Migration of existing routers to use the framework
 
 ## Support

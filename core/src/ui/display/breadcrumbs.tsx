@@ -1,11 +1,9 @@
 "use client";
 
-import * as React from "react";
-import { cn } from "../../lib";
 import type {
-  BreadcrumbsUIComponents,
-  BreadcrumbsProps,
-  BreadcrumbsFactoryConfig,
+    BreadcrumbsFactoryConfig,
+    BreadcrumbsProps,
+    BreadcrumbsUIComponents,
 } from "./types";
 
 /**
@@ -16,7 +14,7 @@ import type {
  *
  * @example
  * ```tsx
- * import { createBreadcrumbs } from '@yobolabs/core/ui/display';
+ * import { createBreadcrumbs } from '@jetdevs/core/ui/display';
  * import { Button } from '@/components/ui/button';
  * import Link from 'next/link';
  * import { ArrowLeft } from 'lucide-react';

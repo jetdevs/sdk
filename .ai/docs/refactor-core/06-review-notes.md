@@ -61,7 +61,7 @@ Collisions throw fatal errors at startup. Override only with explicit `allowOver
 ### 2. Privileged DB: CLI/Internal only
 `createPrivilegedClient` is NOT exported from main package. Only available via:
 ```typescript
-import { createPrivilegedClient } from '@yobo/saas-core/cli/db'
+import { createPrivilegedClient } from '@jetdevs/saas-core/cli/db'
 ```
 
 ### 3. Package Format: ESM-only

@@ -8,7 +8,7 @@
  * @example
  * ```typescript
  * // In your app's components/layout/index.ts
- * import { createAppSkeleton } from '@yobolabs/core/ui/layout';
+ * import { createAppSkeleton } from '@jetdevs/core/ui/layout';
  * import { Skeleton } from '@/components/ui/skeleton';
  *
  * export const { AppSkeleton, MinimalSpinner } = createAppSkeleton({ Skeleton });

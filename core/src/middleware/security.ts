@@ -15,7 +15,7 @@
  * @example
  * ```ts
  * // middleware.ts
- * import { createSecurityMiddleware } from '@yobolabs/core/middleware';
+ * import { createSecurityMiddleware } from '@jetdevs/core/middleware';
  *
  * const middleware = createSecurityMiddleware({
  *   allowedOrigins: ['https://myapp.com'],
@@ -29,10 +29,10 @@
  */
 
 import type {
-  SecurityMiddlewareConfig,
-  SecurityAlertDetails,
-  CSPDirective,
-  CachePatterns,
+    CSPDirective,
+    CachePatterns,
+    SecurityAlertDetails,
+    SecurityMiddlewareConfig,
 } from './types';
 
 // =============================================================================

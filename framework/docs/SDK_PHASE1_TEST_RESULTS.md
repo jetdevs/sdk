@@ -7,7 +7,7 @@
 
 ## Summary
 
-The `@yobo/framework` SDK has been successfully created, linked to the merchant-portal app, and verified to be working correctly. The hybrid approach (tRPC procedures + SDK repository) has been validated through compilation, server startup, and HTTP endpoint testing.
+The `@jetdevs/framework` SDK has been successfully created, linked to the merchant-portal app, and verified to be working correctly. The hybrid approach (tRPC procedures + SDK repository) has been validated through compilation, server startup, and HTTP endpoint testing.
 
 ---
 
@@ -38,7 +38,7 @@ The `@yobo/framework` SDK has been successfully created, linked to the merchant-
 **Configuration**: pnpm workspace in `/pnpm-workspace.yaml`
 
 **Integration**:
-- Added `@yobo/framework` to merchant-portal `package.json` as `workspace:*`
+- Added `@jetdevs/framework` to merchant-portal `package.json` as `workspace:*`
 - Successfully linked via `pnpm install`
 - SDK imports work from app code
 
@@ -54,7 +54,7 @@ The `@yobo/framework` SDK has been successfully created, linked to the merchant-
 
 **Implementation**:
 ```typescript
-import { createRepository } from '@yobo/framework/db';
+import { createRepository } from '@jetdevs/framework/db';
 
 export const campaignsRouterSDK = createTRPCRouter({
   sdkPing: orgProtectedProcedureWithPermission(CampaignPermissions.READ)
@@ -63,7 +63,7 @@ export const campaignsRouterSDK = createTRPCRouter({
         sdk: 'working',
         message: input.message || 'pong',
         orgId: ctx.session?.user?.currentOrgId,
-        framework: '@yobo/framework v1.0.0',
+        framework: '@jetdevs/framework v1.0.0',
       };
     }),
 
@@ -209,7 +209,7 @@ The following tests require authenticated browser session:
 1. **SDK Ping Test**:
    ```javascript
    const result = await api.campaignsSDK.sdkPing.query({ message: 'hello' });
-   // Expected: { sdk: 'working', message: 'hello', orgId: 1, framework: '@yobo/framework v1.0.0' }
+   // Expected: { sdk: 'working', message: 'hello', orgId: 1, framework: '@jetdevs/framework v1.0.0' }
    ```
 
 2. **SDK List Test**:
@@ -279,7 +279,7 @@ The following tests require authenticated browser session:
 
 ### Modified:
 1. `/apps/merchant-portal/src/server/api/root.ts` - Added `campaignsSDK` router (line 89)
-2. `/apps/merchant-portal/package.json` - Added `@yobo/framework` dependency
+2. `/apps/merchant-portal/package.json` - Added `@jetdevs/framework` dependency
 3. `/pnpm-workspace.yaml` - Added packages workspace configuration
 
 ---
@@ -386,13 +386,13 @@ The following tests require authenticated browser session:
 ### Immediate (Phase 2 - Cloud SDK)
 1. Create `/services-cloud` microservice structure
 2. Implement AWS service wrappers (S3, SQS, SES)
-3. Build `@yobo/cloud` SDK package
+3. Build `@jetdevs/cloud` SDK package
 4. Test cloud service integration
 
 ### Future (Phase 3 - Platform SDK)
 1. Create `/services-platform` microservice structure
 2. Implement platform service clients (user, org, config)
-3. Build `@yobo/platform` SDK package
+3. Build `@jetdevs/platform` SDK package
 4. Document complete SDK ecosystem
 
 ### Optional Enhancements

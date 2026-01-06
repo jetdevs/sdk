@@ -1,5 +1,5 @@
 /**
- * @yobolabs/framework - Cross-cutting concerns for Next.js 15 applications
+ * @jetdevs/framework - Cross-cutting concerns for Next.js 15 applications
  *
  * This SDK provides horizontal utilities that every module needs:
  * - RLS context management
@@ -129,6 +129,13 @@ export type {
     AuditableRepository, DomainRepository, SoftDeletableRepository,
     VersionedRepository
 } from './patterns';
+
+// =============================================================================
+// TENANT MODULE (v3.0) - Multi-Tenant/Custom Domain Support
+// =============================================================================
+
+// Re-export all tenant utilities for direct import from @jetdevs/framework
+export * from './tenant';
 
 // Next.js 15 Specific Utilities - PHASE 2 - Temporarily disabled for DTS generation
 // export {

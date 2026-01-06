@@ -4,7 +4,7 @@
  * Provides utilities for managing Row-Level Security context
  * in multi-tenant PostgreSQL databases.
  *
- * @module @yobolabs/framework/db/rls-context
+ * @module @jetdevs/framework/db/rls-context
  */
 
 import type { Actor, DbAccessOptions } from '../auth/actor';
@@ -52,7 +52,11 @@ export function getDbContext<TDb = any>(
   } = options;
 
   // Determine the effective org ID
-  const effectiveOrgId = targetOrgId || actor.orgId;
+  // Use nullish coalescing (??) to distinguish between:
+  // - undefined: not provided, use actor.orgId
+  // - null: explicitly null (global/system roles), keep as null
+  // - number: use the provided number
+  const effectiveOrgId = targetOrgId !== undefined ? targetOrgId : actor.orgId;
 
   // System users requesting cross-org access or bypass RLS
   if (actor.isSystemUser && (crossOrgAccess || bypassRLS)) {
@@ -96,21 +100,32 @@ export function getDbContext<TDb = any>(
   if (sql && typeof (ctx.db as any).transaction === 'function') {
     // Return a function that sets RLS context and executes the callback
     const dbFunction = async (callback: (db: TDb) => Promise<any>) => {
-      return (ctx.db as any).transaction(async (tx: any) => {
-        try {
-          // Set RLS context using PostgreSQL set_config
-          // Using 'rls.current_org_id' as that's what RLS policies expect
-          // Using false (session-level) instead of true (transaction-level) because
-          // Drizzle's transaction handling doesn't maintain context between execute() calls
-          await tx.execute(sql`SELECT set_config('rls.current_org_id', ${effectiveOrgId.toString()}, false)`);
-        } catch (err: any) {
-          console.error('🔐 [getDbContext] Error setting RLS context:', err);
-          // Continue even if there's an error - some operations might not need RLS
-        }
+      try {
+        return await (ctx.db as any).transaction(async (tx: any) => {
+          try {
+            // Set RLS context using PostgreSQL set_config
+            // Using 'rls.current_org_id' as that's what RLS policies expect
+            // Using false (session-level) instead of true (transaction-level) because
+            // Drizzle's transaction handling doesn't maintain context between execute() calls
+            await tx.execute(sql`SELECT set_config('rls.current_org_id', ${effectiveOrgId.toString()}, false)`);
+          } catch (err: any) {
+            console.error('🔐 [getDbContext] Error setting RLS context:', err);
+            // Continue even if there's an error - some operations might not need RLS
+          }
 
-        // Execute the callback
-        return await callback(tx);
-      });
+          // Execute the callback
+          return await callback(tx);
+        });
+      } catch (err: any) {
+        // Handle case where driver detection failed and transaction isn't actually supported
+        // This can happen on Vercel/serverless when env detection doesn't work at module load
+        if (err?.message?.includes('No transactions support') ||
+            (err?.message?.includes('transaction') && err?.message?.includes('neon-http'))) {
+          console.warn('[getDbContext] Transaction failed, falling back to non-transactional execution');
+          return await callback(ctx.db);
+        }
+        throw err;
+      }
     };
 
     return {
@@ -153,7 +168,8 @@ export async function createServiceContextWithDb<TDb = any>(
   withRLS: DbContext<TDb>;
 }> {
   const dbExecutor = getDbContext(ctx, actor, options, sql);
-  const effectiveOrgId = options.targetOrgId || actor.orgId;
+  // Use same logic as getDbContext for consistency
+  const effectiveOrgId = options.targetOrgId !== undefined ? options.targetOrgId : actor.orgId;
 
   return {
     db: ctx.db,

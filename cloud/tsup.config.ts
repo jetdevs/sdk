@@ -1,8 +1,14 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/s3.ts'],
-  format: ['cjs', 'esm'],
+  entry: {
+    'index': 'src/index.ts',
+    'config/index': 'src/config/index.ts',
+    'storage/index': 'src/storage/index.ts',
+    'lib/index': 'src/lib/index.ts',
+    'whatsapp/index': 'src/whatsapp/index.ts',
+  },
+  format: ['esm', 'cjs'],
   dts: true,
   sourcemap: true,
   clean: true,
@@ -13,5 +19,6 @@ export default defineConfig({
     '@aws-sdk/client-s3',
     '@aws-sdk/lib-storage',
     '@aws-sdk/s3-request-presigner',
+    'zod',
   ],
 });

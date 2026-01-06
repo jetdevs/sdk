@@ -75,7 +75,7 @@ packages:
 
 ```json
 {
-  "name": "@yobo/my-saas",
+  "name": "@jetdevs/my-saas",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -86,7 +86,7 @@ packages:
     "postinstall": "prisma generate || true"
   },
   "dependencies": {
-    "@yobo/saas-core": "workspace:*",
+    "@jetdevs/saas-core": "workspace:*",
     "next": "^15.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -115,7 +115,7 @@ const nextConfig = {
   reactStrictMode: true,
 
   // Transpile the workspace package
-  transpilePackages: ['@yobo/saas-core'],
+  transpilePackages: ['@jetdevs/saas-core'],
 
   // Image optimization domains
   images: {
@@ -186,7 +186,7 @@ export default nextConfig
 
 ```json
 {
-  "buildCommand": "cd ../.. && pnpm turbo build --filter=@yobo/my-saas",
+  "buildCommand": "cd ../.. && pnpm turbo build --filter=@jetdevs/my-saas",
   "installCommand": "cd ../.. && pnpm install",
   "framework": "nextjs",
   "outputDirectory": ".next"
@@ -196,7 +196,7 @@ export default nextConfig
 Alternatively, configure via Vercel Dashboard:
 
 1. **Root Directory**: `apps/my-saas`
-2. **Build Command**: `cd ../.. && pnpm turbo build --filter=@yobo/my-saas`
+2. **Build Command**: `cd ../.. && pnpm turbo build --filter=@jetdevs/my-saas`
 3. **Install Command**: `cd ../.. && pnpm install`
 4. **Output Directory**: `.next`
 
@@ -204,7 +204,7 @@ Alternatively, configure via Vercel Dashboard:
 
 ```json
 {
-  "buildCommand": "pnpm turbo build --filter=@yobo/my-saas",
+  "buildCommand": "pnpm turbo build --filter=@jetdevs/my-saas",
   "installCommand": "pnpm install",
   "framework": "nextjs",
   "outputDirectory": "apps/my-saas/.next"
@@ -314,7 +314,7 @@ export function createMigrationClient(url: string) {
 ```typescript
 // apps/my-saas/src/db/index.ts
 
-import { createDbClient } from '@yobo/saas-core/db'
+import { createDbClient } from '@jetdevs/saas-core/db'
 
 // Use connection string from environment
 export const db = createDbClient(process.env.DATABASE_URL!)
@@ -365,8 +365,8 @@ export async function withOrgContext<T>(
 
 import { initTRPC } from '@trpc/server'
 import { db } from '@/db'
-import { setRlsContext } from '@yobo/saas-core/rls'
-import { getServerSession } from '@yobo/saas-core/auth'
+import { setRlsContext } from '@jetdevs/saas-core/rls'
+import { getServerSession } from '@jetdevs/saas-core/auth'
 
 export const createTRPCContext = async (opts: { req: Request }) => {
   const session = await getServerSession()
@@ -403,7 +403,7 @@ export const createTRPCContext = async (opts: { req: Request }) => {
 2. **Configure Build Settings**
    - Root Directory: `apps/my-saas` (or leave empty if using root vercel.json)
    - Framework: Next.js
-   - Build Command: `cd ../.. && pnpm turbo build --filter=@yobo/my-saas`
+   - Build Command: `cd ../.. && pnpm turbo build --filter=@jetdevs/my-saas`
 
 3. **Add Environment Variables**
    - Go to Vercel Dashboard → Project → Settings → Environment Variables
@@ -759,7 +759,7 @@ Ensure `transpilePackages` is set:
 ```javascript
 // next.config.mjs
 const nextConfig = {
-  transpilePackages: ['@yobo/saas-core'],
+  transpilePackages: ['@jetdevs/saas-core'],
 }
 ```
 

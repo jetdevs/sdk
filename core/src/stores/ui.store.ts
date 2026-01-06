@@ -6,6 +6,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { StoreApi, UseBoundStore } from 'zustand';
 import type { UIState, UIActions, UIStore } from './types';
 
 // =============================================================================
@@ -19,7 +20,7 @@ export function createUIStore(options?: {
   name?: string;
   defaultSidebarOpen?: boolean;
   defaultTheme?: 'light' | 'dark' | 'system';
-}) {
+}): UseBoundStore<StoreApi<UIStore>> {
   const {
     name = 'ui-store',
     defaultSidebarOpen = true,

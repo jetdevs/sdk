@@ -4,17 +4,17 @@
  * Generic repository for API key management with schema injection.
  * Apps inject their schema to use this repository.
  *
- * @module @yobolabs/core/api-keys
+ * @module @jetdevs/core/api-keys
  */
 
-import { eq, and, isNull, desc, type SQL } from 'drizzle-orm';
-import type { PgTable, PgColumn } from 'drizzle-orm/pg-core';
+import { and, desc, eq, isNull, type SQL } from 'drizzle-orm';
+import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type {
-  ApiKeyRecord,
-  ApiKeyCreateData,
-  ApiKeyUpdateData,
-  ApiKeyListItem,
+    ApiKeyCreateData,
+    ApiKeyListItem,
+    ApiKeyRecord,
+    ApiKeyUpdateData,
 } from './types';
 
 /**
@@ -52,7 +52,7 @@ export interface ApiKeysRepositoryConfig {
  * Creates an API Keys Repository with injected schema
  *
  * @example
- * import { createApiKeysRepository } from '@yobolabs/core/api-keys';
+ * import { createApiKeysRepository } from '@jetdevs/core/api-keys';
  * import { apiKeys } from '@/db/schema';
  *
  * const repo = createApiKeysRepository({

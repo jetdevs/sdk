@@ -3,7 +3,7 @@
  *
  * Type definitions for API key management.
  *
- * @module @yobolabs/core/api-keys
+ * @module @jetdevs/core/api-keys
  */
 
 /**

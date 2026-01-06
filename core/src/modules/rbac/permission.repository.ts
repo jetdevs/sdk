@@ -4,26 +4,26 @@
  * Handles all database operations for permission-related data.
  * Provides a clean data access layer for permission management.
  *
- * @module @yobolabs/core/rbac
+ * @module @jetdevs/core/rbac
  */
 
 import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  inArray,
+    and,
+    asc,
+    count,
+    desc,
+    eq,
+    inArray,
 } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import type {
-  CategoryCount,
-  Permission,
-  PermissionCreateData,
-  PermissionStats,
-  PermissionUpdateData,
-  PermissionWithUsage,
+    CategoryCount,
+    Permission,
+    PermissionCreateData,
+    PermissionStats,
+    PermissionUpdateData,
+    PermissionWithUsage,
 } from "./types";
 
 // =============================================================================
@@ -35,7 +35,7 @@ import type {
  *
  * @example
  * ```typescript
- * import { PermissionRepository } from '@yobolabs/core/rbac';
+ * import { PermissionRepository } from '@jetdevs/core/rbac';
  *
  * const repo = new PermissionRepository(db, schema);
  * const permissions = await repo.findAll();
@@ -399,9 +399,9 @@ function getSDKPermissionSchema() {
  *
  * @example
  * ```typescript
- * import { SDKPermissionRepository } from '@yobolabs/core/rbac';
- * import { createPermissionRouterConfig } from '@yobolabs/core/trpc/routers';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { SDKPermissionRepository } from '@jetdevs/core/rbac';
+ * import { createPermissionRouterConfig } from '@jetdevs/core/trpc/routers';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * export const permissionRouter = createRouterWithActor(
  *   createPermissionRouterConfig({ Repository: SDKPermissionRepository })

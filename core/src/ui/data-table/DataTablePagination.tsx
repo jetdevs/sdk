@@ -1,7 +1,7 @@
 'use client';
 
-import * as React from 'react';
 import type { Table } from '@tanstack/react-table';
+import * as React from 'react';
 
 // =============================================================================
 // UI COMPONENT TYPES
@@ -47,7 +47,7 @@ export interface DataTablePaginationProps<TData> {
  *
  * @example
  * ```typescript
- * import { createDataTablePagination } from '@yobolabs/core/ui/data-table';
+ * import { createDataTablePagination } from '@jetdevs/core/ui/data-table';
  * import { Button } from '@/components/ui/button';
  * import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
  *

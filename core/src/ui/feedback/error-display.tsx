@@ -1,8 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { cn } from "../../lib";
-import type { ErrorDisplayUIComponents, ErrorDisplayProps } from "./types";
+import type { ErrorDisplayProps, ErrorDisplayUIComponents } from "./types";
 
 /**
  * Factory function to create an ErrorDisplay component.
@@ -12,7 +11,7 @@ import type { ErrorDisplayUIComponents, ErrorDisplayProps } from "./types";
  *
  * @example
  * ```tsx
- * import { createErrorDisplay } from '@yobolabs/core/ui/feedback';
+ * import { createErrorDisplay } from '@jetdevs/core/ui/feedback';
  * import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
  * import { Button } from '@/components/ui/button';
  * import { AlertCircle } from 'lucide-react';

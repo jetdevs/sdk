@@ -5,25 +5,24 @@
  * Handles validation, orchestration, and business rules for role operations.
  * Framework-agnostic - does not depend on tRPC or app-specific code.
  *
- * @module @yobolabs/core/rbac
+ * @module @jetdevs/core/rbac
  */
 
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { RoleRepository } from "./role.repository";
 import type {
-  Actor,
-  RbacServiceContext,
-  RoleAssignPermissionsParams,
-  RoleBulkDeleteParams,
-  RoleBulkUpdateParams,
-  RoleCreateParams,
-  RoleDeleteParams,
-  RoleGetByIdParams,
-  RoleListParams,
-  RoleRemovePermissionsParams,
-  RoleUpdateParams,
-  RoleWithStats,
+    Actor,
+    RbacServiceContext,
+    RoleAssignPermissionsParams,
+    RoleBulkDeleteParams,
+    RoleBulkUpdateParams,
+    RoleCreateParams,
+    RoleDeleteParams,
+    RoleGetByIdParams,
+    RoleListParams,
+    RoleRemovePermissionsParams,
+    RoleUpdateParams
 } from "./types";
 
 // =============================================================================
@@ -101,7 +100,7 @@ export interface RoleServiceHooks {
  *
  * @example
  * ```typescript
- * import { RoleService } from '@yobolabs/core/rbac';
+ * import { RoleService } from '@jetdevs/core/rbac';
  *
  * const service = new RoleService(schema, {
  *   onPermissionsChanged: async (roleId, userIds) => {
@@ -185,13 +184,19 @@ export class RoleService {
     const orgId =
       ctx.isSystemUser && includeSystemRoles ? undefined : ctx.orgId ?? undefined;
 
+    // The repository's buildRoleConditions handles system role exclusion
+    // based on includeSystemRoles flag. When includeSystemRoles is false,
+    // it automatically adds isSystemRole = false condition.
+    // When includeSystemRoles is true, users can optionally filter by isSystemRole.
     return await repo.list({
       limit,
       offset,
       filters: {
         search,
         isActive,
-        isSystemRole: includeSystemRoles ? isSystemRole : false, // Never show system roles unless allowed
+        // Only pass isSystemRole filter when user is authorized to view system roles
+        // The repository will automatically exclude system roles when not authorized
+        isSystemRole: includeSystemRoles ? isSystemRole : undefined,
       },
       includeStats,
       includePermissions,
@@ -659,8 +664,9 @@ export class RoleService {
     }
 
     try {
-      // Soft delete all roles
-      const deletedCount = await repo.bulkUpdate(roleIds, { isActive: false });
+      // Hard delete all roles - permanently removes from database
+      // This matches user expectations when they click "Delete" in the UI
+      const deletedCount = await repo.bulkHardDelete(roleIds);
 
       return {
         success: true,
@@ -767,7 +773,7 @@ export interface RoleServiceSchema {
  *
  * @example
  * ```typescript
- * import { createRoleService } from '@yobolabs/core/rbac';
+ * import { createRoleService } from '@jetdevs/core/rbac';
  * import { roles, permissions, rolePermissions, userRoles } from './schema';
  *
  * const roleService = createRoleService(
@@ -793,10 +799,10 @@ export function createRoleService(
 
 // Import SDK schema tables
 import {
-  roles as sdkRoles,
-  permissions as sdkPermissions,
-  rolePermissions as sdkRolePermissions,
-  userRoles as sdkUserRoles,
+    permissions as sdkPermissions,
+    rolePermissions as sdkRolePermissions,
+    roles as sdkRoles,
+    userRoles as sdkUserRoles,
 } from "../../db/schema/rbac";
 
 /**
@@ -823,7 +829,7 @@ export const sdkRbacSchema: RoleServiceSchema = {
  * @example
  * ```typescript
  * // Zero-boilerplate usage - uses default "admin:full_access" check
- * import { SDKRoleService } from '@yobolabs/core/rbac';
+ * import { SDKRoleService } from '@jetdevs/core/rbac';
  *
  * const roles = await SDKRoleService.list({}, ctx);
  * ```
@@ -831,7 +837,7 @@ export const sdkRbacSchema: RoleServiceSchema = {
  * @example
  * ```typescript
  * // With WebSocket broadcasts for real-time updates
- * import { createSDKRoleService } from '@yobolabs/core/rbac';
+ * import { createSDKRoleService } from '@jetdevs/core/rbac';
  *
  * const roleService = createSDKRoleService({
  *   onPermissionsChanged: async (roleId, userIds) => {
@@ -850,7 +856,7 @@ export const SDKRoleService = new RoleService(sdkRbacSchema);
  *
  * @example
  * ```typescript
- * import { createSDKRoleService } from '@yobolabs/core/rbac';
+ * import { createSDKRoleService } from '@jetdevs/core/rbac';
  *
  * const roleService = createSDKRoleService({
  *   canManageSystemRoles: (actor) =>

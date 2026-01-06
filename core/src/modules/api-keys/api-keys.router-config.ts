@@ -2,29 +2,29 @@
  * API Keys Router Configuration Factory
  *
  * Creates router configuration for API key management.
- * Apps use this with createRouterWithActor from @yobolabs/framework.
+ * Apps use this with createRouterWithActor from @jetdevs/framework.
  *
  * Role-Based Permissions:
  * - When creating an API key with a roleId, permissions are automatically derived from that role
  * - The permissions array is populated with the role's current permissions
  * - Use syncPermissionsFromRole to update an existing API key's permissions from its role
  *
- * @module @yobolabs/core/api-keys
+ * @module @jetdevs/core/api-keys
  */
 
 import { TRPCError } from '@trpc/server';
+import { SDKRoleRepository } from '../rbac/role.repository';
 import { SDKApiKeysRepository, type ApiKeysRepository } from './api-keys.repository';
 import { generateApiKey } from './key-generation';
 import {
-  createApiKeySchema,
-  listApiKeysSchema,
-  getApiKeySchema,
-  revokeApiKeySchema,
-  updateApiKeySchema,
-  syncApiKeyPermissionsSchema,
+    createApiKeySchema,
+    getApiKeySchema,
+    listApiKeysSchema,
+    revokeApiKeySchema,
+    syncApiKeyPermissionsSchema,
+    updateApiKeySchema,
 } from './schemas';
 import type { ApiKeyEnvironment } from './types';
-import { SDKRoleRepository } from '../rbac/role.repository';
 
 /**
  * Service context interface expected by router handlers
@@ -195,19 +195,19 @@ async function findRoleByName(
 /**
  * Creates router configuration for API keys management.
  *
- * Use this with createRouterWithActor from @yobolabs/framework.
+ * Use this with createRouterWithActor from @jetdevs/framework.
  *
  * @example
  * // Zero-config usage with SDK repository
- * import { apiKeysRouterConfig } from '@yobolabs/core/api-keys';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { apiKeysRouterConfig } from '@jetdevs/core/api-keys';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * export const apiKeysRouter = createRouterWithActor(apiKeysRouterConfig);
  *
  * @example
  * // Custom configuration
- * import { createApiKeysRouterConfig } from '@yobolabs/core/api-keys';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createApiKeysRouterConfig } from '@jetdevs/core/api-keys';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  * import { MyApiKeysRepository } from './my-repository';
  *
  * export const apiKeysRouter = createRouterWithActor(
@@ -549,8 +549,8 @@ export function createApiKeysRouterConfig(
  *
  * Zero-configuration usage:
  * ```typescript
- * import { apiKeysRouterConfig } from '@yobolabs/core/api-keys';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { apiKeysRouterConfig } from '@jetdevs/core/api-keys';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * export const apiKeysRouter = createRouterWithActor(apiKeysRouterConfig);
  * ```

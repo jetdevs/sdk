@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { cn } from '../../lib';
 
 // =============================================================================
@@ -273,7 +273,7 @@ function areSetsEqual<T>(set1: Set<T>, set2: Set<T>): boolean {
  *
  * @example
  * ```typescript
- * import { createManagePermissionsDialog } from '@yobolabs/core/ui/admin';
+ * import { createManagePermissionsDialog } from '@jetdevs/core/ui/admin';
  * import { api } from '@/utils/trpc';
  *
  * const ManagePermissionsDialog = createManagePermissionsDialog({

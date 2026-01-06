@@ -4,7 +4,7 @@
  * System user detection utilities for RBAC.
  * These help with role type detection without hardcoding role names.
  *
- * @module @yobolabs/core/rbac
+ * @module @jetdevs/core/rbac
  */
 
 // =============================================================================

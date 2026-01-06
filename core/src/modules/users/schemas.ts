@@ -3,7 +3,7 @@
  *
  * Zod validation schemas for user management operations.
  *
- * @module @yobolabs/core/users
+ * @module @jetdevs/core/users
  */
 
 import { z } from 'zod';
@@ -50,6 +50,7 @@ export const userUpdateSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().optional().nullable(),
   username: z.string().optional().nullable(),
+  password: z.string().min(8).optional(),
   isActive: z.boolean().optional(),
   avatar: z.string().optional().nullable(),
 });

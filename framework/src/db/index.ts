@@ -5,7 +5,7 @@
  *
  * @example
  * ```typescript
- * import { createRepository } from '@yobolabs/framework/db';
+ * import { createRepository } from '@jetdevs/framework/db';
  *
  * const campaignRepo = createRepository('campaigns', {
  *   orgScoped: true

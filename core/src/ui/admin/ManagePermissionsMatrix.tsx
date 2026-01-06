@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { cn } from '../../lib';
 
 // =============================================================================
@@ -324,7 +324,7 @@ const CRUD_OPS = ['create', 'read', 'update', 'delete'] as const;
  *
  * @example
  * ```typescript
- * import { createManagePermissionsMatrix } from '@yobolabs/core/ui/admin';
+ * import { createManagePermissionsMatrix } from '@jetdevs/core/ui/admin';
  * import { PERMISSION_REGISTRY } from '@/permissions/registry';
  * import { api } from '@/utils/trpc';
  *
@@ -679,10 +679,14 @@ export function createManagePermissionsMatrix(
       setIsSubmitting(true);
 
       try {
+        // For global/system roles (orgId = null), we pass undefined to use the role's own orgId
+        // The router handler will use role.orgId ?? null to determine the target org context
+        // crossOrgAccess: true is required to access roles with org_id = NULL
         await assignPermissionsMutation.mutateAsync({
           roleId: role.id,
           permissionIds: Array.from(selectedPermissionIds),
-          orgId: targetOrgId === null ? undefined : targetOrgId,
+          // Pass orgId only if it's a valid number, otherwise let the service determine from the role
+          orgId: typeof targetOrgId === 'number' ? targetOrgId : undefined,
           crossOrgAccess: forceCrossOrg || isSuperuser,
         });
 
@@ -691,7 +695,7 @@ export function createManagePermissionsMatrix(
           utils.role.getWithPermissions.invalidate({
             roleId: role.id,
             crossOrgAccess: forceCrossOrg || isSuperuser,
-            orgId: targetOrgId === null ? undefined : targetOrgId
+            orgId: typeof targetOrgId === 'number' ? targetOrgId : undefined
           }),
         ]);
 

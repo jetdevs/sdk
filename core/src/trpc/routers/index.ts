@@ -8,22 +8,22 @@
  * Also provides pre-built router configurations using the SDK's own schema
  * and repositories for zero-boilerplate usage.
  *
- * @module @yobolabs/core/trpc/routers
+ * @module @jetdevs/core/trpc/routers
  *
  * @example
  * ```typescript
  * // Option 1: Factory pattern with custom repository (full control)
- * import { createThemeRouterConfig } from '@yobolabs/core/trpc/routers';
+ * import { createThemeRouterConfig } from '@jetdevs/core/trpc/routers';
  * import { ThemeRepository } from '@/server/repos/theme.repository';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * export const themeRouter = createRouterWithActor(
  *   createThemeRouterConfig({ Repository: ThemeRepository })
  * );
  *
  * // Option 2: Pre-built router config (zero boilerplate)
- * import { themeRouterConfig } from '@yobolabs/core/trpc/routers';
- * import { createRouterWithActor } from '@yobolabs/framework/router';
+ * import { themeRouterConfig } from '@jetdevs/core/trpc/routers';
+ * import { createRouterWithActor } from '@jetdevs/framework/router';
  *
  * // One-liner theme router using SDK's own schema
  * export const themeRouter = createRouterWithActor(themeRouterConfig);
@@ -35,13 +35,10 @@
 // =============================================================================
 
 export type {
-  ServiceContext,
-  HandlerContext,
-  CacheConfig,
-  RouteConfig,
-  RouterConfig,
-  RouterFactoryDeps,
-  RouterFactoryResult,
+    CacheConfig, HandlerContext, RouteConfig,
+    RouterConfig,
+    RouterFactoryDeps,
+    RouterFactoryResult, ServiceContext
 } from "./types";
 
 // =============================================================================
@@ -49,16 +46,13 @@ export type {
 // =============================================================================
 
 export {
-  createPermissionRouterConfig,
-  permissionRouterConfig,
-  createPermissionSchema,
-  updatePermissionSchema,
+    createPermissionRouterConfig, createPermissionSchema, permissionRouterConfig, updatePermissionSchema
 } from "./permission.router";
 
 export {
-  createThemeRouterConfig,
-  themeCreateSchema,
-  themeUpdateSchema,
+    createThemeRouterConfig,
+    themeCreateSchema,
+    themeUpdateSchema
 } from "./theme.router";
 
 // =============================================================================
@@ -70,4 +64,5 @@ export {
  * Uses SDK's own ThemeRepository and schema.
  * Simply pass to createRouterWithActor for a working theme router.
  */
-export { themeRouterConfig, SDKThemeRepository } from "./theme.router";
+export { SDKThemeRepository, themeRouterConfig } from "./theme.router";
+

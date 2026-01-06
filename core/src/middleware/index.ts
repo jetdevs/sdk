@@ -6,7 +6,7 @@
  * @example
  * ```ts
  * // middleware.ts
- * import { createNextSecurityMiddleware, defaultMiddlewareConfig } from '@yobolabs/core/middleware';
+ * import { createNextSecurityMiddleware, defaultMiddlewareConfig } from '@jetdevs/core/middleware';
  * import { NextResponse } from 'next/server';
  *
  * export default createNextSecurityMiddleware({
@@ -20,20 +20,16 @@
 
 // Types
 export type {
-  SecurityMiddlewareConfig,
-  SecurityAlertDetails,
-  XFrameOptions,
-  COEPPolicy,
-  COOPPolicy,
-  CORPPolicy,
-  CSPDirective,
-  CachePatterns,
-  MiddlewareResponse,
+    COEPPolicy,
+    COOPPolicy,
+    CORPPolicy,
+    CSPDirective,
+    CachePatterns,
+    MiddlewareResponse, SecurityAlertDetails, SecurityMiddlewareConfig, XFrameOptions
 } from './types';
 
 // Security middleware
 export {
-  createSecurityMiddleware,
-  createNextSecurityMiddleware,
-  defaultMiddlewareConfig,
+    createNextSecurityMiddleware, createSecurityMiddleware, defaultMiddlewareConfig
 } from './security';
+

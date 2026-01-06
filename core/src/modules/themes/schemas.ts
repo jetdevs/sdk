@@ -3,7 +3,7 @@
  *
  * Zod schemas for validating theme-related inputs.
  *
- * @module @yobolabs/core/themes
+ * @module @jetdevs/core/themes
  */
 
 import { z } from "zod";

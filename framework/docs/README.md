@@ -1,4 +1,4 @@
-# @yobolabs/framework - Phase 3 Complete ✅
+# @jetdevs/framework - Phase 3 Complete ✅
 
 Core infrastructure abstractions for the Yobo Platform. This SDK eliminates 31-50% of boilerplate code while maintaining full security and type safety.
 
@@ -14,11 +14,11 @@ The Phase 3 implementation delivers:
 
 ## Overview
 
-The `@yobolabs/framework` package is the first of three SDKs in Yobo's hybrid architecture:
+The `@jetdevs/framework` package is the first of three SDKs in Yobo's hybrid architecture:
 
-1. **@yobolabs/framework** (This Package) - Core infrastructure abstractions with Phase 3 DX improvements
-2. **@yobo/cloud** (Coming Soon) - AWS service wrappers (remote services)
-3. **@yobo/platform** (Coming Soon) - Platform service clients (remote services)
+1. **@jetdevs/framework** (This Package) - Core infrastructure abstractions with Phase 3 DX improvements
+2. **@jetdevs/cloud** (Coming Soon) - AWS service wrappers (remote services)
+3. **@jetdevs/platform** (Coming Soon) - Platform service clients (remote services)
 
 ## Features
 
@@ -51,18 +51,18 @@ The `@yobolabs/framework` package is the first of three SDKs in Yobo's hybrid ar
 ## Installation
 
 ```bash
-pnpm add @yobolabs/framework
+pnpm add @jetdevs/framework
 ```
 
 ## Quick Start - Phase 3
 
 ```typescript
-import { createRouterWithActor } from '@yobolabs/framework/router';
+import { createRouterWithActor } from '@jetdevs/framework/router';
 import { CampaignsRepository } from '@/server/repos/campaigns.repository';
 import { z } from 'zod';
 
 // One-time configuration in trpc.ts
-import { configureActorAdapter } from '@yobolabs/framework/router';
+import { configureActorAdapter } from '@jetdevs/framework/router';
 configureActorAdapter({
   createActor,
   getDbContext,
@@ -128,7 +128,7 @@ Developers using this SDK **can** access:
 ### Database Module
 
 ```typescript
-import { createRepository } from '@yobolabs/framework/db';
+import { createRepository } from '@jetdevs/framework/db';
 
 const repo = createRepository<T>(tableName, options, db);
 await repo.findMany(filters);
@@ -147,7 +147,7 @@ import {
   checkPermission,
   requireAnyPermission,
   requireAllPermissions,
-} from '@yobolabs/framework/permissions';
+} from '@jetdevs/framework/permissions';
 
 // Decorator pattern
 const handler = requirePermission('campaign:delete', async (ctx, input) => {
@@ -163,7 +163,7 @@ if (await checkPermission(ctx, 'campaign:manage')) {
 ### Router Module
 
 ```typescript
-import { createRouter, createRouteGroup } from '@yobolabs/framework/router';
+import { createRouter, createRouteGroup } from '@jetdevs/framework/router';
 
 const router = createRouter({
   routeName: {
@@ -178,7 +178,7 @@ const router = createRouter({
 ### Auth Module
 
 ```typescript
-import { getSession, switchOrg, requireAuth } from '@yobolabs/framework/auth';
+import { getSession, switchOrg, requireAuth } from '@jetdevs/framework/auth';
 
 const session = await getSession();
 await switchOrg(session, newOrgId);
@@ -224,7 +224,7 @@ This package implements **local abstractions** - all code runs within the mercha
 ```
 Developer Code (campaigns, segments, orders, etc.)
      ↓ Uses SDK
-@yobolabs/framework (Local Abstractions)
+@jetdevs/framework (Local Abstractions)
      ↓ Internal implementation
 RLS Context + Permission Validation + Database Access
      ↓ PostgreSQL
@@ -284,12 +284,12 @@ Current version: 3.0.0 (Phase 3 Complete)
 
 ## Next Phases
 
-- **Phase 2**: Cloud Services SDK (`@yobo/cloud`)
+- **Phase 2**: Cloud Services SDK (`@jetdevs/cloud`)
   - S3 file operations
   - SQS queue operations
   - SES email operations
 
-- **Phase 3**: Platform Services SDK (`@yobo/platform`)
+- **Phase 3**: Platform Services SDK (`@jetdevs/platform`)
   - User management
   - Organization operations
   - WhatsApp integration

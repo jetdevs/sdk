@@ -5,19 +5,15 @@
  * - MetadataGrid: Display key-value pairs in a grid
  * - Breadcrumbs: Navigation breadcrumb trail
  *
- * @module @yobolabs/core/ui/display
+ * @module @jetdevs/core/ui/display
  */
 
 // Types
 export type {
-  MetadataItem,
-  MetadataGridProps,
-  BreadcrumbItem,
-  BreadcrumbsUIComponents,
-  BreadcrumbsProps,
-  BreadcrumbsFactoryConfig,
+    BreadcrumbItem, BreadcrumbsFactoryConfig, BreadcrumbsProps, BreadcrumbsUIComponents, MetadataGridProps, MetadataItem
 } from "./types";
 
 // Components
+export { SimpleBreadcrumbs, createBreadcrumbs } from "./breadcrumbs";
 export { MetadataGrid } from "./metadata-grid";
-export { createBreadcrumbs, SimpleBreadcrumbs } from "./breadcrumbs";
+
