@@ -75,7 +75,7 @@ export interface CreateApiKeysRouterConfigOptions {
   /**
    * Default role name to use when creating API keys without explicit roleId
    * If specified, the router will look up this role and assign its permissions
-   * @default 'API Key'
+   * @default 'Full API Access' (P2-SR-007: Changed from 'API Key')
    */
   defaultRoleName?: string;
 
@@ -226,7 +226,8 @@ export function createApiKeysRouterConfig(
     keyPrefix = 'yobo',
     invalidationTags = ['api-keys'],
     Repository = SDKApiKeysRepository,
-    defaultRoleName = 'API Key',
+    // P2-SR-007: Changed default from 'API Key' to 'Full API Access'
+    defaultRoleName = 'Full API Access',
     getPrivilegedDb,
   } = options;
 
