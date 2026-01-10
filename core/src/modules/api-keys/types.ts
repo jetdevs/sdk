@@ -65,6 +65,8 @@ export interface ApiKeyUpdateData {
   permissions?: string[];
   /** Permission resolution mode */
   permissionMode?: PermissionMode;
+  /** When permissions were last synced from role */
+  permissionsSyncedAt?: Date;
   rateLimit?: number;
   expiresAt?: Date | null;
 }

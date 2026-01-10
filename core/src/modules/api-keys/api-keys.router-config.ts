@@ -534,9 +534,11 @@ export function createApiKeysRouterConfig(
         // Get current permissions from the role
         const permissions = await getRolePermissions(db, apiKey.roleId, service.orgId);
 
-        // Update the API key with the new permissions
+        // P2-SR-016: Update the API key with new permissions and sync timestamp
+        const syncedAt = new Date();
         const updatedKey = await repository.update(input.id, service.orgId, {
           permissions,
+          permissionsSyncedAt: syncedAt,
         });
 
         if (!updatedKey) {
@@ -549,6 +551,7 @@ export function createApiKeysRouterConfig(
         return {
           ...updatedKey,
           syncedPermissionsCount: permissions.length,
+          permissionsSyncedAt: syncedAt,
         };
       },
     },
