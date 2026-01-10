@@ -211,6 +211,23 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       repository: Repository,
       handler: async (context: HandlerContext<{ userId: number; orgId: number; roleId: number }>) => {
         const { input, service, repo } = context;
+
+        // P2-SR-005: Validate role is not a service role
+        // Service roles are intended for API keys, not user assignments
+        const role = await repo!.getRoleById(input.roleId);
+        if (!role) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Role not found',
+          });
+        }
+        if (role.roleCategory === 'service') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Cannot assign service roles to users. Service roles are intended for API keys only.',
+          });
+        }
+
         // Check if role assignment already exists
         const existing = await repo!.findRoleAssignment(
           input.userId,
