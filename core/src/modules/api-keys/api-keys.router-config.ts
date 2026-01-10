@@ -234,10 +234,13 @@ export function createApiKeysRouterConfig(
     /**
      * Create a new API key
      *
+     * P2-SR-006: Updated for service roles separation with backwards compatibility
+     *
      * Role-based permissions:
-     * - If roleId is provided, permissions are derived from that role
-     * - If no roleId is provided, attempts to find and use the default Admin role
-     * - Falls back to manually specified permissions if no role is available
+     * - If serviceRoleId is provided (preferred), permissions are derived from that role
+     * - If roleId is provided (deprecated), it maps to serviceRoleId for backwards compatibility
+     * - If no role is specified, attempts to find and use the default service role
+     * - Falls back to manually specified permissions if no role is available (legacy mode)
      */
     create: {
       permission,
@@ -252,8 +255,10 @@ export function createApiKeysRouterConfig(
         db,
       }: HandlerContext<{
         name: string;
+        serviceRoleId?: number;
         roleId?: number;
         permissions: string[];
+        permissionMode?: 'cached' | 'fresh';
         rateLimit?: number;
         expiresAt?: Date;
         environment: ApiKeyEnvironment;
@@ -268,17 +273,20 @@ export function createApiKeysRouterConfig(
         // Repository is guaranteed by the repository config
         const repository = repo!;
 
-        // Determine role and permissions
-        let roleId = input.roleId;
+        // P2-SR-006: Map serviceRoleId or roleId to a single role ID
+        // serviceRoleId takes precedence (new preferred field)
+        // roleId is deprecated but supported for backwards compatibility
+        let roleId = input.serviceRoleId ?? input.roleId;
         let permissions = input.permissions;
+        const permissionMode = input.permissionMode ?? 'cached';
 
         // If we have a database connection, derive permissions from role
         if (db) {
           if (roleId) {
-            // Explicit roleId provided - get permissions from that role
+            // Explicit role provided - get permissions from that role
             permissions = await getRolePermissions(db, roleId, service.orgId);
           } else if (permissions.length === 0) {
-            // No roleId and no explicit permissions - try to use the default API Key role
+            // No role and no explicit permissions - try to use the default service role
             // Pass privilegedDb to allow finding system roles that have org_id = NULL
             const privilegedDb = getPrivilegedDb?.();
             const defaultRole = await findRoleByName(db, service.orgId, defaultRoleName, privilegedDb);
@@ -303,6 +311,8 @@ export function createApiKeysRouterConfig(
           keyHash,
           roleId,
           permissions,
+          permissionMode,
+          permissionsSyncedAt: roleId ? new Date() : null, // Set sync time if role-based
           rateLimit: input.rateLimit ?? 1000,
           expiresAt: input.expiresAt,
           createdBy: parseInt(service.userId),

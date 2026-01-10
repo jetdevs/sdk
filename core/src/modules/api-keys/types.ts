@@ -7,6 +7,13 @@
  */
 
 /**
+ * Permission resolution mode for API keys
+ * - 'cached': Permissions stored in api_keys table (faster, updated on sync)
+ * - 'fresh': Permissions fetched from role at runtime (accurate, bypasses cache)
+ */
+export type PermissionMode = 'cached' | 'fresh';
+
+/**
  * API Key record from database
  */
 export interface ApiKeyRecord {
@@ -17,6 +24,10 @@ export interface ApiKeyRecord {
   keyHash: string;
   roleId: number | null;
   permissions: string[];
+  /** Permission resolution mode (P2-SR-002) */
+  permissionMode: PermissionMode;
+  /** When permissions were last synced from role (P2-SR-002) */
+  permissionsSyncedAt: Date | null;
   rateLimit: number;
   expiresAt: Date | null;
   lastUsedAt: Date | null;
@@ -36,6 +47,10 @@ export interface ApiKeyCreateData {
   keyHash: string;
   roleId?: number;
   permissions: string[];
+  /** Permission resolution mode (defaults to 'cached') */
+  permissionMode?: PermissionMode;
+  /** When permissions were synced from role */
+  permissionsSyncedAt?: Date | null;
   rateLimit: number;
   expiresAt?: Date;
   createdBy: number;
@@ -48,6 +63,8 @@ export interface ApiKeyUpdateData {
   name?: string;
   roleId?: number | null;
   permissions?: string[];
+  /** Permission resolution mode */
+  permissionMode?: PermissionMode;
   rateLimit?: number;
   expiresAt?: Date | null;
 }
@@ -62,6 +79,10 @@ export interface ApiKeyListItem {
   roleId: number | null;
   roleName?: string;
   permissions: string[];
+  /** Permission resolution mode */
+  permissionMode?: PermissionMode;
+  /** When permissions were last synced from role */
+  permissionsSyncedAt?: Date | null;
   rateLimit: number;
   expiresAt: Date | null;
   lastUsedAt: Date | null;

@@ -29,6 +29,10 @@ export interface ApiKeysTableSchema {
   keyHash: PgColumn<any>;
   roleId: PgColumn<any>;
   permissions: PgColumn<any>;
+  /** P2-SR-002: Permission resolution mode column */
+  permissionMode?: PgColumn<any>;
+  /** P2-SR-002: Permission sync timestamp column */
+  permissionsSyncedAt?: PgColumn<any>;
   rateLimit: PgColumn<any>;
   expiresAt: PgColumn<any>;
   lastUsedAt: PgColumn<any>;
@@ -80,6 +84,9 @@ export function createApiKeysRepository(
           keyHash: data.keyHash,
           roleId: data.roleId,
           permissions: data.permissions,
+          // P2-SR-006: Support permission mode and sync timestamp
+          permissionMode: data.permissionMode ?? 'cached',
+          permissionsSyncedAt: data.permissionsSyncedAt,
           rateLimit: data.rateLimit,
           expiresAt: data.expiresAt,
           createdBy: data.createdBy,
