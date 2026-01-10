@@ -36,7 +36,10 @@ export type {
 
 // Schemas
 export {
-    assignRoleSchema, assignableOrganizationSchema, assignableRoleSchema, getAvailableRolesSchema,
+    assignRoleSchema, assignableOrganizationSchema, assignableRoleSchema,
+    getAvailableRolesSchema,
+    // Service roles schema
+    getAvailableServiceRolesSchema,
     // Input schemas
     getCurrentOrgSchema, getUserRolesAllOrgsSchema, getUsersByRoleSchema, orgAccessResultSchema, orgUserSchema, removeRoleSchema, roleAssignmentResultSchema, switchOrgResultSchema, switchOrgSchema,
     // Output schemas
@@ -45,7 +48,10 @@ export {
 } from './schemas';
 
 export type {
-    AssignRoleInput, GetAvailableRolesInput, GetCurrentOrgInput, GetUserRolesAllOrgsInput, GetUsersByRoleInput, OrgAccessResult, RemoveRoleInput, RoleAssignmentResultOutput, SwitchOrgResult as SchemaSwitchOrgResult, SwitchOrgInput, UserOrgContextOutput,
+    AssignRoleInput, GetAvailableRolesInput,
+    // Service roles type
+    GetAvailableServiceRolesInput,
+    GetCurrentOrgInput, GetUserRolesAllOrgsInput, GetUsersByRoleInput, OrgAccessResult, RemoveRoleInput, RoleAssignmentResultOutput, SwitchOrgResult as SchemaSwitchOrgResult, SwitchOrgInput, UserOrgContextOutput,
     UserOrgMembershipOutput, ValidateOrgAccessInput
 } from './schemas';
 

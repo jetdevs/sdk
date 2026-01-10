@@ -39,6 +39,7 @@ import type { HandlerContext } from '../../trpc/routers/types';
 import {
     assignRoleSchema,
     getAvailableRolesSchema,
+    getAvailableServiceRolesSchema,
     getUserRolesAllOrgsSchema,
     getUsersByRoleSchema,
     removeRoleSchema,
@@ -333,9 +334,25 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       cache: { ttl: 300, tags: ['roles'] },
       crossOrg: true, // Required to see global roles (orgId = null)
       repository: Repository,
+      handler: async (context: HandlerContext<{ orgId: number; category?: 'user' | 'service' }>) => {
+        const { input, repo } = context;
+        // Default to 'user' category for backwards compatibility
+        return repo!.getAvailableRolesForOrg(input.orgId, { category: input.category });
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // GET AVAILABLE SERVICE ROLES FOR AN ORGANIZATION
+    // -------------------------------------------------------------------------
+    getAvailableServiceRoles: {
+      type: 'query' as const,
+      input: getAvailableServiceRolesSchema,
+      cache: { ttl: 300, tags: ['roles', 'service-roles'] },
+      crossOrg: true, // Required to see global service roles (orgId = null)
+      repository: Repository,
       handler: async (context: HandlerContext<{ orgId: number }>) => {
         const { input, repo } = context;
-        return repo!.getAvailableRolesForOrg(input.orgId);
+        return repo!.getAvailableServiceRoles(input.orgId);
       },
     },
 

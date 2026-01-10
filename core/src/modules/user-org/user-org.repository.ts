@@ -584,8 +584,18 @@ export function createUserOrgRepository(
     /**
      * Get available roles for an organization
      * Returns global roles + org-specific roles for this org only
+     *
+     * @param orgId - Organization ID to get roles for
+     * @param options - Optional filtering options
+     * @param options.category - Filter by role category ('user' or 'service'). Defaults to 'user'.
+     * @returns Array of assignable roles matching the criteria
      */
-    async getAvailableRolesForOrg(orgId: number): Promise<AssignableRole[]> {
+    async getAvailableRolesForOrg(
+      orgId: number,
+      options: { category?: 'user' | 'service' } = {}
+    ): Promise<AssignableRole[]> {
+      const { category = 'user' } = options;
+
       return withTelemetry(
         'user-org-repo.getAvailableRolesForOrg',
         async () => {
@@ -595,6 +605,8 @@ export function createUserOrgRepository(
             .where(
               and(
                 eq(roles.isActive, true),
+                // Filter by role category (default: 'user')
+                eq(roles.roleCategory, category),
                 or(
                   eq(roles.orgId, orgId),
                   and(
@@ -613,6 +625,17 @@ export function createUserOrgRepository(
           return availableRoles as AssignableRole[];
         }
       );
+    }
+
+    /**
+     * Get available service roles for an organization
+     * Convenience method for getAvailableRolesForOrg with category='service'
+     *
+     * @param orgId - Organization ID to get service roles for
+     * @returns Array of assignable service roles
+     */
+    async getAvailableServiceRoles(orgId: number): Promise<AssignableRole[]> {
+      return this.getAvailableRolesForOrg(orgId, { category: 'service' });
     }
 
     /**
