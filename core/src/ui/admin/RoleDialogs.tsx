@@ -83,7 +83,7 @@ export interface DeleteRoleDialogUIComponents {
     children: React.ReactNode;
   }>;
   AlertDialogAction: React.ComponentType<{
-    onClick: () => void;
+    onClick: (e: React.MouseEvent) => void;
     disabled?: boolean;
     className?: string;
     children: React.ReactNode;
@@ -421,7 +421,10 @@ export function createDeleteRoleDialogFactory(
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
               disabled={isDeleting || isSystemRole}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
@@ -464,7 +467,7 @@ export interface BulkDeleteDialogUIComponents {
     children: React.ReactNode;
   }>;
   AlertDialogAction: React.ComponentType<{
-    onClick: () => void;
+    onClick: (e: React.MouseEvent) => void;
     disabled?: boolean;
     className?: string;
     children: React.ReactNode;
@@ -672,7 +675,10 @@ export function createBulkDeleteDialogFactory(
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={onConfirm}
+              onClick={(e) => {
+                e.preventDefault();
+                onConfirm();
+              }}
               disabled={isLoading || customRoles.length === 0}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

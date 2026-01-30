@@ -388,6 +388,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
       input: deleteRoleSchema,
       invalidates: invalidationTags,
       entityType: "role",
+      crossOrg: true, // Allow backoffice to delete roles across organizations
       repository: Repository,
       handler: async ({
         input,
@@ -519,6 +520,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
       input: bulkDeleteRolesSchema,
       invalidates: invalidationTags,
       entityType: "role",
+      crossOrg: true, // Allow backoffice to delete roles across organizations
       repository: Repository,
       handler: async ({
         input,

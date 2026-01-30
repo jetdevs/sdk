@@ -720,10 +720,10 @@ export function createDataTableWithToolbar<TData>(
                     <TableHead key={header.id} className={getDensityClasses()}>
                       {header.isPlaceholder
                         ? null
-                        : flexRender(
+                        : (flexRender(
                             header.column.columnDef.header,
                             header.getContext()
-                          )}
+                          ) as React.ReactNode)}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -739,7 +739,7 @@ export function createDataTableWithToolbar<TData>(
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className={getDensityClasses()}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {flexRender(cell.column.columnDef.cell, cell.getContext()) as React.ReactNode}
                       </TableCell>
                     ))}
                   </TableRow>

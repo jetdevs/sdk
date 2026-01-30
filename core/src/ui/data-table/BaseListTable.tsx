@@ -544,7 +544,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                             isLastColumn && 'sticky right-0 bg-background shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20'
                           )}
                         >
-                          {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                          {header.isPlaceholder ? null : (flexRender(header.column.columnDef.header, header.getContext()) as React.ReactNode)}
                         </TableHead>
                       );
                     })}
@@ -584,7 +584,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                                   'sticky right-0 bg-background shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20'
                               )}
                             >
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              {flexRender(cell.column.columnDef.cell, cell.getContext()) as React.ReactNode}
                             </TableCell>
                           );
                         })}

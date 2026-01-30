@@ -135,14 +135,18 @@ export class RoleService {
 
   /**
    * Check if actor can manage system roles
-   * Default: requires "admin:full_access" permission
+   * Default: uses actor.isSystemUser which checks for any admin:* permission
+   * or isSystemRole flag on roles (aligned with framework actor creation)
    */
   private canManageSystemRoles(actor: Actor): boolean {
     if (this.hooks.canManageSystemRoles) {
       return this.hooks.canManageSystemRoles(actor);
     }
-    // Default: check for admin:full_access permission (more restrictive, safer)
-    return actor.permissions?.includes(ADMIN_FULL_ACCESS_PERMISSION) || false;
+    // Use actor.isSystemUser which is computed from:
+    // - Any admin:* permission, OR
+    // - Having a role with isSystemRole flag
+    // This aligns with how the framework determines system user status
+    return actor.isSystemUser || actor.permissions?.includes(ADMIN_FULL_ACCESS_PERMISSION) || false;
   }
 
   /**
