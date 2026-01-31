@@ -14,6 +14,6 @@ export {
   type UserFormFieldErrors,
   type UserRoleAssignmentDisplay,
   type RoleData,
-  type OrgData,
+  type UserFormOrgData,
   type EditUserData,
 } from "./useUserFormLogic";

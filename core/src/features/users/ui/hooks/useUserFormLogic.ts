@@ -67,7 +67,7 @@ export interface RoleData {
 /**
  * Organization data from API
  */
-export interface OrgData {
+export interface UserFormOrgData {
   id: number;
   name: string;
 }
@@ -103,7 +103,7 @@ export interface UseUserFormLogicConfig {
   currentOrgId: number | null;
 
   /** Current organization data */
-  currentOrg?: OrgData | null;
+  currentOrg?: UserFormOrgData | null;
 
   /** Available roles for assignment */
   availableRoles: RoleData[];
