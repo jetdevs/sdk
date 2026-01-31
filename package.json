@@ -4,6 +4,7 @@
   "private": true,
   "description": "Jetdevs SDK Packages",
   "scripts": {
+    "i": "pnpm i --filter .",
     "build": "pnpm -r build",
     "build:core": "pnpm --filter @jetdevs/core build",
     "build:framework": "pnpm --filter @jetdevs/framework build",

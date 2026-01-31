@@ -120,6 +120,35 @@ export function createApiKeysRepository(
     },
 
     /**
+     * List all API keys across all organizations (for system admins)
+     */
+    async listAll(includeRevoked: boolean = false): Promise<(ApiKeyListItem & { orgId: number })[]> {
+      // Build query based on includeRevoked flag
+      const query = db
+        .select({
+          id: table.id,
+          orgId: table.orgId,
+          name: table.name,
+          keyPrefix: table.keyPrefix,
+          roleId: table.roleId,
+          permissions: table.permissions,
+          rateLimit: table.rateLimit,
+          expiresAt: table.expiresAt,
+          lastUsedAt: table.lastUsedAt,
+          createdAt: table.createdAt,
+          revokedAt: table.revokedAt,
+        })
+        .from(table);
+
+      // Only add where clause if filtering out revoked keys
+      const keys = includeRevoked
+        ? await query.orderBy(desc(table.createdAt))
+        : await query.where(isNull(table.revokedAt)).orderBy(desc(table.createdAt));
+
+      return keys as unknown as (ApiKeyListItem & { orgId: number })[];
+    },
+
+    /**
      * Get API key by ID
      */
     async findById(id: number, orgId: number): Promise<ApiKeyListItem | null> {
@@ -268,6 +297,10 @@ export class SDKApiKeysRepository {
 
   async listByOrgId(orgId: number, includeRevoked: boolean = false): Promise<ApiKeyListItem[]> {
     return this.repo.listByOrgId(orgId, includeRevoked);
+  }
+
+  async listAll(includeRevoked: boolean = false): Promise<(ApiKeyListItem & { orgId: number })[]> {
+    return this.repo.listAll(includeRevoked);
   }
 
   async findById(id: number, orgId: number): Promise<ApiKeyListItem | null> {

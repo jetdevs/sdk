@@ -255,17 +255,31 @@ export function createApiKeysRouterConfig(
 
     /**
      * List API keys for the organization
+     * When accessed with crossOrg (backoffice), lists all keys if no orgId
      */
     list: {
       type: 'query' as const,
       permission,
       input: listApiKeysSchema,
+      crossOrg: true, // Allow backoffice access
       repository: Repository,
       handler: async ({
         input,
         service,
         repo,
-      }: HandlerContext<{ includeRevoked: boolean }>) => {
+        actor,
+      }: HandlerContext<{ includeRevoked: boolean }> & { actor?: { isSystemUser?: boolean } }) => {
+        const repository = repo!;
+
+        // System users (backoffice access) can list all keys across all orgs
+        // This is indicated by crossOrg: true + actor.isSystemUser
+        // Note: service.orgId may be set to actor.orgId even for cross-org requests
+        // due to the ?? fallback in createServiceContext, so we check actor instead
+        if (actor?.isSystemUser) {
+          return repository.listAll(input.includeRevoked);
+        }
+
+        // Regular org-scoped access
         if (!service.orgId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -273,7 +287,6 @@ export function createApiKeysRouterConfig(
           });
         }
 
-        const repository = repo!;
         return repository.listByOrgId(service.orgId, input.includeRevoked);
       },
     },
