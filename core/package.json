@@ -188,6 +188,91 @@
       "types": "./dist/db/drivers/index.d.ts",
       "import": "./dist/db/drivers/index.js",
       "require": "./dist/db/drivers/index.js"
+    },
+    "./features": {
+      "types": "./dist/features/index.d.ts",
+      "import": "./dist/features/index.js",
+      "require": "./dist/features/index.js"
+    },
+    "./features/users": {
+      "types": "./dist/features/users/index.d.ts",
+      "import": "./dist/features/users/index.js",
+      "require": "./dist/features/users/index.js"
+    },
+    "./features/users/ui": {
+      "types": "./dist/features/users/ui/index.d.ts",
+      "import": "./dist/features/users/ui/index.js",
+      "require": "./dist/features/users/ui/index.js"
+    },
+    "./features/users/backend": {
+      "types": "./dist/features/users/backend/index.d.ts",
+      "import": "./dist/features/users/backend/index.js",
+      "require": "./dist/features/users/backend/index.js"
+    },
+    "./features/organizations": {
+      "types": "./dist/features/organizations/index.d.ts",
+      "import": "./dist/features/organizations/index.js",
+      "require": "./dist/features/organizations/index.js"
+    },
+    "./features/organizations/ui": {
+      "types": "./dist/features/organizations/ui/index.d.ts",
+      "import": "./dist/features/organizations/ui/index.js",
+      "require": "./dist/features/organizations/ui/index.js"
+    },
+    "./features/organizations/backend": {
+      "types": "./dist/features/organizations/backend/index.d.ts",
+      "import": "./dist/features/organizations/backend/index.js",
+      "require": "./dist/features/organizations/backend/index.js"
+    },
+    "./features/themes": {
+      "types": "./dist/features/themes/index.d.ts",
+      "import": "./dist/features/themes/index.js",
+      "require": "./dist/features/themes/index.js"
+    },
+    "./features/themes/ui": {
+      "types": "./dist/features/themes/ui/index.d.ts",
+      "import": "./dist/features/themes/ui/index.js",
+      "require": "./dist/features/themes/ui/index.js"
+    },
+    "./features/themes/backend": {
+      "types": "./dist/features/themes/backend/index.d.ts",
+      "import": "./dist/features/themes/backend/index.js",
+      "require": "./dist/features/themes/backend/index.js"
+    },
+    "./features/api-keys": {
+      "types": "./dist/features/api-keys/index.d.ts",
+      "import": "./dist/features/api-keys/index.js",
+      "require": "./dist/features/api-keys/index.js"
+    },
+    "./features/api-keys/ui": {
+      "types": "./dist/features/api-keys/ui/index.d.ts",
+      "import": "./dist/features/api-keys/ui/index.js",
+      "require": "./dist/features/api-keys/ui/index.js"
+    },
+    "./features/api-keys/backend": {
+      "types": "./dist/features/api-keys/backend/index.d.ts",
+      "import": "./dist/features/api-keys/backend/index.js",
+      "require": "./dist/features/api-keys/backend/index.js"
+    },
+    "./features/rbac": {
+      "types": "./dist/features/rbac/index.d.ts",
+      "import": "./dist/features/rbac/index.js",
+      "require": "./dist/features/rbac/index.js"
+    },
+    "./features/rbac/ui": {
+      "types": "./dist/features/rbac/ui/index.d.ts",
+      "import": "./dist/features/rbac/ui/index.js",
+      "require": "./dist/features/rbac/ui/index.js"
+    },
+    "./features/rbac/backend": {
+      "types": "./dist/features/rbac/backend/index.d.ts",
+      "import": "./dist/features/rbac/backend/index.js",
+      "require": "./dist/features/rbac/backend/index.js"
+    },
+    "./features/shared": {
+      "types": "./dist/features/shared/index.d.ts",
+      "import": "./dist/features/shared/index.js",
+      "require": "./dist/features/shared/index.js"
     }
   },
   "scripts": {

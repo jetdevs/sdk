@@ -15,6 +15,12 @@ const clientEntries = [
   'hooks/index',
   'stores/index',
   'providers/index',
+  // Feature-based UI exports
+  'features/users/ui/index',
+  'features/organizations/ui/index',
+  'features/themes/ui/index',
+  'features/api-keys/ui/index',
+  'features/rbac/ui/index',
 ]
 
 // Server-only entry points (no React hooks)
@@ -42,6 +48,19 @@ const serverEntries = {
   'user-org/index': 'src/modules/user-org/index.ts',
   'middleware/index': 'src/middleware/index.ts',
   'db/drivers/index': 'src/db/drivers/index.ts',
+  // Feature-based backend exports
+  'features/index': 'src/features/index.ts',
+  'features/users/index': 'src/features/users/index.ts',
+  'features/users/backend/index': 'src/features/users/backend/index.ts',
+  'features/organizations/index': 'src/features/organizations/index.ts',
+  'features/organizations/backend/index': 'src/features/organizations/backend/index.ts',
+  'features/themes/index': 'src/features/themes/index.ts',
+  'features/themes/backend/index': 'src/features/themes/backend/index.ts',
+  'features/api-keys/index': 'src/features/api-keys/index.ts',
+  'features/api-keys/backend/index': 'src/features/api-keys/backend/index.ts',
+  'features/rbac/index': 'src/features/rbac/index.ts',
+  'features/rbac/backend/index': 'src/features/rbac/backend/index.ts',
+  'features/shared/index': 'src/features/shared/index.ts',
 }
 
 // Client entry points with their source paths

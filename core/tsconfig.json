@@ -15,7 +15,8 @@
 		"baseUrl": ".",
 		"paths": {
 			"@/*": ["./src/*"],
-			"@jetdevs/core/*": ["./src/modules/*"]
+			"@jetdevs/core/*": ["./src/modules/*"],
+			"@jetdevs/core/features/*": ["./src/features/*"]
 		}
 	},
 	"include": ["src/**/*"],
