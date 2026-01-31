@@ -14,3 +14,21 @@ export {
   type UserFormDialogFactoryConfig,
   type UserFormDialogProps,
 } from "./createUserFormDialogFactory";
+
+export {
+  createDeleteUserDialogFactory,
+  type DeleteUserDialogUIComponents,
+  type DeleteUserDialogApi,
+  type DeleteUserDialogFactoryConfig,
+  type DeleteUserDialogProps,
+} from "./createDeleteUserDialogFactory";
+
+export {
+  createUserDataTableFactory,
+  type UserDataTableUIComponents,
+  type UserDataTableFactoryConfig,
+  type UserDataTableFactoryApi,
+  type UserDataTableProps,
+  type UserTableToastInterface,
+  type UserTableColumnDef,
+} from "./createUserDataTableFactory";

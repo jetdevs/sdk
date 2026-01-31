@@ -17,3 +17,22 @@ export {
   type UserFormOrgData,
   type EditUserData,
 } from "./useUserFormLogic";
+
+export {
+  useDeleteUserLogic,
+  type UseDeleteUserLogicConfig,
+  type DeleteUserLogicReturn,
+  type DeleteUserData,
+  type UserRoleImpact,
+} from "./useDeleteUserLogic";
+
+export {
+  useUserDataTableLogic,
+  type UseUserDataTableLogicConfig,
+  type UserDataTableLogicReturn,
+  type UserData,
+  type UsersPaginationState,
+  type UsersSortingState,
+  type UserStatusFilter,
+  type UserDataTableApi,
+} from "./useUserDataTableLogic";
