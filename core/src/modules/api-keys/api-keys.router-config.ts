@@ -327,18 +327,38 @@ export function createApiKeysRouterConfig(
 
     /**
      * Revoke API key
+     * When accessed with crossOrg (backoffice), system users can revoke any key
      */
     revoke: {
       permission,
       input: revokeApiKeySchema,
       invalidates: invalidationTags,
       entityType: 'api_key',
+      crossOrg: true, // Allow backoffice access
       repository: Repository,
       handler: async ({
         input,
         service,
         repo,
-      }: HandlerContext<{ id: number }>) => {
+        actor,
+      }: HandlerContext<{ id: number }> & { actor?: { isSystemUser?: boolean } }) => {
+        const repository = repo!;
+
+        // System users (backoffice access) can revoke any key without org context
+        if (actor?.isSystemUser) {
+          const revoked = await repository.revokeById(input.id);
+
+          if (!revoked) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'API key not found or already revoked',
+            });
+          }
+
+          return { success: true };
+        }
+
+        // Regular org-scoped access requires orgId
         if (!service.orgId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -346,7 +366,6 @@ export function createApiKeysRouterConfig(
           });
         }
 
-        const repository = repo!;
         const revoked = await repository.revoke(input.id, service.orgId);
 
         if (!revoked) {

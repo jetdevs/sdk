@@ -330,9 +330,14 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           ? await deps.hashPassword(input.password, 10)
           : undefined;
 
+        // Derive name from firstName/lastName if not provided
+        const derivedName = input.name ||
+          [input.firstName, input.lastName].filter(Boolean).join(' ').trim() ||
+          input.email.split('@')[0];  // Fallback to email username
+
         // Create new user
         const newUser = await repo.create(db, {
-          name: input.name,
+          name: derivedName,
           firstName: input.firstName,
           lastName: input.lastName,
           email: input.email,
@@ -383,9 +388,14 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           ? await deps.hashPassword(input.password, 10)
           : undefined;
 
+        // Derive name from firstName/lastName if not provided
+        const derivedName = input.name ||
+          [input.firstName, input.lastName].filter(Boolean).join(' ').trim() ||
+          input.email.split('@')[0];  // Fallback to email username
+
         // Create new user
         const newUser = await repo.create(db, {
-          name: input.name,
+          name: derivedName,
           firstName: input.firstName,
           lastName: input.lastName,
           email: input.email,

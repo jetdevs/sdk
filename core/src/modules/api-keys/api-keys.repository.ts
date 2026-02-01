@@ -206,6 +206,26 @@ export function createApiKeysRepository(
     },
 
     /**
+     * Revoke API key by ID only (for system users / cross-org access)
+     * Does not require orgId - use with caution
+     */
+    async revokeById(id: number): Promise<boolean> {
+      const [revokedKey] = await db
+        .update(table)
+        .set({
+          revokedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(table.id, id),
+          isNull(table.revokedAt)
+        ))
+        .returning({ id: table.id });
+
+      return !!revokedKey;
+    },
+
+    /**
      * Update API key
      */
     async update(id: number, orgId: number, data: ApiKeyUpdateData): Promise<ApiKeyListItem | null> {
@@ -313,6 +333,10 @@ export class SDKApiKeysRepository {
 
   async revoke(id: number, orgId: number): Promise<boolean> {
     return this.repo.revoke(id, orgId);
+  }
+
+  async revokeById(id: number): Promise<boolean> {
+    return this.repo.revokeById(id);
   }
 
   async update(id: number, orgId: number, data: ApiKeyUpdateData): Promise<ApiKeyListItem | null> {

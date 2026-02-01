@@ -28,7 +28,7 @@ export type UserFiltersInput = z.infer<typeof userFiltersSchema>;
 // =============================================================================
 
 export const userCreateSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   email: z.string().email(),
@@ -38,6 +38,15 @@ export const userCreateSchema = z.object({
   isActive: z.boolean().default(true),
   roleId: z.number().optional(),
   orgId: z.number().optional(),
+}).transform((data) => {
+  // If name is not provided but firstName/lastName are, derive name from them
+  if (!data.name && (data.firstName || data.lastName)) {
+    return {
+      ...data,
+      name: [data.firstName, data.lastName].filter(Boolean).join(' ').trim() || undefined,
+    };
+  }
+  return data;
 });
 
 export type UserCreateInput = z.infer<typeof userCreateSchema>;

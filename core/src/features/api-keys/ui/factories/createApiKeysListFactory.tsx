@@ -641,7 +641,7 @@ export function createApiKeysListFactory(config: ApiKeysListFactoryConfig) {
                 <AlertTriangleIcon className="text-destructive" />
                 Revoke API Key?
               </AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogDescription asChild>
                 <div className="space-y-3">
                   <p>
                     Are you sure you want to revoke the API key{" "}
