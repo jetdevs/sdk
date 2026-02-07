@@ -4,6 +4,12 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  styled-jsx: 5.1.6
+  react: 19.0.1
+  react-dom: 19.0.1
+  zod: ^3.22.4
+
 importers:
 
   .:
@@ -13,14 +19,14 @@ importers:
         version: 0.44.7
       next-auth:
         specifier: ^4.24.11
-        version: 4.24.13(next@15.5.11(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 4.24.13(next@15.5.11(react-dom@19.2.4(react@19.0.1))(react@19.0.1))(react-dom@19.2.4(react@19.0.1))(react@19.0.1)
       zod:
         specifier: ^3.22.4
         version: 3.25.76
     devDependencies:
       '@tanstack/react-query':
         specifier: ^5.90.12
-        version: 5.90.20(react@19.2.4)
+        version: 5.90.20(react@19.0.1)
       '@trpc/client':
         specifier: ^11.7.2
         version: 11.9.0(@trpc/server@11.9.0(typescript@5.9.3))(typescript@5.9.3)
@@ -35,10 +41,10 @@ importers:
         version: 18.3.27
       next:
         specifier: ^15.1.9
-        version: 15.5.11(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 15.5.11(react-dom@19.2.4(react@19.0.1))(react@19.0.1)
       react:
-        specifier: ^19.0.0
-        version: 19.2.4
+        specifier: 19.0.1
+        version: 19.0.1
       tsup:
         specifier: ^8.0.1
         version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
@@ -552,7 +558,7 @@ packages:
   '@tanstack/react-query@5.90.20':
     resolution: {integrity: sha512-vXBxa+qeyveVO7OA0jX1z+DeyCA4JKnThKv411jd5SORpBKgkcVnYKCiBgECvADvniBX7tobwBmg01qq9JmMJw==}
     peerDependencies:
-      react: ^18 || ^19
+      react: 19.0.1
 
   '@trpc/client@11.9.0':
     resolution: {integrity: sha512-3r4RT/GbR263QO+2gCPyrs5fEYaXua3/AzCs+GbWC09X0F+mVkyBpO3GRSDObiNU/N1YB597U7WGW3WA1d1TVw==}
@@ -862,8 +868,8 @@ packages:
       '@auth/core': 0.34.3
       next: ^12.2.5 || ^13 || ^14 || ^15 || ^16
       nodemailer: ^7.0.7
-      react: ^17.0.2 || ^18 || ^19
-      react-dom: ^17.0.2 || ^18 || ^19
+      react: 19.0.1
+      react-dom: 19.0.1
     peerDependenciesMeta:
       '@auth/core':
         optional: true
@@ -878,8 +884,8 @@ packages:
       '@opentelemetry/api': ^1.1.0
       '@playwright/test': ^1.51.1
       babel-plugin-react-compiler: '*'
-      react: ^18.2.0 || 19.0.0-rc-de68d2f4-20241204 || ^19.0.0
-      react-dom: ^18.2.0 || 19.0.0-rc-de68d2f4-20241204 || ^19.0.0
+      react: 19.0.1
+      react-dom: 19.0.1
       sass: ^1.3.0
     peerDependenciesMeta:
       '@opentelemetry/api':
@@ -970,10 +976,10 @@ packages:
   react-dom@19.2.4:
     resolution: {integrity: sha512-AXJdLo8kgMbimY95O2aKQqsz2iWi9jMgKJhRBAxECE4IFxfcazB2LmzloIoibJI3C12IlY20+KFaLv+71bUJeQ==}
     peerDependencies:
-      react: ^19.2.4
+      react: 19.0.1
 
-  react@19.2.4:
-    resolution: {integrity: sha512-9nfp2hYpCwOjAN+8TZFGhtWEwgvWHXqESH8qT89AT/lWklpLON22Lc8pEtnpsZz7VmawabSU0gCjnj8aC0euHQ==}
+  react@19.0.1:
+    resolution: {integrity: sha512-nVRaZCuEyvu69sWrkdwjP6QY57C+lY+uMNNMyWUFJb9Z/JlaBOQus7mSMfGYsblv7R691u6SSJA/dX9IRnyyLQ==}
     engines: {node: '>=0.10.0'}
 
   readdirp@4.1.2:
@@ -1027,7 +1033,7 @@ packages:
     peerDependencies:
       '@babel/core': '*'
       babel-plugin-macros: '*'
-      react: '>= 16.8.0 || 17.x.x || ^18.0.0-0 || ^19.0.0-0'
+      react: 19.0.1
     peerDependenciesMeta:
       '@babel/core':
         optional: true
@@ -1503,10 +1509,10 @@ snapshots:
 
   '@tanstack/query-core@5.90.20': {}
 
-  '@tanstack/react-query@5.90.20(react@19.2.4)':
+  '@tanstack/react-query@5.90.20(react@19.0.1)':
     dependencies:
       '@tanstack/query-core': 5.90.20
-      react: 19.2.4
+      react: 19.0.1
 
   '@trpc/client@11.9.0(@trpc/server@11.9.0(typescript@5.9.3))(typescript@5.9.3)':
     dependencies:
@@ -1720,30 +1726,30 @@ snapshots:
 
   nanoid@3.3.11: {}
 
-  next-auth@4.24.13(next@15.5.11(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
+  next-auth@4.24.13(next@15.5.11(react-dom@19.2.4(react@19.0.1))(react@19.0.1))(react-dom@19.2.4(react@19.0.1))(react@19.0.1):
     dependencies:
       '@babel/runtime': 7.28.6
       '@panva/hkdf': 1.2.1
       cookie: 0.7.2
       jose: 4.15.9
-      next: 15.5.11(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      next: 15.5.11(react-dom@19.2.4(react@19.0.1))(react@19.0.1)
       oauth: 0.9.15
       openid-client: 5.7.1
       preact: 10.28.2
       preact-render-to-string: 5.2.6(preact@10.28.2)
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
+      react: 19.0.1
+      react-dom: 19.2.4(react@19.0.1)
       uuid: 8.3.2
 
-  next@15.5.11(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
+  next@15.5.11(react-dom@19.2.4(react@19.0.1))(react@19.0.1):
     dependencies:
       '@next/env': 15.5.11
       '@swc/helpers': 0.5.15
       caniuse-lite: 1.0.30001766
       postcss: 8.4.31
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-      styled-jsx: 5.1.6(react@19.2.4)
+      react: 19.0.1
+      react-dom: 19.2.4(react@19.0.1)
+      styled-jsx: 5.1.6(react@19.0.1)
     optionalDependencies:
       '@next/swc-darwin-arm64': 15.5.7
       '@next/swc-darwin-x64': 15.5.7
@@ -1816,12 +1822,12 @@ snapshots:
 
   pretty-format@3.8.0: {}
 
-  react-dom@19.2.4(react@19.2.4):
+  react-dom@19.2.4(react@19.0.1):
     dependencies:
-      react: 19.2.4
+      react: 19.0.1
       scheduler: 0.27.0
 
-  react@19.2.4: {}
+  react@19.0.1: {}
 
   readdirp@4.1.2: {}
 
@@ -1909,10 +1915,10 @@ snapshots:
     dependencies:
       js-tokens: 9.0.1
 
-  styled-jsx@5.1.6(react@19.2.4):
+  styled-jsx@5.1.6(react@19.0.1):
     dependencies:
       client-only: 0.0.1
-      react: 19.2.4
+      react: 19.0.1
 
   sucrase@3.35.1:
     dependencies:

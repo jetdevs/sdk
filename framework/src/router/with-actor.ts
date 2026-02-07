@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { auditLog, type AuditAction } from '../audit';
 import type { Actor } from '../auth/actor';
+import { withRLSContext } from '../rls';
 import { withTelemetry } from '../telemetry';
 
 // =============================================================================
@@ -556,7 +557,9 @@ export function createRouterWithActor<TDb = any>(
       // The crossOrg flag already handles RLS bypass appropriately.
       // =======================================================================
       const lockedOrgId = (ctx as any).lockedOrgId as number | undefined;
-      let targetOrgId = input?.orgId;
+      // Support both input.orgId and input.targetOrgId for flexibility
+      // targetOrgId is commonly used in backoffice operations to specify the target org
+      let targetOrgId = input?.orgId ?? input?.targetOrgId;
 
       // Handle lockedOrgId enforcement based on route type
       if (lockedOrgId !== undefined) {
@@ -596,25 +599,53 @@ export function createRouterWithActor<TDb = any>(
         }
       }
 
+      // =======================================================================
+      // SUPERUSER CROSS-ORG ACCESS
+      //
+      // When a superuser/system user provides a targetOrgId that differs from
+      // their session org (actor.orgId), they need cross-org access to operate
+      // on behalf of that target organization. This is the backoffice use case.
+      //
+      // We enable crossOrgAccess when:
+      // 1. User is a system user (superuser/admin)
+      // 2. A targetOrgId was provided in the input
+      // 3. The targetOrgId differs from the actor's session org
+      //
+      // This allows superusers to create/modify resources in any org without
+      // being blocked by RLS policies that would otherwise restrict them to
+      // their session org.
+      // =======================================================================
+      const needsCrossOrgAccess = actor.isSystemUser &&
+        targetOrgId !== undefined &&
+        targetOrgId !== actor.orgId;
+
       const { dbFunction, effectiveOrgId } = adapter.getDbContext(ctx, actor, {
-        crossOrgAccess: route.crossOrg,
+        crossOrgAccess: route.crossOrg || needsCrossOrgAccess,
         targetOrgId,
       });
 
-      // Execute within RLS context
-      return dbFunction(async (db: TDb) => {
-        const serviceContext = adapter.createServiceContext(db, actor, effectiveOrgId);
+      // Build RLS context for AsyncLocalStorage
+      // This ensures telemetry and other utilities can access org/user context
+      const rlsContext = {
+        orgId: effectiveOrgId ?? 0,
+        userId: actor.userId,
+      };
 
-        // Add userId to service context
-        serviceContext.userId = ctx.session?.user?.id || actor.userId;
+      // Execute within RLS context (both AsyncLocalStorage and database session)
+      return withRLSContext(rlsContext, async () => {
+        return dbFunction(async (db: TDb) => {
+          const serviceContext = adapter.createServiceContext(db, actor, effectiveOrgId);
 
-        // Auto-instantiate repository if specified
-        const repo = route.repository ? new route.repository(db) : undefined;
+          // Add userId to service context
+          serviceContext.userId = ctx.session?.user?.id || actor.userId;
 
-        // Add automatic telemetry
-        const telemetryName = route.description || `${name}.${route.permission || 'access'}`;
+          // Auto-instantiate repository if specified
+          const repo = route.repository ? new route.repository(db) : undefined;
 
-        return withTelemetry(telemetryName, async () => {
+          // Add automatic telemetry
+          const telemetryName = route.description || `${name}.${route.permission || 'access'}`;
+
+          return withTelemetry(telemetryName, async () => {
           let result = await route.handler({
             input,
             service: serviceContext,
@@ -654,6 +685,7 @@ export function createRouterWithActor<TDb = any>(
           }
 
           return result;
+        });
         });
       });
     };
