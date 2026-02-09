@@ -127,6 +127,11 @@ export function createS3Client(config: S3ClientConfig): S3Client {
     clientConfig.forcePathStyle = true; // Required for most S3-compatible services
   }
 
+  // Disable automatic CRC32 checksums - MinIO stores these as metadata
+  // and can hit MetadataTooLarge errors when serving objects
+  clientConfig.requestChecksumCalculation = "WHEN_REQUIRED";
+  clientConfig.responseChecksumValidation = "WHEN_REQUIRED";
+
   return new S3Client(clientConfig);
 }
 
@@ -169,6 +174,9 @@ export const S3_CONFIG = {
   },
   get publicUrl() {
     const config = currentConfig || getEnvConfig();
+    if (config.endpoint) {
+      return `${config.endpoint}/${config.bucket}`;
+    }
     return `https://${config.bucket}.s3.${config.region}.amazonaws.com`;
   },
   get isConfigured() {

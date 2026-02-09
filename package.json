@@ -1,8 +1,8 @@
 {
-  "name": "@jetdevs/packages",
+  "name": "core-saas-sdk",
   "version": "1.0.3-dev",
   "private": true,
-  "description": "Jetdevs SDK Packages",
+  "description": "Core SaaS SDK Packages",
   "scripts": {
     "i": "pnpm i --filter .",
     "build": "pnpm -r build",
