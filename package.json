@@ -1,6 +1,6 @@
 {
   "name": "core-saas-sdk",
-  "version": "1.0.3-dev",
+  "version": "1.0.10-dev",
   "private": true,
   "description": "Core SaaS SDK Packages",
   "scripts": {
