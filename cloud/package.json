@@ -1,6 +1,6 @@
 {
-  "name": "@jetdevs/cloud",
-  "version": "1.0.4-dev",
+  "name": "@yobolabs/cloud",
+  "version": "1.0.9-dev",
   "description": "AWS S3 and cloud service integrations for Jetdevs Platform",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,28 +10,28 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
     },
     "./storage": {
       "types": "./dist/storage/index.d.ts",
-      "import": "./dist/storage/index.js",
-      "require": "./dist/storage/index.cjs"
+      "import": "./dist/storage/index.mjs",
+      "require": "./dist/storage/index.js"
     },
     "./config": {
       "types": "./dist/config/index.d.ts",
-      "import": "./dist/config/index.js",
-      "require": "./dist/config/index.cjs"
+      "import": "./dist/config/index.mjs",
+      "require": "./dist/config/index.js"
     },
     "./lib": {
       "types": "./dist/lib/index.d.ts",
-      "import": "./dist/lib/index.js",
-      "require": "./dist/lib/index.cjs"
+      "import": "./dist/lib/index.mjs",
+      "require": "./dist/lib/index.js"
     },
     "./whatsapp": {
       "types": "./dist/whatsapp/index.d.ts",
-      "import": "./dist/whatsapp/index.js",
-      "require": "./dist/whatsapp/index.cjs"
+      "import": "./dist/whatsapp/index.mjs",
+      "require": "./dist/whatsapp/index.js"
     }
   },
   "scripts": {
