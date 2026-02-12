@@ -183,12 +183,14 @@ export function createApiKeysRouterConfig(
       input: createApiKeySchema,
       invalidates: invalidationTags,
       entityType: 'api_key',
+      crossOrg: true, // Allow backoffice/system users to create keys for any org
       repository: Repository,
       handler: async ({
         input,
         service,
         repo,
         db,
+        actor,
       }: HandlerContext<{
         name: string;
         roleId?: number;
@@ -196,8 +198,14 @@ export function createApiKeysRouterConfig(
         rateLimit?: number;
         expiresAt?: Date;
         environment: ApiKeyEnvironment;
-      }>) => {
-        if (!service.orgId) {
+        targetOrgId?: number;
+      }> & { actor?: { isSystemUser?: boolean } }) => {
+        // Determine effective org: use targetOrgId for system users, otherwise service.orgId
+        const effectiveOrgId = (actor?.isSystemUser && input.targetOrgId)
+          ? input.targetOrgId
+          : service.orgId;
+
+        if (!effectiveOrgId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'No active organization found',
@@ -215,10 +223,10 @@ export function createApiKeysRouterConfig(
         if (db) {
           if (roleId) {
             // Explicit roleId provided - get permissions from that role
-            permissions = await getRolePermissions(db, roleId, service.orgId);
+            permissions = await getRolePermissions(db, roleId, effectiveOrgId);
           } else if (permissions.length === 0) {
             // No roleId and no explicit permissions - try to use default admin role
-            const adminRole = await findAdminRole(db, service.orgId, defaultRoleName);
+            const adminRole = await findAdminRole(db, effectiveOrgId, defaultRoleName);
             if (adminRole) {
               roleId = adminRole.id;
               permissions = adminRole.permissions;
@@ -234,7 +242,7 @@ export function createApiKeysRouterConfig(
 
         // Create the API key record
         const apiKey = await repository.create({
-          orgId: service.orgId,
+          orgId: effectiveOrgId,
           name: input.name,
           keyPrefix: generatedPrefix,
           keyHash,
