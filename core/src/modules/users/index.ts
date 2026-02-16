@@ -85,7 +85,8 @@ export {
 
 export type {
     UserServiceContext as RouterServiceContext,
-    UserHandlerContext, UserRouterDeps
+    UserHandlerContext, UserRouterDeps,
+    OrgMemberInvariantHooks,
 } from './router-config';
 
 // =============================================================================

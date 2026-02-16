@@ -33,6 +33,33 @@ import {
 /**
  * Dependencies that must be provided by the consuming app
  */
+/**
+ * Optional hooks for maintaining org_members invariant.
+ * When provided, legacy user endpoints (invite, removeFromOrg, assignRole)
+ * will also maintain the org_members table.
+ */
+export interface OrgMemberInvariantHooks {
+  /**
+   * Ensure org_members row exists with status 'active' for the user+org.
+   * Called by invite and assignRole to maintain membership invariant.
+   * Should be idempotent (no-op if row already exists and is active).
+   */
+  ensureMembership: (db: any, userId: number, orgId: number, invitedBy?: number) => Promise<void>;
+
+  /**
+   * Mark org_members row as 'removed' for user+org.
+   * Called by removeFromOrg to maintain membership invariant.
+   */
+  markRemoved: (db: any, userId: number, orgId: number, removedBy?: number) => Promise<void>;
+
+  /**
+   * Check if user has an active or suspended membership in the org.
+   * Called by assignRole as a pre-check.
+   * Returns true if user is an active/suspended member.
+   */
+  isActiveMember: (db: any, userId: number, orgId: number) => Promise<boolean>;
+}
+
 export interface UserRouterDeps {
   /**
    * Repository class constructor - will be instantiated by createRouterWithActor
@@ -55,6 +82,13 @@ export interface UserRouterDeps {
    * Optional - if not provided, RLS-enabled db will be used.
    */
   withPrivilegedDb?: <T>(fn: (db: any) => Promise<T>) => Promise<T>;
+
+  /**
+   * Optional org_members invariant hooks.
+   * When provided, legacy endpoints will maintain org_members state.
+   * @see OrgMemberInvariantHooks
+   */
+  orgMemberHooks?: OrgMemberInvariantHooks;
 }
 
 /**
@@ -322,6 +356,12 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
               });
             }
           }
+
+          // Maintain org_members invariant
+          if (deps.orgMemberHooks && service.orgId) {
+            await deps.orgMemberHooks.ensureMembership(db, existing.id, service.orgId, parseInt(service.userId));
+          }
+
           return existing;
         }
 
@@ -361,6 +401,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             orgId: service.orgId,
             assignedBy: parseInt(service.userId),
           });
+        }
+
+        // Maintain org_members invariant
+        if (deps.orgMemberHooks && service.orgId) {
+          await deps.orgMemberHooks.ensureMembership(db, newUser.id, service.orgId, parseInt(service.userId));
         }
 
         return newUser;
@@ -667,6 +712,14 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('BAD_REQUEST', 'Organization context required for role assignment');
         }
 
+        // Pre-check: if org_members hooks are configured, verify user has active membership
+        if (deps.orgMemberHooks) {
+          const isMember = await deps.orgMemberHooks.isActiveMember(db, input.userId, orgId);
+          if (!isMember) {
+            throw new UserRouterError('BAD_REQUEST', 'User must be an active org member before assigning roles. Use the invite flow to add them first.');
+          }
+        }
+
         // Check if already has role
         const hasRole = await repo.hasRoleInOrg(db, input.userId, input.roleId, orgId);
         if (hasRole) {
@@ -727,6 +780,12 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         }
 
         const removed = await repo.removeAllRolesInOrg(db, input.userId, orgId);
+
+        // Maintain org_members invariant - mark as removed
+        if (deps.orgMemberHooks) {
+          await deps.orgMemberHooks.markRemoved(db, input.userId, orgId, parseInt(service.userId));
+        }
+
         return { removed };
       },
     },
