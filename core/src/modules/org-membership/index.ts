@@ -21,3 +21,53 @@ export {
   type OrgMember,
   type NewOrgMember,
 } from '../../db/schema/org-members';
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+export type {
+  OrgMemberStatus,
+  OrgMemberWithUser,
+  InviteInput,
+  ListMembersInput,
+  CountMembersInput,
+} from './types';
+
+export { VALID_STATUS_TRANSITIONS } from './types';
+
+// =============================================================================
+// SCHEMAS
+// =============================================================================
+
+export {
+  listMembersSchema,
+  inviteByEmailSchema,
+  inviteExistingUserSchema,
+  acceptSchema,
+  memberActionSchema,
+  reinviteSchema,
+} from './schemas';
+
+export type {
+  ListMembersInput as ListMembersSchemaInput,
+  InviteByEmailInput,
+  InviteExistingUserInput,
+  AcceptInput,
+  MemberActionInput,
+  ReinviteInput,
+} from './schemas';
+
+// =============================================================================
+// REPOSITORY
+// =============================================================================
+
+export {
+  createOrgMemberRepositoryClass,
+  OrgMemberRepositoryError,
+} from './repository';
+
+export type {
+  OrgMemberRepositorySchema,
+  IOrgMemberRepository,
+} from './repository';
