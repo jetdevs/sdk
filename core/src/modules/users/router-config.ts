@@ -372,6 +372,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
     // -------------------------------------------------------------------------
     create: {
       permission: 'admin:manage',
+      crossOrg: true,
       input: userCreateSchema,
       invalidates: ['users'],
       entityType: 'user',
@@ -425,6 +426,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
     // -------------------------------------------------------------------------
     update: {
       input: userUpdateSchema,
+      crossOrg: true,
       invalidates: ['users'],
       entityType: 'user',
       repository: deps.Repository,

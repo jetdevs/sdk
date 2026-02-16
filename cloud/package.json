@@ -1,5 +1,5 @@
 {
-  "name": "@yobolabs/cloud",
+  "name": "@jetdevs/cloud",
   "version": "1.0.9-dev",
   "description": "AWS S3 and cloud service integrations for Jetdevs Platform",
   "main": "./dist/index.js",
