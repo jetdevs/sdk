@@ -71,3 +71,28 @@ export type {
   OrgMemberRepositorySchema,
   IOrgMemberRepository,
 } from './repository';
+
+// =============================================================================
+// SERVICE
+// =============================================================================
+
+export {
+  OrgMembershipServiceError,
+} from './service';
+
+export type {
+  OrgMembershipHooks,
+  OrgMembershipServiceContext,
+} from './service';
+
+// =============================================================================
+// ROUTER CONFIG
+// =============================================================================
+
+export {
+  createOrgMembershipRouterConfig,
+} from './router-config';
+
+export type {
+  OrgMembershipRouterDeps,
+} from './router-config';
