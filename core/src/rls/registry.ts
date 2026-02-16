@@ -156,6 +156,14 @@ export const coreRlsTables: RlsRegistry = {
     rlsEnabled: true,
   },
 
+  org_members: {
+    isolation: 'org',
+    orgId: true,
+    workspaceId: false,
+    description: 'Organization membership records - tracks user lifecycle within orgs',
+    rlsEnabled: true,
+  },
+
   // =============================================================================
   // AUTHENTICATION TABLES - No RLS (managed by application logic)
   // =============================================================================

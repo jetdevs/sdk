@@ -179,6 +179,11 @@
       "import": "./dist/user-org/index.js",
       "require": "./dist/user-org/index.js"
     },
+    "./org-membership": {
+      "types": "./dist/org-membership/index.d.ts",
+      "import": "./dist/org-membership/index.js",
+      "require": "./dist/org-membership/index.js"
+    },
     "./middleware": {
       "types": "./dist/middleware/index.d.ts",
       "import": "./dist/middleware/index.js",

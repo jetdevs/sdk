@@ -327,6 +327,54 @@ export const corePermissions: PermissionRegistry = {
     },
 
     // =============================================================================
+    // ORG MEMBERSHIP MODULE
+    // =============================================================================
+    'org-membership': {
+      name: "Organization Membership",
+      description: "Organization membership lifecycle management (invite, accept, suspend, remove)",
+      category: 'organization',
+      dependencies: ['organization'],
+      rlsTable: 'org_members',
+      secureComponents: ['MemberList', 'InviteMember', 'MemberActions'],
+      permissions: {
+        "org-member:read": {
+          slug: "org-member:read",
+          name: "View Members",
+          description: "View organization members",
+          category: 'organization',
+          requiresOrg: true,
+          dependencies: ["org:member"],
+        },
+        "org-member:invite": {
+          slug: "org-member:invite",
+          name: "Invite Members",
+          description: "Invite users to organization",
+          category: 'organization',
+          requiresOrg: true,
+          dependencies: ["org-member:read"],
+          critical: true,
+        },
+        "org-member:update": {
+          slug: "org-member:update",
+          name: "Update Membership",
+          description: "Suspend/unsuspend members",
+          category: 'organization',
+          requiresOrg: true,
+          dependencies: ["org-member:read"],
+        },
+        "org-member:remove": {
+          slug: "org-member:remove",
+          name: "Remove Members",
+          description: "Remove users from organization",
+          category: 'organization',
+          requiresOrg: true,
+          dependencies: ["org-member:read"],
+          critical: true,
+        },
+      }
+    },
+
+    // =============================================================================
     // ROLE MANAGEMENT MODULE
     // =============================================================================
     roles: {
@@ -433,8 +481,8 @@ export const corePermissions: PermissionRegistry = {
   metadata: {
     version: "1.0.0",
     generated: new Date().toISOString(),
-    totalModules: 5,
-    totalPermissions: 34,
+    totalModules: 6,
+    totalPermissions: 38,
     lastDatabaseSync: undefined,
   }
 };

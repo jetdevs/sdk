@@ -46,6 +46,7 @@ const serverEntries = {
   'users/index': 'src/modules/users/index.ts',
   'organizations/index': 'src/modules/organizations/index.ts',
   'user-org/index': 'src/modules/user-org/index.ts',
+  'org-membership/index': 'src/modules/org-membership/index.ts',
   'middleware/index': 'src/middleware/index.ts',
   'db/drivers/index': 'src/db/drivers/index.ts',
   // Feature-based backend exports
