@@ -306,6 +306,7 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
     getAllWithStats: {
       type: 'query' as const,
       permission: 'admin:manage',
+      crossOrg: true,
       input: orgGetAllWithStatsSchema,
       repository: Repository,
       handler: async ({ input, repo, db }: OrgHandlerContext<z.infer<typeof orgGetAllWithStatsSchema>>) => {
@@ -356,6 +357,7 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
     count: {
       type: 'query' as const,
       permission: 'admin:manage',
+      crossOrg: true,
       repository: Repository,
       handler: async ({ repo, db }: OrgHandlerContext) => {
         const result = await executePrivileged(async (privilegedDb) => {
@@ -786,6 +788,7 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
     // -------------------------------------------------------------------------
     updateCopilotStatus: {
       permission: 'admin:manage',
+      crossOrg: true,
       input: orgUpdateCopilotStatusSchema,
       invalidates: ['organizations'],
       entityType: 'organization',
@@ -862,6 +865,7 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
     // -------------------------------------------------------------------------
     ensureDefault: {
       permission: 'admin:manage',
+      crossOrg: true,
       repository: Repository,
       handler: async ({ service, repo, db }: OrgHandlerContext) => {
         return executePrivileged(async (privilegedDb) => {

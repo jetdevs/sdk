@@ -1,6 +1,6 @@
 {
   "name": "@jetdevs/core",
-  "version": "0.1.14-dev",
+  "version": "0.1.16-dev",
   "description": "Core SDK components, UI primitives, and utilities for Jetdevs Platform",
   "type": "module",
   "publishConfig": {
