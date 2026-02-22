@@ -24,9 +24,13 @@ import { useEffect, useRef } from "react";
 export interface UseOrgChangeDetectorConfig {
   /** Function to get current org ID from session */
   getCurrentOrgId: () => number | null | undefined;
-  /** React Query client for cache removal */
+  /** React Query client for cache clearing.
+   *  Supports three-layer clear (cancel → remove → reset) when all methods are provided.
+   *  Falls back to removeQueries-only for backward compatibility. */
   queryClient: {
+    cancelQueries?: () => void;
     removeQueries: () => void;
+    resetQueries?: () => void;
   };
   /** Whether to persist previous org ID in sessionStorage (survives page refresh) */
   persistAcrossRefresh?: boolean;
@@ -84,7 +88,9 @@ export function useOrgChangeDetector(config: UseOrgChangeDetectorConfig) {
 
         // Detect org change after page refresh
         if (previousOrgIdRef.current !== currentOrgId) {
+          queryClient.cancelQueries?.();
           queryClient.removeQueries();
+          queryClient.resetQueries?.();
           previousOrgIdRef.current = currentOrgId;
           sessionStorage.setItem(storageKey, String(currentOrgId));
         }
@@ -93,7 +99,9 @@ export function useOrgChangeDetector(config: UseOrgChangeDetectorConfig) {
 
       // Detect org change within same session (SPA navigation / org switch)
       if (previousOrgIdRef.current !== null && previousOrgIdRef.current !== currentOrgId) {
+        queryClient.cancelQueries?.();
         queryClient.removeQueries();
+        queryClient.resetQueries?.();
       }
 
       // Always update tracked org ID
@@ -107,7 +115,9 @@ export function useOrgChangeDetector(config: UseOrgChangeDetectorConfig) {
       }
 
       if (previousOrgIdRef.current !== currentOrgId) {
+        queryClient.cancelQueries?.();
         queryClient.removeQueries();
+        queryClient.resetQueries?.();
         previousOrgIdRef.current = currentOrgId;
       }
     }

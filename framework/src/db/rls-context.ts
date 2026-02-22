@@ -105,9 +105,10 @@ export function getDbContext<TDb = any>(
           try {
             // Set RLS context using PostgreSQL set_config
             // Using 'rls.current_org_id' as that's what RLS policies expect
-            // Using false (session-level) instead of true (transaction-level) because
-            // Drizzle's transaction handling doesn't maintain context between execute() calls
-            await tx.execute(sql`SELECT set_config('rls.current_org_id', ${effectiveOrgId.toString()}, false)`);
+            // Using true (transaction-scoped) so the setting reverts when the transaction ends.
+            // This prevents RLS context from leaking across pooled connections on serverless
+            // platforms (Vercel, AWS Lambda) where connections are reused between requests.
+            await tx.execute(sql`SELECT set_config('rls.current_org_id', ${effectiveOrgId.toString()}, true)`);
           } catch (err: any) {
             console.error('🔐 [getDbContext] Error setting RLS context:', err);
             // Continue even if there's an error - some operations might not need RLS

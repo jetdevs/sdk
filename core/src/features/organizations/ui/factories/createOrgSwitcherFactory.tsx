@@ -123,9 +123,13 @@ export interface OrgSwitcherApi {
       isPending: boolean;
     };
   };
-  /** Query client for cache management (optional) */
+  /** Query client for cache management (optional).
+   *  SDK performs three-layer cache clear internally (cancel → remove → reset).
+   *  Falls back to removeQueries-only for backward compatibility. */
   useQueryClient?: () => {
+    cancelQueries?: () => void;
     removeQueries: () => void;
+    resetQueries?: () => void;
   };
 }
 
@@ -167,6 +171,9 @@ export interface OrgSwitcherFactoryConfig {
   isCustomDomainOrg?: (org: SwitcherOrgData) => boolean;
   /** Path to navigate after successful switch (default: '/dashboard') */
   redirectPath?: string;
+  /** Use window.location.href instead of router.push after org switch (default: true).
+   *  Required for Vercel/serverless to clear Next.js router cache and RSC prefetch. */
+  useHardNavigation?: boolean;
   /** Whether to show search input for large org lists */
   showSearch?: boolean;
   /** Minimum orgs before showing search (default: 5) */
@@ -309,6 +316,7 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
     isPlatformSystemRole,
     isCustomDomainOrg,
     redirectPath = "/dashboard",
+    useHardNavigation = true,
     showSearch = true,
     searchThreshold = 5,
   } = config;
@@ -413,12 +421,24 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
           const result = await switchOrgMutation.mutateAsync({ orgId });
 
           if (result.success) {
-            // Refresh session
+            // Verify session reflects new org before proceeding
+            const prevOrgId = session?.user?.currentOrgId;
             await updateSession();
 
-            // Remove all cached queries to prevent stale data from previous org
-            // Using removeQueries (not invalidate) to avoid showing stale data while refetching
-            queryClient?.removeQueries();
+            // Poll to verify session cookie reflects new org (handles Vercel cold start delays)
+            for (let i = 0; i < 3; i++) {
+              await new Promise(r => setTimeout(r, 300));
+              const refreshed = await updateSession();
+              const newOrgId = (refreshed as any)?.user?.currentOrgId;
+              if (newOrgId && newOrgId !== prevOrgId) break;
+            }
+
+            // Three-layer cache clear to prevent stale cross-org data
+            if (queryClient) {
+              queryClient.cancelQueries?.();  // 1. Abort in-flight requests
+              queryClient.removeQueries();    // 2. Delete all cached data
+              queryClient.resetQueries?.();   // 3. Force observers to re-subscribe
+            }
 
             // Update sessionStorage so useOrgChangeDetector knows the switch
             // already happened (prevents unnecessary double-clear on navigation)
@@ -426,15 +446,17 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
               sessionStorage.setItem('previousOrgId', String(orgId));
             } catch (_) {}
 
-            // Brief delay for session cookie propagation before new queries fire
-            await new Promise((resolve) => setTimeout(resolve, 200));
-
             toast.success(`Switched to ${result.org.name}`);
 
             onSwitchSuccess?.({ id: orgId, name: result.org.name });
 
             // Navigate to redirect path
-            router.push(redirectPath);
+            if (useHardNavigation) {
+              // Hard navigation clears ALL caches (React Query, Next.js router, RSC prefetch)
+              window.location.href = redirectPath;
+            } else {
+              router.push(redirectPath);
+            }
           } else {
             const errorMsg = result.error || "Failed to switch organization";
             toast.error(errorMsg);
