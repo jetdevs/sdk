@@ -34,6 +34,8 @@ export {
   type SwitcherOrgData,
   type UseOrgSwitcherLogicConfig,
   type OrgSwitcherLogicReturn,
+  useOrgChangeDetector,
+  type UseOrgChangeDetectorConfig,
 } from "./hooks";
 
 // Export factories

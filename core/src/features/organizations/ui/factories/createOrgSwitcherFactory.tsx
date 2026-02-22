@@ -123,9 +123,9 @@ export interface OrgSwitcherApi {
       isPending: boolean;
     };
   };
-  /** Utils for cache invalidation (optional) */
-  useUtils?: () => {
-    invalidate: () => Promise<void>;
+  /** Query client for cache management (optional) */
+  useQueryClient?: () => {
+    removeQueries: () => void;
   };
 }
 
@@ -343,8 +343,8 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
     // Switch mutation
     const switchOrgMutation = api.switchOrg.useMutation();
 
-    // Utils for cache invalidation (optional)
-    const utils = api.useUtils?.();
+    // Query client for cache removal on org switch
+    const queryClient = api.useQueryClient?.();
 
     // Check if user has system role
     const hasSystemRole = React.useMemo(() => {
@@ -416,13 +416,18 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
             // Refresh session
             await updateSession();
 
-            // Invalidate cache if available
-            if (utils?.invalidate) {
-              await utils.invalidate();
-            }
+            // Remove all cached queries to prevent stale data from previous org
+            // Using removeQueries (not invalidate) to avoid showing stale data while refetching
+            queryClient?.removeQueries();
 
-            // Brief delay for session propagation
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            // Update sessionStorage so useOrgChangeDetector knows the switch
+            // already happened (prevents unnecessary double-clear on navigation)
+            try {
+              sessionStorage.setItem('previousOrgId', String(orgId));
+            } catch (_) {}
+
+            // Brief delay for session cookie propagation before new queries fire
+            await new Promise((resolve) => setTimeout(resolve, 200));
 
             toast.success(`Switched to ${result.org.name}`);
 

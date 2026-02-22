@@ -12,3 +12,8 @@ export {
   type UseOrgSwitcherLogicConfig,
   type OrgSwitcherLogicReturn,
 } from "./useOrgSwitcherLogic";
+
+export {
+  useOrgChangeDetector,
+  type UseOrgChangeDetectorConfig,
+} from "./useOrgChangeDetector";
