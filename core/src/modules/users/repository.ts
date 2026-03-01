@@ -93,6 +93,16 @@ export interface UserRepositorySchema {
     roleId: any;
     permissionId: any;
   };
+  /**
+   * Optional org_members schema for org-scoped user filtering.
+   * When provided with an orgId filter, users are filtered through org_members.
+   * When NOT provided but orgId IS provided, findAll() throws (fail-closed).
+   */
+  orgMembers?: PgTable & {
+    userId: any;
+    orgId: any;
+    status: any;
+  };
 }
 
 // =============================================================================
@@ -163,7 +173,7 @@ export interface IUserRepository {
  * ```
  */
 export function createUserRepositoryClass(schema: UserRepositorySchema) {
-  const { users, userRoles, roles, orgs, permissions, rolePermissions } = schema;
+  const { users, userRoles, roles, orgs, permissions, rolePermissions, orgMembers } = schema;
 
   return class UserRepository implements IUserRepository {
     // -------------------------------------------------------------------------
@@ -178,6 +188,25 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
 
       // Build where conditions
       const whereConditions: SQL<unknown>[] = [];
+
+      // Org-scoped filtering through org_members (security-critical)
+      if (filters.orgId) {
+        if (!orgMembers) {
+          throw new Error(
+            'SDKUserRepository: orgMembers schema is required for org-scoped queries. ' +
+            'Pass orgMembers to UserRepositorySchema to enable org membership filtering.'
+          );
+        }
+        // Filter users through org_members with active/suspended status
+        const activeMembers = db
+          .select({ userId: orgMembers.userId })
+          .from(orgMembers)
+          .where(and(
+            eq(orgMembers.orgId, filters.orgId),
+            inArray(orgMembers.status, ['active', 'suspended'])
+          ));
+        whereConditions.push(inArray(users.id, activeMembers));
+      }
 
       if (filters.search) {
         const searchCondition = or(
@@ -235,6 +264,24 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
      */
     async count(db: PostgresJsDatabase<any>, filters: UserFilters): Promise<number> {
       const whereConditions: SQL<unknown>[] = [];
+
+      // Org-scoped filtering through org_members (security-critical)
+      if (filters.orgId) {
+        if (!orgMembers) {
+          throw new Error(
+            'SDKUserRepository: orgMembers schema is required for org-scoped queries. ' +
+            'Pass orgMembers to UserRepositorySchema to enable org membership filtering.'
+          );
+        }
+        const activeMembers = db
+          .select({ userId: orgMembers.userId })
+          .from(orgMembers)
+          .where(and(
+            eq(orgMembers.orgId, filters.orgId),
+            inArray(orgMembers.status, ['active', 'suspended'])
+          ));
+        whereConditions.push(inArray(users.id, activeMembers));
+      }
 
       if (filters.search) {
         const searchCondition = or(

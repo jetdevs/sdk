@@ -385,6 +385,53 @@ export const corePermissions: PermissionRegistry = {
     },
 
     // =============================================================================
+    // ORG MEMBERSHIP MODULE
+    // =============================================================================
+    'org-membership': {
+      name: "Organization Membership",
+      description: "Manage user membership lifecycle within organizations (invite, suspend, remove)",
+      category: 'organization',
+      dependencies: ['organization'],
+      rlsTable: 'org_members',
+      secureComponents: ['MemberList', 'InviteDialog', 'MemberActions'],
+      permissions: {
+        "org-member:read": {
+          slug: "org-member:read",
+          name: "View Members",
+          description: "View organization members and their membership status",
+          category: 'organization',
+          requiresOrg: true,
+          dependencies: ["org:member"],
+        },
+        "org-member:invite": {
+          slug: "org-member:invite",
+          name: "Invite Members",
+          description: "Invite users to the organization",
+          category: 'organization',
+          requiresOrg: true,
+          dependencies: ["org-member:read"],
+        },
+        "org-member:update": {
+          slug: "org-member:update",
+          name: "Update Membership",
+          description: "Suspend or unsuspend organization members",
+          category: 'organization',
+          requiresOrg: true,
+          dependencies: ["org-member:read"],
+        },
+        "org-member:remove": {
+          slug: "org-member:remove",
+          name: "Remove Members",
+          description: "Remove users from the organization",
+          category: 'organization',
+          requiresOrg: true,
+          dependencies: ["org-member:read"],
+          critical: true,
+        },
+      }
+    },
+
+    // =============================================================================
     // THEME MANAGEMENT MODULE
     // =============================================================================
     themes: {
@@ -431,10 +478,10 @@ export const corePermissions: PermissionRegistry = {
   },
 
   metadata: {
-    version: "1.0.0",
+    version: "1.1.0",
     generated: new Date().toISOString(),
-    totalModules: 5,
-    totalPermissions: 34,
+    totalModules: 6,
+    totalPermissions: 38,
     lastDatabaseSync: undefined,
   }
 };

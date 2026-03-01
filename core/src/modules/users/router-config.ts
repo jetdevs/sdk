@@ -738,6 +738,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
 // =============================================================================
 
 import {
+    orgMembers,
     orgs,
     permissions,
     rolePermissions,
@@ -750,8 +751,8 @@ import { createUserRepositoryClass } from './repository';
 /**
  * SDK User Repository
  *
- * A repository class configured with the SDK's own schema tables.
- * Useful for apps that don't need to customize the schema.
+ * A repository class configured with the SDK's own schema tables,
+ * including orgMembers for org-scoped user filtering.
  *
  * @example
  * ```typescript
@@ -769,6 +770,7 @@ export const SDKUserRepository = createUserRepositoryClass({
   orgs,
   permissions,
   rolePermissions,
+  orgMembers,
 });
 
 // =============================================================================

@@ -140,6 +140,14 @@ export const coreRlsTables: RlsRegistry = {
     )`,
   },
 
+  org_members: {
+    isolation: 'org',
+    orgId: true,
+    workspaceId: false,
+    description: 'Organization membership records - tracks user lifecycle within orgs',
+    rlsEnabled: true,
+  },
+
   api_keys: {
     isolation: 'org',
     orgId: true,

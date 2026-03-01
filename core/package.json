@@ -1,6 +1,6 @@
 {
   "name": "@jetdevs/core",
-  "version": "0.1.19-dev",
+  "version": "0.1.20-dev",
   "description": "Core SDK components, UI primitives, and utilities for Core SaaS",
   "type": "module",
   "publishConfig": {
@@ -178,6 +178,11 @@
       "types": "./dist/user-org/index.d.ts",
       "import": "./dist/user-org/index.js",
       "require": "./dist/user-org/index.js"
+    },
+    "./org-membership": {
+      "types": "./dist/org-membership/index.d.ts",
+      "import": "./dist/org-membership/index.js",
+      "require": "./dist/org-membership/index.js"
     },
     "./middleware": {
       "types": "./dist/middleware/index.d.ts",
