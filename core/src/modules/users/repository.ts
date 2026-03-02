@@ -146,6 +146,10 @@ export interface IUserRepository {
   updateSessionTimeout(db: any, userId: number, timeoutMinutes: number): Promise<UserWithRoles>;
   updateThemePreference(db: any, userId: number, theme: string): Promise<UserWithRoles>;
   getUserSettings(db: any, userId: number): Promise<any>;
+
+  // Membership status operations
+  getMembershipStatuses(db: any, userIds: number[], orgId: number): Promise<Map<number, string>>;
+  getMembershipStatusesAllOrgs(db: any, userIds: number[]): Promise<Map<number, string>>;
 }
 
 // =============================================================================
@@ -795,6 +799,71 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
         .limit(1);
 
       return result[0] || null;
+    }
+
+    // -------------------------------------------------------------------------
+    // MEMBERSHIP STATUS OPERATIONS
+    // -------------------------------------------------------------------------
+
+    /**
+     * Get membership statuses for users in a specific org.
+     * Returns a map of userId -> status string.
+     */
+    async getMembershipStatuses(db: PostgresJsDatabase<any>, userIds: number[], orgId: number): Promise<Map<number, string>> {
+      if (!orgMembers || userIds.length === 0) {
+        return new Map();
+      }
+
+      const memberStatuses = await db
+        .select({
+          userId: orgMembers.userId,
+          status: orgMembers.status,
+        })
+        .from(orgMembers)
+        .where(
+          and(
+            inArray(orgMembers.userId, userIds),
+            eq(orgMembers.orgId, orgId)
+          )
+        );
+
+      return new Map(memberStatuses.map((m: any) => [m.userId, m.status]));
+    }
+
+    /**
+     * Get effective membership statuses for users across ALL orgs (system-wide view).
+     * Uses priority ordering: active > suspended > invited > removed.
+     * Returns a map of userId -> effective status string.
+     */
+    async getMembershipStatusesAllOrgs(db: PostgresJsDatabase<any>, userIds: number[]): Promise<Map<number, string>> {
+      if (!orgMembers || userIds.length === 0) {
+        return new Map();
+      }
+
+      const memberStatuses = await db
+        .select({
+          userId: orgMembers.userId,
+          status: orgMembers.status,
+        })
+        .from(orgMembers)
+        .where(inArray(orgMembers.userId, userIds));
+
+      // Build effective status per user: active > suspended > invited > removed
+      const statusMap = new Map<number, string>();
+      for (const ms of memberStatuses) {
+        const current = statusMap.get(ms.userId);
+        if (ms.status === 'active') {
+          statusMap.set(ms.userId, 'active');
+        } else if (ms.status === 'suspended' && current !== 'active') {
+          statusMap.set(ms.userId, 'suspended');
+        } else if (ms.status === 'invited' && !current) {
+          statusMap.set(ms.userId, 'invited');
+        } else if (ms.status === 'removed' && !current) {
+          statusMap.set(ms.userId, 'removed');
+        }
+      }
+
+      return statusMap;
     }
   };
 }

@@ -129,6 +129,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       input: userFiltersSchema,
       repository: deps.Repository,
       handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userFiltersSchema>>) => {
+        const effectiveOrgId = input.orgId ?? (service.orgId ?? undefined);
+
         const users = await repo.findAll(db, {
           limit: input.limit,
           offset: input.offset,
@@ -136,8 +138,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             search: input.search,
             isActive: input.isActive,
             roleId: input.roleId,
-            // Convert null to undefined for repository compatibility
-            orgId: input.orgId ?? (service.orgId ?? undefined),
+            orgId: effectiveOrgId,
           },
         });
 
@@ -145,18 +146,35 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           search: input.search,
           isActive: input.isActive,
           roleId: input.roleId,
-          orgId: input.orgId ?? (service.orgId ?? undefined),
+          orgId: effectiveOrgId,
         });
 
         // Get roles for users
         const userIds = users.map(u => u.id);
-        // Convert null to undefined for repository compatibility
         const rolesByUser = await repo.getUserRolesBatch(db, userIds, service.orgId ?? undefined);
 
-        const usersWithRoles = users.map(user => ({
-          ...user,
-          roles: rolesByUser.get(user.id) || [],
-        }));
+        // Get membership statuses for the org (if org-scoped)
+        const orgId = service.orgId;
+        const statusMap = orgId
+          ? await repo.getMembershipStatuses(db, userIds, orgId)
+          : new Map<number, string>();
+
+        const usersWithRoles = users.map(user => {
+          // Filter to only active roles
+          const allRoles = rolesByUser.get(user.id) || [];
+          const activeRoles = allRoles.filter((r: any) => r.isActive !== false);
+
+          return {
+            ...user,
+            roles: activeRoles,
+            roleCount: activeRoles.length,
+            orgCount: orgId ? 1 : undefined,
+            lastLoginAt: (user as any).lastLoginAt ?? null,
+            membershipStatus: orgId
+              ? (statusMap.get(user.id) || 'active')
+              : undefined,
+          };
+        });
 
         return {
           users: usersWithRoles,
@@ -215,15 +233,37 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         const userIds = users.map(u => u.id);
         const rolesByUser = await repo.getUserRolesBatch(db, userIds);
 
-        const usersWithRoles = users.map(user => ({
-          ...user,
-          roles: rolesByUser.get(user.id) || [],
-        }));
+        // Get effective membership statuses across all orgs
+        const statusMap = await repo.getMembershipStatusesAllOrgs(db, userIds);
+
+        const usersWithRoles = users.map(user => {
+          // Filter to only active roles
+          const allRoles = rolesByUser.get(user.id) || [];
+          const activeRoles = allRoles.filter((r: any) => r.isActive !== false);
+
+          return {
+            ...user,
+            roles: activeRoles,
+            roleCount: activeRoles.length,
+            membershipStatus: statusMap.get(user.id) || undefined,
+          };
+        });
+
+        // Post-query filter by membership status
+        let filteredUsers = usersWithRoles;
+
+        if (input.membershipStatus) {
+          // Explicit filter: show only users with this specific membership status
+          filteredUsers = filteredUsers.filter(u => u.membershipStatus === input.membershipStatus);
+        } else if (!input.includeRemoved) {
+          // Default behavior: exclude users whose membership status is 'removed' or undefined (no org memberships)
+          filteredUsers = filteredUsers.filter(u => u.membershipStatus && u.membershipStatus !== 'removed');
+        }
 
         return {
-          users: usersWithRoles,
-          totalCount,
-          hasMore: input.offset + input.limit < totalCount,
+          users: filteredUsers,
+          totalCount: filteredUsers.length,
+          hasMore: false, // Post-query filtering makes server pagination unreliable; client handles it
         };
       },
     },

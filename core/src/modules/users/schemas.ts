@@ -19,6 +19,10 @@ export const userFiltersSchema = z.object({
   isActive: z.boolean().optional(),
   roleId: z.number().optional(),
   orgId: z.number().optional(),
+  /** Filter by membership status. When undefined, 'removed' users are excluded by default in system-wide queries. */
+  membershipStatus: z.enum(['active', 'invited', 'suspended', 'removed']).optional(),
+  /** Include removed users (users with no active org memberships). Defaults to false. */
+  includeRemoved: z.boolean().optional().default(false),
 });
 
 export type UserFiltersInput = z.infer<typeof userFiltersSchema>;
