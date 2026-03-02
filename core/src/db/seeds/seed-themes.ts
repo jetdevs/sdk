@@ -108,6 +108,14 @@ export const EXTENDED_THEMES: ThemeSeedData[] = [
     isActive: true,
     isDefault: false,
   },
+  {
+    name: 'gtm',
+    displayName: 'GTM',
+    description: 'Dark zinc palette with indigo accents — inspired by the GTM campaign manager demo',
+    cssFile: '/themes/gtm.css',
+    isActive: true,
+    isDefault: false,
+  },
 ];
 
 /**
