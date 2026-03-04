@@ -8,11 +8,11 @@
 import { eq } from 'drizzle-orm';
 import { seedLog } from '../../cli';
 import type {
-    SeedDatabase,
-    SeedResult,
-    ThemeSeedData,
-    ThemeSeedOptions,
-    ThemeSeedSchema,
+  SeedDatabase,
+  SeedResult,
+  ThemeSeedData,
+  ThemeSeedOptions,
+  ThemeSeedSchema,
 } from './types';
 import { createSeedResult } from './types';
 
@@ -111,7 +111,7 @@ export const EXTENDED_THEMES: ThemeSeedData[] = [
   {
     name: 'gtm',
     displayName: 'GTM',
-    description: 'Dark zinc palette with indigo accents — inspired by the GTM campaign manager demo',
+    description: 'Dark-first zinc palette with indigo primary, designed for data-dense campaign management',
     cssFile: '/themes/gtm.css',
     isActive: true,
     isDefault: false,
