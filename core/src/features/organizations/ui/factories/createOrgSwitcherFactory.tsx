@@ -542,21 +542,21 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
             <ChevronDownIcon className="h-4 w-4 shrink-0 ml-2 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-[240px] max-h-[400px] overflow-y-auto">
-          <DropdownMenuLabel>Switch Organization</DropdownMenuLabel>
+        <DropdownMenuContent className="w-[220px] max-h-[400px] overflow-y-auto bg-popover backdrop-blur-xl border-border shadow-xl">
+          <DropdownMenuLabel className="text-xs text-muted-foreground font-medium">Switch Organization</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          {/* Search input */}
+          {/* Search input - only show when many orgs */}
           {shouldShowSearch && (
             <>
               <div className="px-2 pb-2">
                 <div className="relative">
-                  <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
-                    placeholder="Search organizations..."
+                    placeholder="Search..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8 h-8"
+                    className="pl-8 h-7 text-xs"
                   />
                 </div>
               </div>
@@ -566,7 +566,7 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
 
           {/* Organization list */}
           {filteredOrgs.length === 0 ? (
-            <div className="px-2 py-4 text-sm text-center text-muted-foreground">
+            <div className="px-2 py-4 text-xs text-center text-muted-foreground">
               No organizations found
             </div>
           ) : (
@@ -577,26 +577,11 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
                 className="cursor-pointer"
                 disabled={switchOrgMutation.isPending}
               >
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{org.name}</span>
-                      {org.customDomain && isCustomDomainOrg?.(org) && (
-                        <GlobeIcon className="h-3 w-3 text-muted-foreground" />
-                      )}
-                    </div>
-                    {org.roles && org.roles.length > 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        {org.roleCount ?? org.roles.length}{" "}
-                        {(org.roleCount ?? org.roles.length) === 1
-                          ? "role"
-                          : "roles"}
-                        : {org.roles.slice(0, 2).join(", ")}
-                        {org.roles.length > 2 &&
-                          ` +${org.roles.length - 2} more`}
-                      </div>
-                    )}
-                  </div>
+                <div className="flex items-center gap-2 w-full">
+                  <span className="text-sm truncate">{org.name}</span>
+                  {org.customDomain && isCustomDomainOrg?.(org) && (
+                    <GlobeIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+                  )}
                 </div>
               </DropdownMenuItem>
             ))
