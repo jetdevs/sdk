@@ -18,6 +18,9 @@ export type {
 export { UserThemeProvider, useUserTheme } from './UserThemeProvider';
 export type { UserThemeProviderProps } from './UserThemeProvider';
 
+export { ThemeEnforcer, useThemeEnforcement } from './ThemeEnforcer';
+export type { ThemeEnforcerProps } from './ThemeEnforcer';
+
 // =============================================================================
 // TRPC PROVIDERS
 // =============================================================================
