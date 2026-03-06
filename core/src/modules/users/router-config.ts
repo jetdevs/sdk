@@ -256,14 +256,16 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           // Explicit filter: show only users with this specific membership status
           filteredUsers = filteredUsers.filter(u => u.membershipStatus === input.membershipStatus);
         } else if (!input.includeRemoved) {
-          // Default behavior: exclude users whose membership status is 'removed' or undefined (no org memberships)
-          filteredUsers = filteredUsers.filter(u => u.membershipStatus && u.membershipStatus !== 'removed');
+          // Default behavior: exclude only explicitly 'removed' users.
+          // Users with no org_members records (membershipStatus undefined) are still shown
+          // since they may be pre-existing users or system users without membership entries.
+          filteredUsers = filteredUsers.filter(u => u.membershipStatus !== 'removed');
         }
 
         return {
           users: filteredUsers,
-          totalCount: filteredUsers.length,
-          hasMore: false, // Post-query filtering makes server pagination unreliable; client handles it
+          totalCount,
+          hasMore: input.offset + input.limit < totalCount,
         };
       },
     },
