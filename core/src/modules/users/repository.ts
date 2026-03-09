@@ -35,6 +35,8 @@ import type {
     UserWithRoles,
 } from './types';
 
+import { orgMembers as sdkOrgMembers } from '../../db/schema';
+
 // =============================================================================
 // SCHEMA INTERFACE
 // =============================================================================
@@ -177,7 +179,7 @@ export interface IUserRepository {
  * ```
  */
 export function createUserRepositoryClass(schema: UserRepositorySchema) {
-  const { users, userRoles, roles, orgs, permissions, rolePermissions, orgMembers } = schema;
+  const { users, userRoles, roles, orgs, permissions, rolePermissions, orgMembers = sdkOrgMembers } = schema;
 
   return class UserRepository implements IUserRepository {
     // -------------------------------------------------------------------------
