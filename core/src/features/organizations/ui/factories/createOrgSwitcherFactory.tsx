@@ -446,8 +446,6 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
               sessionStorage.setItem('previousOrgId', String(orgId));
             } catch (_) {}
 
-            toast.success(`Switched to ${result.org.name}`);
-
             onSwitchSuccess?.({ id: orgId, name: result.org.name });
 
             // Navigate to redirect path

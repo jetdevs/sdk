@@ -109,7 +109,7 @@ export const changePasswordSchema = z.object({
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 export const updateSessionPreferenceSchema = z.object({
-  sessionTimeoutMinutes: z.number().min(5).max(480),
+  sessionTimeoutMinutes: z.number().min(5).max(10080),
 });
 
 export type UpdateSessionPreferenceInput = z.infer<typeof updateSessionPreferenceSchema>;
