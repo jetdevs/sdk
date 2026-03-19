@@ -2,3 +2,4 @@ packages:
   - 'core'
   - 'framework'
   - 'cloud'
+  - 'messaging'

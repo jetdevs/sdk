@@ -122,6 +122,8 @@ export interface BaseListTableProps<TData> {
   getRowProps?: (row: TData) => React.HTMLAttributes<HTMLTableRowElement>;
   toolbarLayout?: 'single-row' | 'two-row';
   enableStickyActions?: boolean;
+  /** Hide the table body (useful for grid view where only the toolbar is needed) */
+  hideTable?: boolean;
   /** Custom select component for status filter (apps can pass their own styled Select) */
   SelectComponent?: React.ComponentType<{
     value: string;
@@ -250,7 +252,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
 
     if (layout === 'two-row') {
       return (
-        <div className="sticky top-0.5 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40 pb-3 mb-3 -mx-6 px-6 space-y-3">
+        <div className="sticky top-0.5 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40 pb-3 mb-3 space-y-3">
           {/* Row 1: Filters */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -302,7 +304,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
 
     // Single-row layout (default)
     return (
-      <div className="sticky top-0.5 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40 flex items-center justify-between pb-3 mb-3 -mx-6 px-6">
+      <div className="sticky top-0.5 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40 flex items-center justify-between pb-3 mb-3">
         <div className="flex items-center gap-2">
           {search && (
             <div className="relative">
@@ -330,10 +332,10 @@ export function createBaseListTable(ui: DataTableUIComponents) {
               Clear
             </Button>
           )}
+          {resultLabel && <div className="text-sm text-muted-foreground hidden md:block">{resultLabel}</div>}
         </div>
 
         <div className="flex items-center gap-2">
-          {resultLabel && <div className="text-sm text-muted-foreground hidden md:block">{resultLabel}</div>}
           {columnVisibilityControl}
           {onRefresh && (
             <Button variant="outline" size="sm" onClick={onRefresh} className="h-8 w-8 p-0">
@@ -391,6 +393,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     getRowProps,
     toolbarLayout = 'single-row',
     enableStickyActions = true,
+    hideTable = false,
     SelectComponent,
   }: BaseListTableProps<TData>) {
     const [sorting, setSorting] = useState<SortingState>([]);
@@ -459,7 +462,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     const densityClasses = useMemo(() => {
       switch (density) {
         case 'compact':
-          return 'text-xs';
+          return 'text-xs !py-1.5 !px-3';
         case 'spacious':
           return 'text-base py-4';
         default:
@@ -516,7 +519,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
           SelectComponent={SelectComponent}
         />
 
-        <div className="rounded-md border relative">
+        {!hideTable && <div className="rounded-md border relative">
           {/* Left scroll indicator */}
           {shouldUseStickyActions && scrollState.canScrollLeft && (
             <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent pointer-events-none z-10" />
@@ -609,7 +612,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
               </TableBody>
             </Table>
           </div>
-        </div>
+        </div>}
 
         {/* Pagination Controls */}
         {pagination && (
