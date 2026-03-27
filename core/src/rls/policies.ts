@@ -325,10 +325,14 @@ export const RLS_CONTEXT_FUNCTIONS = {
 CREATE OR REPLACE FUNCTION set_org_context(org_id integer)
 RETURNS void AS $$
 BEGIN
-    PERFORM set_config('rls.current_org_id', org_id::text, false);
+    -- Use true (transaction-scoped) to prevent context leaking across
+    -- pooled connections on serverless platforms (Vercel, AWS Lambda).
+    -- Session-scoped (false) would persist on the connection after the
+    -- transaction ends, potentially leaking org context to other requests.
+    PERFORM set_config('rls.current_org_id', org_id::text, true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;`,
-    comment: 'Sets the current organization context for RLS policies',
+    comment: 'Sets the current organization context for RLS policies (transaction-scoped)',
     paramType: 'integer'
   },
 
@@ -337,7 +341,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;`,
 CREATE OR REPLACE FUNCTION clear_org_context()
 RETURNS void AS $$
 BEGIN
-    PERFORM set_config('rls.current_org_id', '', false);
+    PERFORM set_config('rls.current_org_id', '', true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;`,
     comment: 'Clears the current organization context',
@@ -366,10 +370,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;`,
 CREATE OR REPLACE FUNCTION set_workspace_context(workspace_id integer)
 RETURNS void AS $$
 BEGIN
-    PERFORM set_config('app.current_workspace_id', workspace_id::text, false);
+    PERFORM set_config('app.current_workspace_id', workspace_id::text, true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;`,
-    comment: 'Sets the current workspace context for RLS policies',
+    comment: 'Sets the current workspace context for RLS policies (transaction-scoped)',
     paramType: 'integer'
   },
 
@@ -378,7 +382,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;`,
 CREATE OR REPLACE FUNCTION clear_workspace_context()
 RETURNS void AS $$
 BEGIN
-    PERFORM set_config('app.current_workspace_id', '', false);
+    PERFORM set_config('app.current_workspace_id', '', true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;`,
     comment: 'Clears the current workspace context',
