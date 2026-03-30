@@ -183,7 +183,6 @@ export function createApiKeysRouterConfig(
       input: createApiKeySchema,
       invalidates: invalidationTags,
       entityType: 'api_key',
-      crossOrg: true, // Allow backoffice/system users to create keys for any org
       repository: Repository,
       handler: async ({
         input,
@@ -199,9 +198,11 @@ export function createApiKeysRouterConfig(
         expiresAt?: Date;
         environment: ApiKeyEnvironment;
         targetOrgId?: number;
-      }> & { actor?: { isSystemUser?: boolean } }) => {
-        // Determine effective org: use targetOrgId for system users, otherwise service.orgId
-        const effectiveOrgId = (actor?.isSystemUser && input.targetOrgId)
+      }> & { actor?: { isSystemUser?: boolean; isSuperUser?: boolean } }) => {
+        // Determine effective org: use targetOrgId ONLY for platform super users, otherwise service.orgId
+        // SECURITY: actor.isSystemUser is too broad (any admin:* permission) —
+        // cross-org key creation requires platform super user (admin:full_access / isSystemRole)
+        const effectiveOrgId = (actor?.isSuperUser && input.targetOrgId)
           ? input.targetOrgId
           : service.orgId;
 
@@ -262,32 +263,20 @@ export function createApiKeysRouterConfig(
     },
 
     /**
-     * List API keys for the organization
-     * When accessed with crossOrg (backoffice), lists all keys if no orgId
+     * List API keys for the current organization
      */
     list: {
       type: 'query' as const,
       permission,
       input: listApiKeysSchema,
-      crossOrg: true, // Allow backoffice access
       repository: Repository,
       handler: async ({
         input,
         service,
         repo,
-        actor,
-      }: HandlerContext<{ includeRevoked: boolean }> & { actor?: { isSystemUser?: boolean } }) => {
+      }: HandlerContext<{ includeRevoked: boolean }>) => {
         const repository = repo!;
 
-        // System users (backoffice access) can list all keys across all orgs
-        // This is indicated by crossOrg: true + actor.isSystemUser
-        // Note: service.orgId may be set to actor.orgId even for cross-org requests
-        // due to the ?? fallback in createServiceContext, so we check actor instead
-        if (actor?.isSystemUser) {
-          return repository.listAll(input.includeRevoked);
-        }
-
-        // Regular org-scoped access
         if (!service.orgId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -334,39 +323,21 @@ export function createApiKeysRouterConfig(
     },
 
     /**
-     * Revoke API key
-     * When accessed with crossOrg (backoffice), system users can revoke any key
+     * Revoke API key (org-scoped)
      */
     revoke: {
       permission,
       input: revokeApiKeySchema,
       invalidates: invalidationTags,
       entityType: 'api_key',
-      crossOrg: true, // Allow backoffice access
       repository: Repository,
       handler: async ({
         input,
         service,
         repo,
-        actor,
-      }: HandlerContext<{ id: number }> & { actor?: { isSystemUser?: boolean } }) => {
+      }: HandlerContext<{ id: number }>) => {
         const repository = repo!;
 
-        // System users (backoffice access) can revoke any key without org context
-        if (actor?.isSystemUser) {
-          const revoked = await repository.revokeById(input.id);
-
-          if (!revoked) {
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'API key not found or already revoked',
-            });
-          }
-
-          return { success: true };
-        }
-
-        // Regular org-scoped access requires orgId
         if (!service.orgId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',

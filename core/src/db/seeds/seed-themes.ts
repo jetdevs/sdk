@@ -116,6 +116,14 @@ export const EXTENDED_THEMES: ThemeSeedData[] = [
     isActive: true,
     isDefault: false,
   },
+  {
+    name: 'cadraos',
+    displayName: 'CadraOS',
+    description: 'Dark-first cyan/teal tech aesthetic with Space Grotesk and glow accents',
+    cssFile: '/themes/cadraos.css',
+    isActive: true,
+    isDefault: false,
+  },
 ];
 
 /**
