@@ -39,6 +39,7 @@ export default defineConfig({
     'drizzle-orm',
     '@trpc/server',
     '@trpc/server/observable',
+    '@trpc/server/adapters/fetch',
     '@trpc/client',
     '@tanstack/react-query',
     'next-auth',

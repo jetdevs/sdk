@@ -51,3 +51,7 @@ export type {
     AdminOnlyProcedure, AdminOnlyProcedureOptions, AuthenticatedContext, OrgProtectedContext, OrgProtectedProcedure, OrgProtectedProcedureOptions, ProtectedProcedure, PublicProcedure, TRPCContext, WithPermissionOptions
 } from './procedures';
 
+// Fetch handler factory
+export { createTRPCFetchHandler } from './handler';
+export type { TRPCFetchHandlerOptions } from './handler';
+

@@ -90,6 +90,8 @@ export {
 export type {
     AdminOnlyProcedure, AuthenticatedContext, OrgProtectedProcedure, ProtectedProcedure, PublicProcedure, TRPCContext
 } from './trpc';
+export { createTRPCFetchHandler } from './trpc';
+export type { TRPCFetchHandlerOptions } from './trpc';
 
 // Database RLS Context (NEW - For Actor pattern)
 export {
