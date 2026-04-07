@@ -70,6 +70,15 @@ export interface DataTableUIComponents {
   ChevronRightIcon: React.ComponentType<{ className?: string }>;
   ChevronsLeftIcon: React.ComponentType<{ className?: string }>;
   ChevronsRightIcon: React.ComponentType<{ className?: string }>;
+  /**
+   * Optional sort indicator icons. Used to auto-wrap columns whose `header` is
+   * a plain string into a sortable button. If any are omitted, a minimal
+   * Unicode fallback is rendered. Consumers upgrading to enable sortable
+   * string headers should pass lucide's ArrowUp / ArrowDown / ChevronsUpDown.
+   */
+  SortAscIcon?: React.ComponentType<{ className?: string }>;
+  SortDescIcon?: React.ComponentType<{ className?: string }>;
+  SortNeutralIcon?: React.ComponentType<{ className?: string }>;
 }
 
 // =============================================================================
@@ -198,7 +207,96 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     ChevronRightIcon,
     ChevronsLeftIcon,
     ChevronsRightIcon,
+    SortAscIcon,
+    SortDescIcon,
+    SortNeutralIcon,
   } = ui;
+
+  // =============================================================================
+  // AUTO-SORTABLE HEADER WRAPPER
+  // =============================================================================
+  //
+  // When a column is passed with `header: "Some String"`, TanStack will render
+  // it as a dead label even though sort state is wired. We detect that case in
+  // `normalizeColumns` below and swap the string for this render-fn component,
+  // which drives `column.toggleSorting()` on click. The original string is
+  // preserved as the visible label; visuals are unchanged until the user
+  // interacts with it.
+  //
+  // Columns that explicitly set `enableSorting: false` are left untouched.
+  // Columns with render-fn headers are respected as explicit opt-in/out.
+  // =============================================================================
+
+  const SORT_ICON_CLASS = 'h-3.5 w-3.5 ml-1 inline-block opacity-60';
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function AutoSortableHeader({ column, title }: { column: any; title: string }) {
+    // Bail out if the column runtime has opted out of sorting
+    if (!column.getCanSort || !column.getCanSort()) {
+      return <span className="font-medium">{title}</span>;
+    }
+
+    const sorted = column.getIsSorted() as false | 'asc' | 'desc';
+
+    const Indicator = () => {
+      if (sorted === 'asc') {
+        return SortAscIcon ? (
+          <SortAscIcon className={SORT_ICON_CLASS} />
+        ) : (
+          <span className={SORT_ICON_CLASS} aria-hidden>↑</span>
+        );
+      }
+      if (sorted === 'desc') {
+        return SortDescIcon ? (
+          <SortDescIcon className={SORT_ICON_CLASS} />
+        ) : (
+          <span className={SORT_ICON_CLASS} aria-hidden>↓</span>
+        );
+      }
+      return SortNeutralIcon ? (
+        <SortNeutralIcon className={cn(SORT_ICON_CLASS, 'opacity-40')} />
+      ) : (
+        <span className={cn(SORT_ICON_CLASS, 'opacity-40')} aria-hidden>↕</span>
+      );
+    };
+
+    return (
+      <button
+        type="button"
+        onClick={() => column.toggleSorting(sorted === 'asc')}
+        className="-ml-2 h-8 px-2 inline-flex items-center rounded font-medium hover:bg-accent transition-colors"
+      >
+        <span>{title}</span>
+        <Indicator />
+      </button>
+    );
+  }
+
+  /**
+   * Preprocess the columns array: replace plain-string `header` values with a
+   * render-fn that produces a clickable AutoSortableHeader. Leaves render-fn
+   * headers (explicit) and columns with `enableSorting: false` untouched.
+   */
+  function normalizeColumns<TData>(
+    cols: ColumnDef<TData, unknown>[]
+  ): ColumnDef<TData, unknown>[] {
+    return cols.map((col) => {
+      // Only auto-wrap when header is a plain string
+      if (typeof col.header !== 'string') return col;
+
+      // Respect explicit sorting opt-out from the column definition. Note
+      // this is the declarative value; AutoSortableHeader additionally checks
+      // the runtime `column.getCanSort()` as a final guard.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((col as any).enableSorting === false) return col;
+
+      const title = col.header;
+      return {
+        ...col,
+        header: ({ column }) => <AutoSortableHeader column={column} title={title} />,
+      } as ColumnDef<TData, unknown>;
+    });
+  }
 
   // =============================================================================
   // LIST TOOLBAR COMPONENT
@@ -436,9 +534,13 @@ export function createBaseListTable(ui: DataTableUIComponents) {
       };
     }, [data]);
 
+    // Auto-wrap plain-string headers into sortable buttons. Memoized on the
+    // columns identity so TanStack doesn't re-detect columns every render.
+    const normalizedColumns = useMemo(() => normalizeColumns(columns), [columns]);
+
     const table = useReactTable({
       data,
-      columns,
+      columns: normalizedColumns,
       state: {
         sorting,
         columnVisibility,
