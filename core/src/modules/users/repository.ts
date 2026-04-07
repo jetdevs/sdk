@@ -15,6 +15,7 @@ import {
     desc,
     eq,
     inArray,
+    isNotNull,
     isNull,
     like,
     not,
@@ -133,6 +134,7 @@ export interface IUserRepository {
   assignRole(db: any, assignment: UserRoleAssignment): Promise<void>;
   removeRole(db: any, userId: number, roleId: number, orgId: number): Promise<number>;
   removeAllRolesInOrg(db: any, userId: number, orgId: number): Promise<number>;
+  rotateStaleCurrentOrg(db: any, userIds: number[]): Promise<Array<{ userId: number; previousOrgId: number | null; newOrgId: number | null }>>;
   hasRoleInOrg(db: any, userId: number, roleId: number, orgId: number): Promise<boolean>;
   findGlobalStandardUserRole(db: any): Promise<{ id: number; name: string } | null>;
 
@@ -567,6 +569,59 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
         .returning();
 
       return result.length;
+    }
+
+    /**
+     * For each given userId, ensure users.current_org_id still points to an org
+     * the user has active access to. If not, rotate to the first remaining
+     * accessible org (or NULL if none). Idempotent.
+     *
+     * Why: when a user's role for their currently-active org is removed, the JWT
+     * still references the stale org. Rotating before the SSE broadcast ensures
+     * the client's session refresh picks up a valid org.
+     */
+    async rotateStaleCurrentOrg(
+      db: PostgresJsDatabase<any>,
+      userIds: number[]
+    ): Promise<Array<{ userId: number; previousOrgId: number | null; newOrgId: number | null }>> {
+      if (userIds.length === 0) return [];
+      const rotations: Array<{ userId: number; previousOrgId: number | null; newOrgId: number | null }> = [];
+
+      const userRows = await db
+        .select({ id: users.id, currentOrgId: users.currentOrgId })
+        .from(users)
+        .where(inArray(users.id, userIds));
+
+      for (const u of userRows) {
+        const currentOrgId = u.currentOrgId as number | null;
+        if (currentOrgId == null) continue;
+
+        const activeOrgRows = await db
+          .selectDistinct({ orgId: userRoles.orgId })
+          .from(userRoles)
+          .where(and(
+            eq(userRoles.userId, u.id),
+            eq(userRoles.isActive, true),
+            isNotNull(userRoles.orgId),
+            not(eq(userRoles.orgId, -1))
+          ));
+
+        const orgIds = activeOrgRows
+          .map((r: any) => r.orgId as number | null)
+          .filter((id: number | null): id is number => id != null);
+
+        if (orgIds.includes(currentOrgId)) continue;
+
+        const newOrgId = orgIds[0] ?? null;
+        await db
+          .update(users)
+          .set({ currentOrgId: newOrgId, updatedAt: new Date() } as any)
+          .where(eq(users.id, u.id));
+
+        rotations.push({ userId: u.id, previousOrgId: currentOrgId, newOrgId });
+      }
+
+      return rotations;
     }
 
     /**

@@ -1050,6 +1050,13 @@ export function createUserService(deps: UserServiceDeps): IUserService {
         );
       }
 
+      // Rotate stale current_org_id so subsequent JWT refreshes don't strand
+      // the user "in" an org they no longer belong to.
+      await hooks.withPrivilegedDb(async (db) => {
+        const repo = getRepo(db);
+        await repo.rotateStaleCurrentOrg(db, [params.userId]);
+      });
+
       return { success: true, removed: removedCount };
     },
 
@@ -1073,6 +1080,12 @@ export function createUserService(deps: UserServiceDeps): IUserService {
           return await repo.removeAllRolesInOrg(db, params.userId, params.orgId);
         });
       }
+
+      // Rotate stale current_org_id (always, since this removes ALL roles in org)
+      await hooks.withPrivilegedDb(async (db) => {
+        const repo = getRepo(db);
+        await repo.rotateStaleCurrentOrg(db, [params.userId]);
+      });
 
       return { success: true, removed: removedCount };
     },
