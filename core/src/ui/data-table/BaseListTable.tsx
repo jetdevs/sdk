@@ -252,7 +252,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
 
     if (layout === 'two-row') {
       return (
-        <div className="sticky top-0.5 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40 pb-3 mb-3 space-y-3">
+        <div className="sticky top-0.5 z-10 pb-3 mb-1 space-y-3">
           {/* Row 1: Filters */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -304,7 +304,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
 
     // Single-row layout (default)
     return (
-      <div className="sticky top-0.5 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40 flex items-center justify-between pb-3 mb-3">
+      <div className="sticky top-0.5 z-10 flex items-center justify-between pb-3 mb-1">
         <div className="flex items-center gap-2">
           {search && (
             <div className="relative">
