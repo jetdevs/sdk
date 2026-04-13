@@ -333,41 +333,25 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
           });
         }
 
-        // Determine which roles to return based on user's access
-        let roleWhereClause;
+        // Always return system roles (org_id IS NULL or -1) + current org roles.
+        // Previous logic had branching that could miss roles or return nothing.
+        const roleWhereConditions = [
+          eq(userRoles.userId, numericUserId),
+          eq(userRoles.isActive, true)
+        ];
 
-        if (systemRoles.length > 0 && orgRoles.length === 0) {
-          // User has ONLY system roles
-          roleWhereClause = and(
-            eq(userRoles.userId, numericUserId),
-            isNull(userRoles.orgId),
-            eq(userRoles.isActive, true)
-          );
-        } else if (systemRoles.length > 0 && !hasAccessToCurrentOrg) {
-          // User has system roles but no access to current org
-          roleWhereClause = and(
-            eq(userRoles.userId, numericUserId),
-            isNull(userRoles.orgId),
-            eq(userRoles.isActive, true)
-          );
-        } else if (hasAccessToCurrentOrg) {
-          // User has access to current org - return both org and system roles
-          roleWhereClause = and(
-            eq(userRoles.userId, numericUserId),
-            or(
-              eq(userRoles.orgId, user.currentOrgId!),
-              isNull(userRoles.orgId)
-            ),
-            eq(userRoles.isActive, true)
-          );
-        } else {
-          // Edge case: User has org roles but not for current org, and no system roles
-          roleWhereClause = and(
-            eq(userRoles.userId, numericUserId),
-            eq(userRoles.orgId, -9999), // Will return nothing
-            eq(userRoles.isActive, true)
-          );
+        const orgConditions = [
+          isNull(userRoles.orgId),      // system roles (NULL)
+          eq(userRoles.orgId, -1)       // legacy system role sentinel
+        ];
+        if (user.currentOrgId) {
+          orgConditions.push(eq(userRoles.orgId, user.currentOrgId));
         }
+
+        const roleWhereClause = and(
+          ...roleWhereConditions,
+          or(...orgConditions)
+        );
 
         // Get role assignments with permissions (bypasses RLS)
         const userRoleAssignments = await privilegedDb.query.userRoles.findMany({

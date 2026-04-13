@@ -102,6 +102,12 @@ export interface UserOrgRouterFactoryDeps {
   Repository: new (db: any) => any;
   /** TRPCError class for throwing typed errors (optional - uses default if not provided) */
   TRPCError?: TRPCErrorConstructor;
+  /**
+   * Get privileged database client that bypasses RLS.
+   * Required for getUserOrganizations to work for non-superusers,
+   * since the crossOrg flag only bypasses RLS for system users.
+   */
+  getPrivilegedDb?: () => any;
 }
 
 /**
@@ -127,7 +133,7 @@ export interface UserOrgRouterFactoryDeps {
  * ```
  */
 export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
-  const { Repository, TRPCError = DefaultTRPCError } = deps;
+  const { Repository, TRPCError = DefaultTRPCError, getPrivilegedDb } = deps;
 
   return {
     // -------------------------------------------------------------------------
@@ -156,6 +162,19 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       handler: async (context: HandlerContext) => {
         const { service, repo } = context;
         const userId = parseInt(service.userId);
+
+        // getUserOrganizations MUST bypass RLS to see all orgs the user belongs to.
+        // The crossOrg flag only bypasses RLS for system users, so for regular
+        // multi-org users we need to use the privileged db directly.
+        if (getPrivilegedDb) {
+          const privilegedDb = getPrivilegedDb();
+          if (privilegedDb) {
+            const privilegedRepo = new Repository(privilegedDb);
+            return privilegedRepo.getUserOrganizations(userId);
+          }
+        }
+
+        // Fallback to RLS-scoped db (only works for system users via crossOrg)
         return repo!.getUserOrganizations(userId);
       },
     },
