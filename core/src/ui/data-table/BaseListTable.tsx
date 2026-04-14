@@ -254,16 +254,16 @@ export function createBaseListTable(ui: DataTableUIComponents) {
       return (
         <div className="sticky top-0.5 z-10 pb-3 mb-1 space-y-3">
           {/* Row 1: Filters */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
               {search && (
-                <div className="relative">
+                <div className="relative w-40 md:w-80">
                   <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={search.value}
                     onChange={(e) => search.onChange(e.target.value)}
                     placeholder={search.placeholder || 'Search...'}
-                    className="pl-8 w-80 bg-background border"
+                    className="pl-8 w-full bg-background border"
                   />
                 </div>
               )}
@@ -283,13 +283,13 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                 </Button>
               )}
             </div>
-            {rightContent && <div className="flex items-center gap-2">{rightContent}</div>}
+            {rightContent && <div className="flex flex-wrap items-center gap-2">{rightContent}</div>}
           </div>
 
           {/* Row 2: Actions */}
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             {resultLabel && <div className="text-sm text-muted-foreground">{resultLabel}</div>}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {columnVisibilityControl}
               {onRefresh && (
                 <Button variant="outline" size="sm" onClick={onRefresh} className="h-8 w-8 p-0">
@@ -302,18 +302,18 @@ export function createBaseListTable(ui: DataTableUIComponents) {
       );
     }
 
-    // Single-row layout (default)
+    // Single-row layout (default) — wraps to multiple rows on narrow screens
     return (
-      <div className="sticky top-0.5 z-10 flex items-center justify-between pb-3 mb-1">
-        <div className="flex items-center gap-2">
+      <div className="sticky top-0.5 z-10 flex flex-wrap items-center justify-between gap-2 pb-3 mb-1">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           {search && (
-            <div className="relative">
+            <div className="relative w-40 md:w-80">
               <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 value={search.value}
                 onChange={(e) => search.onChange(e.target.value)}
                 placeholder={search.placeholder || 'Search...'}
-                className="pl-8 w-80 bg-background border"
+                className="pl-8 w-full bg-background border"
               />
             </div>
           )}
@@ -335,7 +335,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
           {resultLabel && <div className="text-sm text-muted-foreground hidden md:block">{resultLabel}</div>}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {columnVisibilityControl}
           {onRefresh && (
             <Button variant="outline" size="sm" onClick={onRefresh} className="h-8 w-8 p-0">
