@@ -41,6 +41,15 @@ export { createDataTableColumnHeader } from './DataTableColumnHeader';
 export { createDataTablePagination } from './DataTablePagination';
 export { createDataTableWithToolbar } from './DataTableWithToolbar';
 
+// Column meta — TanStack ColumnMeta augmentation (`label`, `align`) plus
+// helpers used by the table primitives. Importing this file from anywhere
+// in `@jetdevs/core/ui/data-table` registers the augmentation.
+export {
+  getAlignCellClass,
+  getAlignHeaderClass,
+} from './column-meta';
+export type { ColumnAlign } from './column-meta';
+
 // Type exports - UI component interfaces
 export type { DataTableUIComponents } from './BaseListTable';
 export type { ColumnHeaderUIComponents } from './DataTableColumnHeader';

@@ -2,6 +2,7 @@
 
 import type { Column } from '@tanstack/react-table';
 import * as React from 'react';
+import { getAlignHeaderClass } from './column-meta';
 
 // =============================================================================
 // UI COMPONENT TYPES
@@ -79,16 +80,33 @@ export function createDataTableColumnHeader(ui: ColumnHeaderUIComponents) {
     title,
     className,
   }: DataTableColumnHeaderProps<TData, TValue>) {
+    // Pull alignment from column meta (`meta.align: 'left' | 'center' | 'right'`).
+    // For right-aligned columns we drop the negative left margin and push the
+    // button to the right of the cell so the sort affordance hugs the value.
+    const align = column.columnDef.meta?.align;
+    const alignJustify = getAlignHeaderClass(align);
+
     if (!column.getCanSort()) {
-      return <span className="font-medium">{title}</span>;
+      // Non-sortable: render a block element so `text-right` etc. flow from
+      // the parent <th> className.
+      return <span className={`block font-medium ${className || ''}`}>{title}</span>;
     }
 
     const sorted = column.getIsSorted();
 
+    const buttonClass = [
+      align === 'right' || align === 'center' ? '' : '-ml-3',
+      'h-8 data-[state=open]:bg-accent',
+      alignJustify,
+      className || '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
     return (
       <Button
         variant="ghost"
-        className={`-ml-3 h-8 data-[state=open]:bg-accent ${className || ''}`}
+        className={buttonClass}
         onClick={() => column.toggleSorting(sorted === 'asc')}
       >
         <span className="mr-2 font-medium">{title}</span>

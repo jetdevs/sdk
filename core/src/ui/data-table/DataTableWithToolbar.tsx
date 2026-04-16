@@ -15,6 +15,7 @@ import {
 } from '@tanstack/react-table';
 import * as React from 'react';
 import { useState } from 'react';
+import { getAlignCellClass } from './column-meta';
 
 // =============================================================================
 // SVG ICONS - Built-in to avoid lucide-react dependency in this component
@@ -716,16 +717,22 @@ export function createDataTableWithToolbar<TData>(
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className={getDensityClasses()}>
-                      {header.isPlaceholder
-                        ? null
-                        : (flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          ) as React.ReactNode)}
-                    </TableHead>
-                  ))}
+                  {headerGroup.headers.map((header) => {
+                    const alignClass = getAlignCellClass(header.column.columnDef.meta?.align);
+                    return (
+                      <TableHead
+                        key={header.id}
+                        className={`${getDensityClasses()} ${alignClass}`.trim()}
+                      >
+                        {header.isPlaceholder
+                          ? null
+                          : (flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            ) as React.ReactNode)}
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
               ))}
             </TableHeader>
@@ -737,11 +744,17 @@ export function createDataTableWithToolbar<TData>(
                     data-state={row.getIsSelected() ? 'selected' : undefined}
                     className={getDensityClasses()}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className={getDensityClasses()}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext()) as React.ReactNode}
-                      </TableCell>
-                    ))}
+                    {row.getVisibleCells().map((cell) => {
+                      const alignClass = getAlignCellClass(cell.column.columnDef.meta?.align);
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          className={`${getDensityClasses()} ${alignClass}`.trim()}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext()) as React.ReactNode}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))
               ) : (

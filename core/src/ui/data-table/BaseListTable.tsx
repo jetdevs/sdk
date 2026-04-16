@@ -14,6 +14,7 @@ import {
 import * as React from 'react';
 import { useMemo, useState } from 'react';
 import { cn } from '../../lib';
+import { getAlignCellClass } from './column-meta';
 
 // =============================================================================
 // UI COMPONENT TYPES - Types for injected UI components
@@ -538,11 +539,13 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                     {hGroup.headers.map((header, index) => {
                       const isFirstColumn = shouldUseStickyActions && index === 0;
                       const isLastColumn = shouldUseStickyActions && index === lastColumnIndex;
+                      const alignClass = getAlignCellClass(header.column.columnDef.meta?.align);
                       return (
                         <TableHead
                           key={header.id}
                           className={cn(
                             densityClasses,
+                            alignClass,
                             isFirstColumn && 'sticky left-0 bg-background shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20',
                             isLastColumn && 'sticky right-0 bg-background shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20'
                           )}
@@ -576,11 +579,13 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                         {row.getVisibleCells().map((cell, index) => {
                           const isFirstColumn = shouldUseStickyActions && index === 0;
                           const isLastColumn = shouldUseStickyActions && index === lastColumnIndex;
+                          const alignClass = getAlignCellClass(cell.column.columnDef.meta?.align);
                           return (
                             <TableCell
                               key={cell.id}
                               className={cn(
                                 densityClasses,
+                                alignClass,
                                 isFirstColumn &&
                                   'sticky left-0 bg-background shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20',
                                 isLastColumn &&
