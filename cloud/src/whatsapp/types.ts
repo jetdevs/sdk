@@ -121,6 +121,13 @@ export interface DeleteTemplateOptions extends WabaConfig {
 export interface SendTemplateMessageRequest extends WabaConfig {
   templateId: string;
   phoneNumber: string;
+  /**
+   * Media resource for the header: can be a URL or a pre-uploaded media_id.
+   * - URL: starts with http:// or https:// (sent as `link`)
+   * - media_id: any other value (sent as `id`)
+   */
+  media?: string;
+  /** @deprecated Use `media` instead. Kept for backwards compatibility. */
   imageUrl?: string;
   metadata?: Record<string, unknown>;
   bodyParameters?: string[];
@@ -141,8 +148,14 @@ export interface SendTemplateMessageRequest extends WabaConfig {
  * Carousel card for carousel messages
  */
 export interface CarouselCard {
-  /** Media URL (image or video) */
-  imageUrl: string;
+  /**
+   * Media resource (image or video): URL or pre-uploaded media_id.
+   * - URL: starts with http:// or https:// (sent as `link`)
+   * - media_id: any other value (sent as `id`)
+   */
+  media?: string;
+  /** @deprecated Use `media` instead. Kept for backwards compatibility. */
+  imageUrl?: string;
   /** Type of media (image or video), defaults to 'image' */
   mediaType?: 'image' | 'video';
   bodyParameters?: string[];

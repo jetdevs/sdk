@@ -384,8 +384,12 @@ export class WhatsAppClient {
    * @param params - Send template message request with optional WABA config
    */
   async sendTemplateMessage(params: SendTemplateMessageRequest): Promise<SendMessageResponse> {
-    const { templateId, phoneNumber, imageUrl, metadata, bodyParameters, wabaId, senderLabel, mediaType, buttons, documentFilename } =
+    const { templateId, phoneNumber, metadata, bodyParameters, wabaId, senderLabel, mediaType, buttons, documentFilename } =
       params;
+
+    // Accept either `media` (new) or `imageUrl` (deprecated) as the media resource
+    const media = params.media ?? params.imageUrl;
+    const isUrl = !!media && media.toLowerCase().startsWith('http');
 
     // Determine effective media type (default to 'image' for backwards compatibility)
     const effectiveMediaType = mediaType || 'image';
@@ -395,7 +399,8 @@ export class WhatsAppClient {
     log.debug('Sending template message', {
       templateId,
       phoneNumber,
-      hasMedia: !!imageUrl,
+      hasMedia: !!media,
+      mediaMode: media ? (isUrl ? 'link' : 'id') : 'none',
       mediaType: effectiveMediaType,
       hasButtons: !!buttons && buttons.length > 0,
       buttonCount: buttons?.length || 0,
@@ -410,29 +415,24 @@ export class WhatsAppClient {
         text: value,
       })) || [];
 
-    // Build header parameters based on media type
-    const headerParameters = imageUrl
+    // Build header parameters based on media type, switching between `link` and `id`
+    const headerParameters = media
       ? [
           isDocument
             ? {
                 type: 'document',
-                document: {
-                  link: imageUrl,
-                  filename: documentFilename || 'document.pdf',
-                },
+                document: isUrl
+                  ? { link: media, filename: documentFilename || 'document.pdf' }
+                  : { id: media, filename: documentFilename || 'document.pdf' },
               }
             : isVideo
             ? {
                 type: 'video',
-                video: {
-                  link: imageUrl,
-                },
+                video: isUrl ? { link: media } : { id: media },
               }
             : {
                 type: 'image',
-                image: {
-                  link: imageUrl,
-                },
+                image: isUrl ? { link: media } : { id: media },
               },
         ]
       : [];
@@ -446,7 +446,7 @@ export class WhatsAppClient {
       metadata: metadata || {},
       components: [
         // Only include header component if there's media
-        ...(imageUrl
+        ...(media
           ? [
               {
                 type: 'header',
@@ -511,8 +511,12 @@ export class WhatsAppClient {
     const carouselCards = cards.map((card, cardIndex) => {
       const cardComponents: Array<{ type: string; parameters: unknown[] }> = [];
 
+      // Accept either `media` (new) or `imageUrl` (deprecated) as the card media
+      const cardMedia = card.media ?? card.imageUrl;
+      const cardIsUrl = !!cardMedia && cardMedia.toLowerCase().startsWith('http');
+
       // Add HEADER with media (image or video) if available
-      if (card.imageUrl) {
+      if (cardMedia) {
         const isVideo = card.mediaType === 'video';
         cardComponents.push({
           type: 'header',
@@ -520,15 +524,11 @@ export class WhatsAppClient {
             isVideo
               ? {
                   type: 'video',
-                  video: {
-                    link: card.imageUrl,
-                  },
+                  video: cardIsUrl ? { link: cardMedia } : { id: cardMedia },
                 }
               : {
                   type: 'image',
-                  image: {
-                    link: card.imageUrl,
-                  },
+                  image: cardIsUrl ? { link: cardMedia } : { id: cardMedia },
                 },
           ],
         });
