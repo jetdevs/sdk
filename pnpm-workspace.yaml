@@ -3,3 +3,4 @@ packages:
   - 'framework'
   - 'cloud'
   - 'messaging'
+  - 'state'
