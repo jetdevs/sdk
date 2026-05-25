@@ -45,6 +45,28 @@ importers:
         specifier: ^3.2.3
         version: 3.2.4(@types/node@20.19.37)(tsx@4.21.0)
 
+  connect:
+    dependencies:
+      jose:
+        specifier: ^6.0.0
+        version: 6.2.3
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.37
+      next-auth:
+        specifier: ^4.24.0
+        version: 4.24.13(next@15.5.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.0.0
+        version: 1.6.1(@types/node@20.19.37)
+
   core:
     dependencies:
       '@neondatabase/serverless':
@@ -2228,6 +2250,9 @@ packages:
 
   jose@4.15.9:
     resolution: {integrity: sha512-1vUQX+IdDMVPj4k8kOxgUqlcK518yluMuGZwqlr44FS1ppZB/5GWh4rZG89erpOBOJjU/OBsnCVFfapsRz6nEA==}
+
+  jose@6.2.3:
+    resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
 
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
@@ -5144,6 +5169,8 @@ snapshots:
   isexe@2.0.0: {}
 
   jose@4.15.9: {}
+
+  jose@6.2.3: {}
 
   joycon@3.1.1: {}
 
