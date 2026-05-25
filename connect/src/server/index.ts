@@ -69,7 +69,7 @@ export class YoboConnect {
       client_id: this.cfg.clientId,
     })
     if (this.cfg.clientSecret) body.set('client_secret', this.cfg.clientSecret)
-    return this._postToken(discovery.token_endpoint, body)
+    return this.postToken(discovery.token_endpoint, body)
   }
 
   async refreshTokens(refreshToken: string, scopeSubset?: string[]): Promise<TokenSet> {
@@ -81,7 +81,7 @@ export class YoboConnect {
     })
     if (this.cfg.clientSecret) body.set('client_secret', this.cfg.clientSecret)
     if (scopeSubset?.length) body.set('scope', scopeSubset.join(' '))
-    return this._postToken(discovery.token_endpoint, body)
+    return this.postToken(discovery.token_endpoint, body)
   }
 
   async revokeToken(
@@ -102,8 +102,8 @@ export class YoboConnect {
       body: body.toString(),
     })
     if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      throw new Error(`Revoke failed ${res.status}: ${text}`)
+      const json = await res.json().catch(() => ({})) as { error?: string }
+      throw new Error(`Revoke failed ${res.status}: ${json.error ?? 'unknown_error'}`)
     }
   }
 
@@ -112,7 +112,7 @@ export class YoboConnect {
     const res = await fetch(discovery.userinfo_endpoint, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
-    if (!res.ok) throw new Error(`Userinfo request failed: HTTP ${res.status}`)
+    if (!res.ok) throw new Error(`Userinfo request failed: HTTP ${res.status} from ${discovery.userinfo_endpoint}`)
     return res.json() as Promise<ConnectUserinfo>
   }
 
@@ -138,7 +138,7 @@ export class YoboConnect {
     return res.json() as Promise<IntrospectionResponse>
   }
 
-  private async _postToken(endpoint: string, body: URLSearchParams): Promise<TokenSet> {
+  private async postToken(endpoint: string, body: URLSearchParams): Promise<TokenSet> {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

@@ -190,4 +190,14 @@ describe('YoboConnect', () => {
       await expect(client.exchangeCode('bad-code', 'bad-verifier')).rejects.toThrow('invalid_client')
     })
   })
+
+  describe('introspect', () => {
+    it('throws when no introspection_endpoint is advertised', async () => {
+      const { introspection_endpoint, ...discoveryNoIntrospect } = MOCK_DISCOVERY
+      global.fetch = vi.fn().mockImplementation(() =>
+        Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(discoveryNoIntrospect) }),
+      )
+      await expect(client.introspect('some-token')).rejects.toThrow('introspection_endpoint')
+    })
+  })
 })

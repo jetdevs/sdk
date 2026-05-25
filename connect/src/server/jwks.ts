@@ -11,6 +11,11 @@ function getJwksSet(jwksUri: string): ReturnType<typeof createRemoteJWKSet> {
   return jwksSets.get(jwksUri)!
 }
 
+/** Clear the cached RemoteJWKSet instances (e.g. after a provider key migration). */
+export function clearJwksCache(): void {
+  jwksSets.clear()
+}
+
 /**
  * Verify a Yobo Connect ID token (RS256 JWT).
  * Fetches JWKS from the discovery document's jwks_uri; jose caches keys internally.
