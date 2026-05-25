@@ -27,6 +27,11 @@ describe('YoboConnectProvider', () => {
     expect(provider.checks).toContain('state')
   })
 
+  it('includes nonce check for ID token replay protection', () => {
+    const provider = YoboConnectProvider(config)
+    expect(provider.checks).toContain('nonce')
+  })
+
   it('maps profile to NextAuth user shape', () => {
     const provider = YoboConnectProvider(config)
     const profile = {

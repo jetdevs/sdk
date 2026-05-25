@@ -60,7 +60,7 @@ export function YoboConnectProvider(
         scope: scopes.join(' '),
       },
     },
-    checks: ['pkce', 'state'],
+    checks: ['pkce', 'state', 'nonce'],
     clientId: config.clientId,
     clientSecret: config.clientSecret,
     profile(profile: YoboConnectProfile) {
