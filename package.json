@@ -15,6 +15,8 @@
     "publish:cloud": "pnpm --filter @jetdevs/cloud publish --access public --no-git-checks",
     "publish:state": "pnpm --filter @jetdevs/state publish --access public --no-git-checks",
     "build:state": "pnpm --filter @jetdevs/state build",
+    "build:connect": "pnpm --filter @jetdevs/connect build",
+    "publish:connect": "pnpm --filter @jetdevs/connect publish --access public --no-git-checks",
     "version:patch": "pnpm -r exec -- npm version patch",
     "version:minor": "pnpm -r exec -- npm version minor"
   }

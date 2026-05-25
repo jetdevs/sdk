@@ -4,3 +4,4 @@ packages:
   - 'cloud'
   - 'messaging'
   - 'state'
+  - 'connect'
