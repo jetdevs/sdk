@@ -14,8 +14,6 @@
 export interface SignInOptions {
   /** URL to redirect to after successful sign-in (relative to RP origin). */
   returnTo?: string
-  /** Force re-authentication ('login') or re-consent ('consent'). */
-  prompt?: 'login' | 'consent'
 }
 
 export interface SignOutOptions {
@@ -31,7 +29,6 @@ export interface SignOutOptions {
 export function initiateSignIn(options: SignInOptions = {}): void {
   const url = new URL('/api/auth/signin/yobo-connect', window.location.origin)
   if (options.returnTo) url.searchParams.set('callbackUrl', options.returnTo)
-  if (options.prompt) url.searchParams.set('prompt', options.prompt)
   window.location.assign(url.toString())
 }
 

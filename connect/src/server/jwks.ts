@@ -39,7 +39,8 @@ export async function verifyIdToken(
   const claims = payload as unknown as ConnectIdTokenClaims
 
   if (nonce !== undefined && claims.nonce !== nonce) {
-    throw new Error(`ID token nonce mismatch: expected ${nonce}, got ${claims.nonce ?? 'undefined'}`)
+    // Generic message — do not leak the expected/received nonce values into logs.
+    throw new Error('ID token nonce mismatch')
   }
 
   return claims

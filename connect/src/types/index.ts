@@ -53,7 +53,7 @@ export interface ConnectIdTokenClaims {
   name?: string
   picture?: string
   org_id?: number
-  org_role?: string
+  org_role?: 'owner' | 'admin' | 'member'
   /** Session ID for back-channel logout targeting. */
   sid?: string
 }
