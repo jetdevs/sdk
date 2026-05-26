@@ -36,6 +36,17 @@ export const orgMemberStatusEnum = pgEnum("org_member_status", [
   "removed",    // Removed from org (soft delete)
 ]);
 
+/**
+ * Platform-level org role. Distinct from app RBAC roles (user_roles).
+ * Feeds the OIDC `org_role` claim (owner/admin/member). Tenant-scoped only —
+ * NEVER conveys system/global access.
+ */
+export const orgMemberRoleEnum = pgEnum("org_member_role", [
+  "owner",
+  "admin",
+  "member",
+]);
+
 // =============================================================================
 // ORG MEMBERS TABLE
 // =============================================================================
@@ -52,6 +63,7 @@ export const orgMembers = pgTable(
       .notNull()
       .references(() => orgs.id, { onDelete: "cascade" }),
     status: orgMemberStatusEnum("status").notNull().default("invited"),
+    role: orgMemberRoleEnum("role").notNull().default("member"),
     pendingRoleId: integer("pending_role_id")
       .references(() => roles.id, { onDelete: "set null" }),
     invitedBy: integer("invited_by")
