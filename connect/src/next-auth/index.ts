@@ -23,9 +23,12 @@ export interface YoboConnectProviderConfig {
 
 /**
  * `OAuthConfig<YoboConnectProfile>` with `profile` narrowed to a synchronous return
- * so callers can access `User` properties directly without awaiting.
+ * so callers can access `User` properties directly without awaiting, and `type`
+ * widened to allow `'oidc'` (the runtime value — Yobo Connect is an OIDC provider
+ * so NextAuth performs discovery + id_token validation).
  */
-export type YoboConnectOAuthConfig = Omit<OAuthConfig<YoboConnectProfile>, 'profile'> & {
+export type YoboConnectOAuthConfig = Omit<OAuthConfig<YoboConnectProfile>, 'profile' | 'type'> & {
+  type: 'oauth' | 'oidc'
   profile: (profile: YoboConnectProfile, tokens: Parameters<OAuthConfig<YoboConnectProfile>['profile']>[1]) => User
 }
 

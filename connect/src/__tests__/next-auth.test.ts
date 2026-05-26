@@ -11,7 +11,7 @@ describe('YoboConnectProvider', () => {
   it('has correct id and type', () => {
     const provider = YoboConnectProvider(config)
     expect(provider.id).toBe('yobo-connect')
-    expect(provider.type).toBe('oauth')
+    expect(provider.type).toBe('oidc')
   })
 
   it('sets wellKnown to discovery URL', () => {
