@@ -12,6 +12,12 @@
 
 export type OrgMemberStatus = 'invited' | 'active' | 'suspended' | 'removed';
 
+/**
+ * Platform-level org role. Distinct from app RBAC roles (user_roles).
+ * Feeds the OIDC `org_role` claim. Tenant-scoped only — NEVER system/global.
+ */
+export type OrgPlatformRole = 'owner' | 'admin' | 'member';
+
 // =============================================================================
 // RECORD TYPES
 // =============================================================================
@@ -25,6 +31,7 @@ export interface OrgMemberRecord {
   userId: number;
   orgId: number;
   status: OrgMemberStatus;
+  role: OrgPlatformRole;
   pendingRoleId: number | null;
   invitedBy: number | null;
   invitedAt: Date | null;

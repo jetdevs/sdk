@@ -31,6 +31,7 @@ export interface OrgMemberRepositorySchema {
     userId: any;
     orgId: any;
     status: any;
+    role: any;
     pendingRoleId: any;
     invitedBy: any;
     invitedAt: any;
@@ -85,6 +86,13 @@ export interface IOrgMemberRepository {
     invitedBy: number,
     pendingRoleId?: number
   ): Promise<OrgMemberRecord>;
+
+  // Provisioning (Yobo Connect)
+  upsertMembership(
+    db: any,
+    data: { userId: number; orgId: number; status?: OrgMemberStatus; role?: 'owner' | 'admin' | 'member' }
+  ): Promise<OrgMemberRecord>;
+  findActiveMemberships(db: any, userId: number): Promise<OrgMemberRecord[]>;
 }
 
 // =============================================================================
@@ -128,6 +136,7 @@ export function createOrgMemberRepositoryClass(schema: OrgMemberRepositorySchema
           userId: orgMembers.userId,
           orgId: orgMembers.orgId,
           status: orgMembers.status,
+          role: orgMembers.role,
           pendingRoleId: orgMembers.pendingRoleId,
           invitedBy: orgMembers.invitedBy,
           invitedAt: orgMembers.invitedAt,
@@ -156,6 +165,7 @@ export function createOrgMemberRepositoryClass(schema: OrgMemberRepositorySchema
         userId: r.userId,
         orgId: r.orgId,
         status: r.status,
+        role: r.role,
         pendingRoleId: r.pendingRoleId,
         invitedBy: r.invitedBy,
         invitedAt: r.invitedAt,
@@ -449,6 +459,61 @@ export function createOrgMemberRepositoryClass(schema: OrgMemberRepositorySchema
         .returning();
 
       return result[0] as unknown as OrgMemberRecord;
+    }
+
+    // -------------------------------------------------------------------------
+    // PROVISIONING OPERATIONS (Yobo Connect)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Idempotent membership upsert keyed on (userId, orgId). Targets the
+     * existing org_members_user_org_idx unique index.
+     */
+    async upsertMembership(
+      db: PostgresJsDatabase<any>,
+      data: { userId: number; orgId: number; status?: OrgMemberStatus; role?: 'owner' | 'admin' | 'member' }
+    ): Promise<OrgMemberRecord> {
+      const status = data.status ?? 'active';
+      const role = data.role ?? 'member';
+      const now = new Date();
+      const result = await db
+        .insert(orgMembers)
+        .values({
+          userId: data.userId,
+          orgId: data.orgId,
+          status,
+          role,
+          joinedAt: status === 'active' ? now : null,
+          invitedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        } as any)
+        .onConflictDoUpdate({
+          target: [orgMembers.userId, orgMembers.orgId],
+          set: { status, role, updatedAt: now },
+        })
+        .returning();
+      return result[0] as unknown as OrgMemberRecord;
+    }
+
+    /**
+     * Return active/suspended memberships for a user (used by OIDC org
+     * resolution to find single-membership orgs).
+     */
+    async findActiveMemberships(
+      db: PostgresJsDatabase<any>,
+      userId: number
+    ): Promise<OrgMemberRecord[]> {
+      const rows = await db
+        .select()
+        .from(orgMembers)
+        .where(
+          and(
+            eq(orgMembers.userId, userId),
+            inArray(orgMembers.status, ['active', 'suspended'])
+          )
+        );
+      return rows as unknown as OrgMemberRecord[];
     }
   };
 }

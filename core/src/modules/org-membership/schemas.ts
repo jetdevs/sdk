@@ -15,6 +15,21 @@ import { z } from 'zod';
 export const orgMemberStatusSchema = z.enum(['invited', 'active', 'suspended', 'removed']);
 
 // =============================================================================
+// PLATFORM ROLE ENUM
+// =============================================================================
+
+export const orgPlatformRoleSchema = z.enum(['owner', 'admin', 'member']);
+export type OrgPlatformRoleInput = z.infer<typeof orgPlatformRoleSchema>;
+
+export const upsertMembershipSchema = z.object({
+  userId: z.number(),
+  orgId: z.number(),
+  status: orgMemberStatusSchema.default('active'),
+  role: orgPlatformRoleSchema.default('member'),
+});
+export type UpsertMembershipInput = z.infer<typeof upsertMembershipSchema>;
+
+// =============================================================================
 // LIST / QUERY SCHEMAS
 // =============================================================================
 

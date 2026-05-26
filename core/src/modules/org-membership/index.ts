@@ -17,6 +17,7 @@
 
 export type {
   OrgMemberStatus,
+  OrgPlatformRole,
   OrgMemberRecord,
   OrgMemberWithUser,
   InviteInput,
@@ -32,6 +33,8 @@ export type {
 
 export {
   orgMemberStatusSchema,
+  orgPlatformRoleSchema,
+  upsertMembershipSchema,
   orgMemberListSchema,
   inviteByEmailSchema,
   inviteExistingUserSchema,
@@ -43,6 +46,8 @@ export {
 } from './schemas';
 
 export type {
+  OrgPlatformRoleInput,
+  UpsertMembershipInput,
   OrgMemberListInput,
   InviteByEmailInput as InviteByEmailSchemaInput,
   InviteExistingUserInput,
