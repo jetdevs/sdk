@@ -11,7 +11,13 @@ describe('YoboConnectProvider', () => {
   it('has correct id and type', () => {
     const provider = YoboConnectProvider(config)
     expect(provider.id).toBe('yobo-connect')
-    expect(provider.type).toBe('oidc')
+    // NextAuth v4 OIDC providers are typed `oauth` + wellKnown + idToken.
+    expect(provider.type).toBe('oauth')
+  })
+
+  it('enables idToken validation for OIDC', () => {
+    const provider = YoboConnectProvider(config)
+    expect(provider.idToken).toBe(true)
   })
 
   it('sets wellKnown to discovery URL', () => {

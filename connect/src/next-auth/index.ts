@@ -58,11 +58,18 @@ export function YoboConnectProvider(
   return {
     id: 'yobo-connect',
     name: 'Yobo Connect',
-    // 'oidc' type makes NextAuth call the /userinfo endpoint after the token
-    // exchange so the profile callback receives the full userinfo payload
-    // (email, name, org_id, etc.) rather than only the sparse ID token claims.
-    type: 'oidc',
+    // NextAuth v4 represents OIDC providers as `type: 'oauth'` with `wellKnown`
+    // discovery + `idToken: true` (see the built-in Auth0/Okta providers). The
+    // `'oidc'` provider type is a NextAuth **v5** concept and is NOT handled by
+    // v4's signin/callback routes — using it makes the signin route fall through
+    // to the `/api/auth/signin` fallback (silent failure, no authorize redirect).
+    // With `idToken: true` NextAuth still performs discovery, validates the
+    // id_token, and (because the discovery doc advertises a userinfo_endpoint)
+    // calls /userinfo so the `profile` callback receives the full payload
+    // (email, name, org_id, org_role) rather than only the sparse id_token claims.
+    type: 'oauth',
     wellKnown: `${config.baseUrl}/.well-known/openid-configuration`,
+    idToken: true,
     authorization: {
       params: {
         scope: scopes.join(' '),
