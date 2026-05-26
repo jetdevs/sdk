@@ -53,7 +53,10 @@ export function YoboConnectProvider(
   return {
     id: 'yobo-connect',
     name: 'Yobo Connect',
-    type: 'oauth',
+    // 'oidc' type makes NextAuth call the /userinfo endpoint after the token
+    // exchange so the profile callback receives the full userinfo payload
+    // (email, name, org_id, etc.) rather than only the sparse ID token claims.
+    type: 'oidc',
     wellKnown: `${config.baseUrl}/.well-known/openid-configuration`,
     authorization: {
       params: {
