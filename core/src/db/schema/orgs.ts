@@ -46,6 +46,12 @@ export const orgs = pgTable(
     name: varchar("name", { length: 255 }).notNull(),
     description: text("description"),
     slug: varchar("slug", { length: 255 }).unique(),
+    /**
+     * Canonical yobo-auth org id this RP-local org maps to. Set when an app
+     * provisions/maps a Yobo Connect org. NULL for orgs created before
+     * migration. The OIDC token carries the canonical id; the RP maps it here.
+     */
+    connectOrgId: integer("connect_org_id"),
     logoUrl: text("logo_url"),
     website: text("website"),
     businessAddress: text("business_address"),
@@ -93,6 +99,11 @@ export const users = pgTable(
     id: serial("id").notNull().primaryKey(),
     uuid: uuid("uuid").unique().notNull().defaultRandom(),
     email: varchar("email", { length: 255 }),
+    /**
+     * Stable yobo-auth OIDC `sub` for this shadow user. Replaces email matching
+     * for SSO provisioning. NULL until first Yobo Connect login / backfill.
+     */
+    connectSub: varchar("connect_sub", { length: 64 }),
     name: varchar("name", { length: 255 }),
     firstName: varchar("first_name", { length: 255 }),
     lastName: varchar("last_name", { length: 255 }),
