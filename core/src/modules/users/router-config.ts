@@ -55,6 +55,14 @@ export interface UserRouterDeps {
    * Optional - if not provided, RLS-enabled db will be used.
    */
   withPrivilegedDb?: <T>(fn: (db: any) => Promise<T>) => Promise<T>;
+
+  /**
+   * Optional hook fired after a user is invited (created OR an existing user
+   * re-invited into the org). Used by RPs to provision a canonical Yobo Connect
+   * identity at invite time. Receives the resulting user, the target org id, and
+   * the db handle. Errors should be swallowed by the implementer (non-fatal).
+   */
+  onUserInvited?: (args: { user: any; orgId: number | null; db: any }) => Promise<void>;
 }
 
 /**
@@ -364,6 +372,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
               });
             }
           }
+          await deps.onUserInvited?.({ user: existing, orgId: service.orgId ?? null, db });
           return existing;
         }
 
@@ -404,6 +413,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             assignedBy: parseInt(service.userId),
           });
         }
+
+        await deps.onUserInvited?.({ user: newUser, orgId: service.orgId ?? null, db });
 
         return newUser;
       },
