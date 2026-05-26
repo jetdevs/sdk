@@ -2,6 +2,8 @@ import type { OAuthConfig } from 'next-auth/providers/oauth'
 import type { User } from 'next-auth'
 import type { ConnectUserinfo } from '../types/index.js'
 
+export { mapConnectClaimsToToken, applyConnectOrgToSession } from './session.js'
+
 /** Profile returned from Yobo Connect's /userinfo endpoint. */
 export type YoboConnectProfile = ConnectUserinfo
 
