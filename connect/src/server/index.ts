@@ -1,4 +1,15 @@
 import { randomBytes } from 'crypto'
+
+// Server-side RP provisioning client (mirrors local users/orgs/memberships into
+// the canonical Yobo Connect directory). Carries an internal API key → server only.
+export {
+  ConnectProvisioningClient,
+  type ConnectProvisioningConfig,
+  type OrgPlatformRole,
+  type MembershipStatus,
+  type SourceSystem,
+} from './provisioning.js'
+
 import { generateCodeVerifier, generateCodeChallenge } from './pkce.js'
 import { DiscoveryCache, fetchDiscovery } from './discovery.js'
 import { verifyIdToken as verifyIdTokenJwt } from './jwks.js'
