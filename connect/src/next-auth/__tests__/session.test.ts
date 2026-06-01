@@ -5,10 +5,10 @@ import {
 } from '../session.js'
 
 describe('mapConnectClaimsToToken', () => {
-  it('copies org_id/org_role/sub from a yobo-connect profile into the token', () => {
+  it('copies org_id/org_role/sub from a connect profile into the token', () => {
     const token: Record<string, unknown> = {}
     mapConnectClaimsToToken(token, {
-      account: { provider: 'yobo-connect' },
+      account: { provider: 'connect' },
       profile: {
         sub: 'user-uuid-123',
         org_id: 5,
@@ -20,7 +20,7 @@ describe('mapConnectClaimsToToken', () => {
     expect(token.connectOrgRole).toBe('admin')
   })
 
-  it('is a no-op for non-yobo-connect providers', () => {
+  it('is a no-op for non-connect providers', () => {
     const token: Record<string, unknown> = {}
     mapConnectClaimsToToken(token, {
       account: { provider: 'google' },
@@ -35,10 +35,31 @@ describe('mapConnectClaimsToToken', () => {
     expect(token.connectOrgRole).toBeUndefined()
   })
 
+  it('matches a custom providerId when configured', () => {
+    const token: Record<string, unknown> = {}
+    mapConnectClaimsToToken(token, {
+      account: { provider: 'acme-connect' },
+      providerId: 'acme-connect',
+      profile: { sub: 'user-uuid-123', org_id: 7 } as any,
+    })
+    expect(token.connectSub).toBe('user-uuid-123')
+    expect(token.connectOrgId).toBe(7)
+  })
+
+  it('is a no-op when the account provider differs from providerId', () => {
+    const token: Record<string, unknown> = {}
+    mapConnectClaimsToToken(token, {
+      account: { provider: 'connect' },
+      providerId: 'acme-connect',
+      profile: { sub: 'user-uuid-123', org_id: 7 } as any,
+    })
+    expect(token.connectSub).toBeUndefined()
+  })
+
   it('tolerates a missing org_id (system/global user → no org claim, but sub still copied)', () => {
     const token: Record<string, unknown> = {}
     mapConnectClaimsToToken(token, {
-      account: { provider: 'yobo-connect' },
+      account: { provider: 'connect' },
       profile: {
         sub: 'system-user-1',
       } as any,

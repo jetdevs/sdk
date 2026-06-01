@@ -4,13 +4,13 @@ import type { ConnectUserinfo } from '../types/index.js'
 
 export { mapConnectClaimsToToken, applyConnectOrgToSession } from './session.js'
 
-/** Profile returned from Yobo Connect's /userinfo endpoint. */
-export type YoboConnectProfile = ConnectUserinfo
+/** Profile returned from the Connect IdP's /userinfo endpoint. */
+export type ConnectProfile = ConnectUserinfo
 
-export interface YoboConnectProviderConfig {
-  /** Base URL of Yobo Connect, e.g. https://connect.yobolabs.ai */
+export interface ConnectProviderConfig {
+  /** Base URL of the Connect IdP, e.g. https://connect.example.com */
   baseUrl: string
-  /** OAuth client ID registered with Yobo Connect. */
+  /** OAuth client ID registered with the Connect IdP. */
   clientId: string
   /** OAuth client secret. */
   clientSecret: string
@@ -19,45 +19,56 @@ export interface YoboConnectProviderConfig {
    * Include 'offline_access' to receive refresh tokens.
    */
   defaultScopes?: string[]
+  /**
+   * NextAuth provider id (also the sign-in route slug:
+   * `/api/auth/signin/<id>`). Defaults to `'connect'`. Set this to brand the
+   * provider for a specific IdP (e.g. `'acme-connect'`); the browser helper's
+   * `initiateSignIn({ providerId })` must use the same value.
+   */
+  id?: string
+  /** Human-readable provider name shown on the sign-in button. Defaults to `'Connect'`. */
+  name?: string
 }
 
 /**
- * `OAuthConfig<YoboConnectProfile>` with `profile` narrowed to a synchronous return
+ * `OAuthConfig<ConnectProfile>` with `profile` narrowed to a synchronous return
  * so callers can access `User` properties directly without awaiting, and `type`
- * widened to allow `'oidc'` (the runtime value — Yobo Connect is an OIDC provider
+ * widened to allow `'oidc'` (the runtime value — the Connect IdP is an OIDC provider
  * so NextAuth performs discovery + id_token validation).
  */
-export type YoboConnectOAuthConfig = Omit<OAuthConfig<YoboConnectProfile>, 'profile' | 'type'> & {
+export type ConnectOAuthConfig = Omit<OAuthConfig<ConnectProfile>, 'profile' | 'type'> & {
   type: 'oauth' | 'oidc'
-  profile: (profile: YoboConnectProfile, tokens: Parameters<OAuthConfig<YoboConnectProfile>['profile']>[1]) => User
+  profile: (profile: ConnectProfile, tokens: Parameters<OAuthConfig<ConnectProfile>['profile']>[1]) => User
 }
 
 /**
- * Drop-in NextAuth v4 provider for Yobo Connect.
+ * Drop-in NextAuth v4 provider for a Connect-compatible OIDC identity provider.
  *
  * Usage in [...nextauth].ts:
  * ```ts
- * import { YoboConnectProvider } from '@jetdevs/connect/next-auth'
+ * import { ConnectProvider } from '@jetdevs/connect/next-auth'
  *
  * export default NextAuth({
  *   providers: [
- *     YoboConnectProvider({
- *       baseUrl: process.env.YOBO_CONNECT_URL!,
- *       clientId: process.env.YOBO_CONNECT_CLIENT_ID!,
- *       clientSecret: process.env.YOBO_CONNECT_CLIENT_SECRET!,
+ *     ConnectProvider({
+ *       baseUrl: process.env.CONNECT_ISSUER_URL!,
+ *       clientId: process.env.CONNECT_CLIENT_ID!,
+ *       clientSecret: process.env.CONNECT_CLIENT_SECRET!,
+ *       // Optional branding — defaults to id:'connect', name:'Connect':
+ *       // id: 'acme-connect', name: 'Acme Connect',
  *     }),
  *   ],
  * })
  * ```
  */
-export function YoboConnectProvider(
-  config: YoboConnectProviderConfig,
-): YoboConnectOAuthConfig {
+export function ConnectProvider(
+  config: ConnectProviderConfig,
+): ConnectOAuthConfig {
   const scopes = config.defaultScopes ?? ['openid', 'profile', 'email', 'offline_access']
 
   return {
-    id: 'yobo-connect',
-    name: 'Yobo Connect',
+    id: config.id ?? 'connect',
+    name: config.name ?? 'Connect',
     // NextAuth v4 represents OIDC providers as `type: 'oauth'` with `wellKnown`
     // discovery + `idToken: true` (see the built-in Auth0/Okta providers). The
     // `'oidc'` provider type is a NextAuth **v5** concept and is NOT handled by
@@ -78,7 +89,7 @@ export function YoboConnectProvider(
     checks: ['pkce', 'state', 'nonce'],
     clientId: config.clientId,
     clientSecret: config.clientSecret,
-    profile(profile: YoboConnectProfile) {
+    profile(profile: ConnectProfile) {
       return {
         id: profile.sub,
         name: profile.name ?? profile.email ?? profile.sub,

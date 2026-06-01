@@ -1,11 +1,11 @@
 /**
  * Server-side client for a relying party to provision canonical identities,
- * orgs, and memberships into Yobo Connect (the IdP) over its internal
+ * orgs, and memberships into the Connect IdP over its internal
  * provisioning API. Authenticated with a per-RP `X-Internal-API-Key`.
  *
  * This is the "app-driven, synced" provisioning model (Approach 1): when an RP
  * creates a user / org / invite locally, it mirrors that into the canonical
- * directory so returning logins via "Sign in with Yobo" resolve a stable
+ * directory so returning logins via Connect SSO resolve a stable
  * `org_id` claim. All endpoints are idempotent — safe to retry.
  *
  * SERVER ONLY — never import from client/browser code (it carries the internal
@@ -18,11 +18,15 @@ export type OrgPlatformRole = 'owner' | 'admin' | 'member'
 /** Membership lifecycle state in the canonical directory. */
 export type MembershipStatus = 'invited' | 'active' | 'suspended' | 'removed'
 
-/** The relying party a canonical org originated from (C5 keying). */
-export type SourceSystem = 'crm' | 'yobo' | 'slides'
+/**
+ * The relying party a canonical org originated from (C5 keying). A free-form
+ * key chosen by each RP to identify itself (e.g. its app slug). Kept as `string`
+ * so the SDK is not coupled to any specific set of consuming applications.
+ */
+export type SourceSystem = string
 
 export interface ConnectProvisioningConfig {
-  /** Base URL of the Yobo Connect IdP (no trailing slash required). */
+  /** Base URL of the Connect IdP (no trailing slash required). */
   baseUrl: string
   /** Per-RP internal API key (sent as `X-Internal-API-Key`). */
   internalApiKey: string
@@ -94,8 +98,8 @@ export class ConnectProvisioningClient {
   }
 
   /**
-   * C3: make a provisioned canonical user *loginable* via "Sign in with Yobo".
-   * Provisioning a user (find-or-create + membership) is NOT enough — yobo-auth's
+   * C3: make a provisioned canonical user *loginable* via Connect SSO.
+   * Provisioning a user (find-or-create + membership) is NOT enough — the IdP's
    * signIn guard rejects a user with no login role, and `users.password` stays
    * NULL. This sets a credential (NON-CLOBBERING) and/or grants the minimal
    * org-scoped "Connect User" login role on `orgId`. At least one of

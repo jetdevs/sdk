@@ -1,7 +1,7 @@
 {
   "name": "@jetdevs/connect",
-  "version": "0.1.0-dev",
-  "description": "RP client SDK for Yobo Connect OAuth 2.0 / OIDC integration",
+  "version": "0.2.0-dev",
+  "description": "OIDC Relying-Party client SDK for any Connect-compatible identity provider",
   "type": "module",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"

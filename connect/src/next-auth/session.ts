@@ -1,18 +1,22 @@
 import type { ConnectUserinfo } from '../types/index.js'
 
 /**
- * Map Yobo Connect OIDC claims onto the NextAuth JWT token in the `jwt` callback.
- * Only acts for the `yobo-connect` provider. Copies canonical org_id / org_role / sub
- * so they survive into the session callback. org_id may be ABSENT (system/global users).
+ * Map Connect OIDC claims onto the NextAuth JWT token in the `jwt` callback.
+ * Only acts for the Connect provider — pass `providerId` to match the id you
+ * configured on `ConnectProvider` (defaults to `'connect'`). Copies canonical
+ * org_id / org_role / sub so they survive into the session callback. org_id may
+ * be ABSENT (system/global users).
  */
 export function mapConnectClaimsToToken(
   token: Record<string, unknown>,
   args: {
     account?: { provider?: string } | null
     profile?: (ConnectUserinfo & { org_id?: number; org_role?: string }) | null
+    /** Provider id to match — defaults to `'connect'`. */
+    providerId?: string
   },
 ): void {
-  if (args.account?.provider !== 'yobo-connect') return
+  if (args.account?.provider !== (args.providerId ?? 'connect')) return
   const profile = args.profile
   if (!profile) return
   if (profile.sub != null) token.connectSub = String(profile.sub)

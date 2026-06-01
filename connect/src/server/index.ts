@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
 
 // Server-side RP provisioning client (mirrors local users/orgs/memberships into
-// the canonical Yobo Connect directory). Carries an internal API key → server only.
+// the canonical Connect directory). Carries an internal API key → server only.
 export {
   ConnectProvisioningClient,
   type ConnectProvisioningConfig,
@@ -26,7 +26,7 @@ import type {
 
 type ResolvedConfig = Required<Pick<ConnectConfig, 'defaultScopes' | 'discoveryTtlMs'>> & ConnectConfig
 
-export class YoboConnect {
+export class ConnectClient {
   private readonly cfg: ResolvedConfig
   private readonly cache: DiscoveryCache
 
@@ -101,7 +101,7 @@ export class YoboConnect {
   ): Promise<void> {
     const discovery = await this.getDiscovery()
     if (!discovery.revocation_endpoint) {
-      throw new Error('Yobo Connect did not advertise a revocation_endpoint')
+      throw new Error('The Connect IdP did not advertise a revocation_endpoint')
     }
     const body = new URLSearchParams({ token, client_id: this.cfg.clientId })
     if (tokenTypeHint) body.set('token_type_hint', tokenTypeHint)
@@ -135,7 +135,7 @@ export class YoboConnect {
   async introspect(token: string): Promise<IntrospectionResponse> {
     const discovery = await this.getDiscovery()
     if (!discovery.introspection_endpoint) {
-      throw new Error('Yobo Connect did not advertise an introspection_endpoint')
+      throw new Error('The Connect IdP did not advertise an introspection_endpoint')
     }
     const body = new URLSearchParams({ token, client_id: this.cfg.clientId })
     if (this.cfg.clientSecret) body.set('client_secret', this.cfg.clientSecret)

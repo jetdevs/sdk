@@ -39,6 +39,7 @@ yarn-error.log*
 .temp/
 *.tsbuildinfo.npmrc
 .npmrc
+.antigravitycli
 
 #cloud 
 cloud/.npmrc

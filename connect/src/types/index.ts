@@ -1,8 +1,8 @@
 /** Base configuration for a relying-party client. */
 export interface ConnectConfig {
-  /** Base URL of Yobo Connect, e.g. https://connect.yobolabs.ai */
+  /** Base URL of the Connect IdP, e.g. https://connect.example.com */
   baseUrl: string
-  /** OAuth client ID registered with Yobo Connect. */
+  /** OAuth client ID registered with the Connect IdP. */
   clientId: string
   /** OAuth client secret. Required for confidential clients. */
   clientSecret?: string
@@ -33,13 +33,13 @@ export interface ConnectUserinfo {
   emailVerified?: boolean
   name?: string
   picture?: string
-  /** Yobo org ID — the org the user selected at consent. */
+  /** Org ID — the org the user selected at consent. */
   orgId?: number
-  /** Yobo Connect membership role at the org level. NOT product RBAC. */
+  /** Connect membership role at the org level. NOT product RBAC. */
   orgRole?: 'owner' | 'admin' | 'member'
 }
 
-/** Verified claims from a Yobo Connect ID token (RS256 JWT). */
+/** Verified claims from a Connect ID token (RS256 JWT). */
 export interface ConnectIdTokenClaims {
   iss: string
   sub: string

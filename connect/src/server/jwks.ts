@@ -17,7 +17,7 @@ export function clearJwksCache(): void {
 }
 
 /**
- * Verify a Yobo Connect ID token (RS256 JWT).
+ * Verify a Connect ID token (RS256 JWT).
  * Fetches JWKS from the discovery document's jwks_uri; jose caches keys internally.
  *
  * @throws if signature invalid, issuer/audience mismatch, expired, or nonce mismatch

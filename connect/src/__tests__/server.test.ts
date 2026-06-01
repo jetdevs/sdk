@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { YoboConnect } from '../server/index.js'
+import { ConnectClient } from '../server/index.js'
 
 const MOCK_DISCOVERY = {
-  issuer: 'https://connect.yobolabs.ai',
-  authorization_endpoint: 'https://connect.yobolabs.ai/oauth/authorize',
-  token_endpoint: 'https://connect.yobolabs.ai/oauth/token',
-  userinfo_endpoint: 'https://connect.yobolabs.ai/userinfo',
-  jwks_uri: 'https://connect.yobolabs.ai/.well-known/jwks.json',
-  revocation_endpoint: 'https://connect.yobolabs.ai/oauth/revoke',
-  introspection_endpoint: 'https://connect.yobolabs.ai/oauth/introspect',
+  issuer: 'https://connect.example.com',
+  authorization_endpoint: 'https://connect.example.com/oauth/authorize',
+  token_endpoint: 'https://connect.example.com/oauth/token',
+  userinfo_endpoint: 'https://connect.example.com/userinfo',
+  jwks_uri: 'https://connect.example.com/.well-known/jwks.json',
+  revocation_endpoint: 'https://connect.example.com/oauth/revoke',
+  introspection_endpoint: 'https://connect.example.com/oauth/introspect',
   response_types_supported: ['code'],
   grant_types_supported: ['authorization_code', 'refresh_token'],
   code_challenge_methods_supported: ['S256'],
@@ -36,13 +36,13 @@ function makeFetchMock(responses: Array<unknown>) {
   })
 }
 
-describe('YoboConnect', () => {
-  let client: YoboConnect
+describe('ConnectClient', () => {
+  let client: ConnectClient
   const originalFetch = global.fetch
 
   beforeEach(() => {
-    client = new YoboConnect({
-      baseUrl: 'https://connect.yobolabs.ai',
+    client = new ConnectClient({
+      baseUrl: 'https://connect.example.com',
       clientId: 'test-client',
       clientSecret: 'test-secret',
       redirectUri: 'https://app.example.com/auth/callback',
@@ -57,10 +57,10 @@ describe('YoboConnect', () => {
     it('fetches and returns the discovery document', async () => {
       global.fetch = makeFetchMock([MOCK_DISCOVERY])
       const doc = await client.getDiscovery()
-      expect(doc.issuer).toBe('https://connect.yobolabs.ai')
-      expect(doc.token_endpoint).toBe('https://connect.yobolabs.ai/oauth/token')
+      expect(doc.issuer).toBe('https://connect.example.com')
+      expect(doc.token_endpoint).toBe('https://connect.example.com/oauth/token')
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://connect.yobolabs.ai/.well-known/openid-configuration',
+        'https://connect.example.com/.well-known/openid-configuration',
       )
     })
 
@@ -91,9 +91,9 @@ describe('YoboConnect', () => {
 
     it('includes resource parameter when provided', async () => {
       global.fetch = makeFetchMock([MOCK_DISCOVERY])
-      const result = await client.buildAuthorizationUrl({ resource: 'yobo-merchant-api' })
+      const result = await client.buildAuthorizationUrl({ resource: 'example-api' })
       const url = new URL(result.url)
-      expect(url.searchParams.get('resource')).toBe('yobo-merchant-api')
+      expect(url.searchParams.get('resource')).toBe('example-api')
     })
 
     it('uses custom scopes when provided', async () => {
