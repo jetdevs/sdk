@@ -78,6 +78,23 @@ export interface CreateApiKeysRouterConfigOptions {
    * @default 'Admin'
    */
   defaultRoleName?: string;
+
+  /**
+   * Permissions to assign when an API key is created without an explicit roleId
+   * or permissions AND the default-role lookup yields nothing.
+   *
+   * This is a safety net: without it, such keys are persisted with an empty
+   * permission array and every downstream `hasPermission` check fails
+   * ("No permissions"). For apps whose default role is a system role that the
+   * tenant-scoped role lookup cannot resolve (e.g. cadra-web's 'API Key' role),
+   * set this to `['*']` so created keys carry full org-scoped access — keys are
+   * always bound to a single org via their `orgId`, so `['*']` is org-admin
+   * access, not cross-org/platform access.
+   *
+   * Leave undefined to preserve the prior behavior (empty permissions on a
+   * failed role lookup).
+   */
+  defaultPermissions?: string[];
 }
 
 /**
@@ -167,6 +184,7 @@ export function createApiKeysRouterConfig(
     invalidationTags = ['api-keys'],
     Repository = SDKApiKeysRepository,
     defaultRoleName = 'Admin',
+    defaultPermissions,
   } = options;
 
   return {
@@ -233,6 +251,14 @@ export function createApiKeysRouterConfig(
               permissions = adminRole.permissions;
             }
           }
+        }
+
+        // Safety net: never persist a key with zero permissions when the app
+        // has configured a default. The default-role lookup is tenant-scoped and
+        // cannot resolve system roles (e.g. cadra-web's 'API Key' role), which
+        // would otherwise leave the key with `[]` -> "No permissions" downstream.
+        if (permissions.length === 0 && defaultPermissions && defaultPermissions.length > 0) {
+          permissions = defaultPermissions;
         }
 
         // Generate API key
