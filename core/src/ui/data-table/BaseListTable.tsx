@@ -7,6 +7,7 @@ import {
     getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
+    Row,
     SortingState,
     useReactTable,
     VisibilityState,
@@ -142,6 +143,51 @@ export interface BaseListTableProps<TData> {
     placeholder?: string;
     className?: string;
   }>;
+
+  // ---------------------------------------------------------------------------
+  // Card / expand extension (OPT-IN, backwards-compatible — p6 Track A).
+  //
+  // When `renderRow` is UNSET, every line below is inert and the `useReactTable`
+  // options object is byte-identical to before this addition (no `getRowId`, no
+  // expanded row model). This is what keeps existing consumers unaffected.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Render each row as a bespoke node instead of the column-cell grid. When
+   * provided, the table header is suppressed and the body renders these, each
+   * wrapped in `<TableRow><TableCell colSpan={visibleLeafCount}>`. `ctx` exposes
+   * the TanStack row + index + expand controls.
+   */
+  renderRow?: (
+    row: TData,
+    ctx: {
+      row: Row<TData>;
+      index: number;
+      isExpanded: boolean;
+      toggleExpanded: () => void;
+    },
+  ) => React.ReactNode;
+
+  /** Detail panel shown under an expanded row (only meaningful with renderRow). */
+  renderExpanded?: (row: TData) => React.ReactNode;
+
+  /** Gate which rows can expand (default: () => Boolean(renderExpanded)). */
+  getRowCanExpand?: (row: TData) => boolean;
+
+  /**
+   * Stable row id, applied to `useReactTable` ONLY when `renderRow` is set
+   * (REQUIRED for renderRow consumers — pass the row uuid) so expand state
+   * attaches to the entity, not the array index. Untouched (back-compat) when
+   * `renderRow` is unset.
+   */
+  getRowId?: (row: TData) => string;
+
+  /**
+   * Wrapper semantics for renderRow mode. p6 ships `'list'` only (stacked
+   * full-width rows in the existing `<Table>`). `'cards'` is reserved, not
+   * implemented. Default `'list'`.
+   */
+  rowLayout?: 'list';
 }
 
 // =============================================================================
@@ -494,6 +540,12 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     enableStickyActions = true,
     hideTable = false,
     SelectComponent,
+    renderRow,
+    renderExpanded,
+    getRowCanExpand,
+    getRowId,
+    // rowLayout is 'list'-only for p6; accepted for API parity, no branch needed.
+    rowLayout: _rowLayout = 'list',
   }: BaseListTableProps<TData>) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
@@ -509,6 +561,10 @@ export function createBaseListTable(ui: DataTableUIComponents) {
       });
       return visibility;
     });
+
+    // Expand state — only used in renderRow mode. Keyed by getRowId(row) so it
+    // survives pagination/refetch (renderRow consumers MUST pass getRowId).
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
     // Horizontal scroll detection - use a simple ref approach
     const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -560,7 +616,23 @@ export function createBaseListTable(ui: DataTableUIComponents) {
       getPaginationRowModel: pagination ? getPaginationRowModel() : undefined,
       manualPagination: pagination?.onPageChange !== undefined,
       pageCount: pagination?.totalCount ? Math.ceil(pagination.totalCount / pagination.pageSize) : undefined,
+      // GATED: only thread getRowId when renderRow is set, so the options object
+      // is byte-identical to before when the card/expand props are unused.
+      ...(renderRow && getRowId ? { getRowId } : {}),
     });
+
+    // renderRow mode helpers (inert when renderRow is unset).
+    const rowCanExpand = getRowCanExpand ?? (() => Boolean(renderExpanded));
+    const resolveRowId = (row: Row<TData>): string =>
+      getRowId ? getRowId(row.original) : row.id;
+    const toggleExpanded = (id: string) => {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
 
     const densityClasses = useMemo(() => {
       switch (density) {
@@ -635,39 +707,99 @@ export function createBaseListTable(ui: DataTableUIComponents) {
 
           <div ref={scrollRef} className="overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
             <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((hGroup) => (
-                  <TableRow key={hGroup.id}>
-                    {hGroup.headers.map((header, index) => {
-                      const isFirstColumn = shouldUseStickyActions && index === 0;
-                      const isLastColumn = shouldUseStickyActions && index === lastColumnIndex;
-                      const alignClass = getAlignCellClass(header.column.columnDef.meta?.align);
-                      return (
-                        <TableHead
-                          key={header.id}
-                          className={cn(
-                            densityClasses,
-                            alignClass,
-                            isFirstColumn && 'sticky left-0 bg-background shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20',
-                            isLastColumn && 'sticky right-0 bg-background shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20'
-                          )}
-                        >
-                          {header.isPlaceholder ? null : (flexRender(header.column.columnDef.header, header.getContext()) as React.ReactNode)}
-                        </TableHead>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
+              {/* Header suppressed in renderRow mode (custom rows own their layout). */}
+              {!renderRow && (
+                <TableHeader>
+                  {table.getHeaderGroups().map((hGroup) => (
+                    <TableRow key={hGroup.id}>
+                      {hGroup.headers.map((header, index) => {
+                        const isFirstColumn = shouldUseStickyActions && index === 0;
+                        const isLastColumn = shouldUseStickyActions && index === lastColumnIndex;
+                        const alignClass = getAlignCellClass(header.column.columnDef.meta?.align);
+                        return (
+                          <TableHead
+                            key={header.id}
+                            className={cn(
+                              densityClasses,
+                              alignClass,
+                              isFirstColumn && 'sticky left-0 bg-background shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20',
+                              isLastColumn && 'sticky right-0 bg-background shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20'
+                            )}
+                          >
+                            {header.isPlaceholder ? null : (flexRender(header.column.columnDef.header, header.getContext()) as React.ReactNode)}
+                          </TableHead>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+              )}
               <TableBody>
                 {isLoading ? (
                   [...Array(pagination?.pageSize || 5)].map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={columns.length} className="h-12">
+                      <TableCell
+                        colSpan={renderRow ? (table.getVisibleLeafColumns().length || 1) : columns.length}
+                        className="h-12"
+                      >
                         <div className="h-3 w-full bg-muted animate-pulse rounded" />
                       </TableCell>
                     </TableRow>
                   ))
+                ) : renderRow ? (
+                  table.getRowModel().rows.length ? (
+                    table.getRowModel().rows.map((row, index) => {
+                      const rowId = resolveRowId(row);
+                      const canExpand = rowCanExpand(row.original);
+                      const isExpanded = canExpand && expandedIds.has(rowId);
+                      const visibleLeafCount = table.getVisibleLeafColumns().length || 1;
+                      const rowProps = getRowProps ? getRowProps(row.original) : {};
+                      return (
+                        <React.Fragment key={rowId}>
+                          <TableRow
+                            data-state={row.getIsSelected() ? 'selected' : undefined}
+                            className={densityClasses}
+                            {...rowProps}
+                          >
+                            <TableCell colSpan={visibleLeafCount} className="p-0">
+                              {renderRow(row.original, {
+                                row,
+                                index,
+                                isExpanded,
+                                toggleExpanded: () => {
+                                  if (canExpand) toggleExpanded(rowId);
+                                },
+                              }) as React.ReactNode}
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && renderExpanded && (
+                            <TableRow>
+                              <TableCell colSpan={visibleLeafCount} className="p-0">
+                                {renderExpanded(row.original) as React.ReactNode}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={table.getVisibleLeafColumns().length || 1}
+                        className="h-24 text-center"
+                      >
+                        {emptyState ? (
+                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                            {emptyState.icon}
+                            <div className="font-medium text-foreground">{emptyState.title}</div>
+                            {emptyState.subtitle && <div className="text-sm">{emptyState.subtitle}</div>}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">No items found.</div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
                 ) : table.getRowModel().rows.length ? (
                   table.getRowModel().rows.map((row) => {
                     const rowProps = getRowProps ? getRowProps(row.original) : {};
