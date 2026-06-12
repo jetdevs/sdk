@@ -8,6 +8,7 @@ import {
     getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
+    Row,
     RowSelectionState,
     SortingState,
     useReactTable,
@@ -247,6 +248,52 @@ export interface DataTableWithToolbarProps<TData> {
     onClose: () => void;
     onConfirm: () => void;
   }) => React.ReactNode;
+
+  // ---------------------------------------------------------------------------
+  // Card / expand extension (OPT-IN, backwards-compatible — p6 Track A).
+  //
+  // When `renderRow` is UNSET, every line below is inert and the `useReactTable`
+  // options object is byte-identical to before this addition (no `getRowId`, no
+  // expanded row model). This is what keeps existing consumers (cadra-web, crm,
+  // core-saas, …) unaffected.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Render each row as a bespoke node instead of the column-cell grid. When
+   * provided, the table header is suppressed and the body renders these, each
+   * wrapped in `<TableRow><TableCell colSpan={visibleLeafCount}>`. `ctx` exposes
+   * the TanStack row + index + expand controls.
+   */
+  renderRow?: (
+    row: TData,
+    ctx: {
+      row: Row<TData>;
+      index: number;
+      isExpanded: boolean;
+      toggleExpanded: () => void;
+    },
+  ) => React.ReactNode;
+
+  /** Detail panel shown under an expanded row (only meaningful with renderRow). */
+  renderExpanded?: (row: TData) => React.ReactNode;
+
+  /** Gate which rows can expand (default: () => Boolean(renderExpanded)). */
+  getRowCanExpand?: (row: TData) => boolean;
+
+  /**
+   * Stable row id, applied to `useReactTable` ONLY when `renderRow` is set
+   * (REQUIRED for renderRow consumers — pass the row uuid) so expand state
+   * attaches to the entity, not the array index. Untouched (back-compat) when
+   * `renderRow` is unset.
+   */
+  getRowId?: (row: TData) => string;
+
+  /**
+   * Wrapper semantics for renderRow mode. p6 ships `'list'` only (stacked
+   * full-width rows in the existing `<Table>`). `'cards'` is reserved, not
+   * implemented. Default `'list'`.
+   */
+  rowLayout?: 'list';
 }
 
 /**
@@ -390,6 +437,12 @@ export function createDataTableWithToolbar<TData>(
     isLoading,
     onRefresh,
     renderDialog,
+    renderRow,
+    renderExpanded,
+    getRowCanExpand,
+    getRowId,
+    // rowLayout is 'list'-only for p6; accepted for API parity, no branch needed.
+    rowLayout: _rowLayout = 'list',
   }: DataTableWithToolbarProps<TData>) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -399,6 +452,10 @@ export function createDataTableWithToolbar<TData>(
     const [density, setDensity] = useState<'compact' | 'comfortable' | 'spacious'>('comfortable');
     const [dialogOpen, setDialogOpen] = useState(false);
     const [dialogAction, setDialogAction] = useState<string | null>(null);
+
+    // Expand state — only used in renderRow mode. Keyed by getRowId(row) so it
+    // survives pagination/refetch (renderRow consumers MUST pass getRowId).
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
     const table = useReactTable({
       data,
@@ -420,6 +477,10 @@ export function createDataTableWithToolbar<TData>(
       getSortedRowModel: getSortedRowModel(),
       getFilteredRowModel: getFilteredRowModel(),
       getPaginationRowModel: getPaginationRowModel(),
+      // GATED: only thread getRowId when renderRow is set, so the options object
+      // is byte-identical to before when the card/expand props are unused. An
+      // unconditional getRowId would re-key RowSelectionState and break bulk-select.
+      ...(renderRow && getRowId ? { getRowId } : {}),
       initialState: {
         pagination: {
           pageSize: defaultPageSize,
@@ -430,6 +491,19 @@ export function createDataTableWithToolbar<TData>(
     const selectedRows = table.getFilteredSelectedRowModel().rows;
     const selectedData = selectedRows.map(row => row.original);
     const hasSelection = selectedRows.length > 0;
+
+    // renderRow mode helpers (inert when renderRow is unset).
+    const rowCanExpand = getRowCanExpand ?? (() => Boolean(renderExpanded));
+    const resolveRowId = (row: Row<TData>): string =>
+      getRowId ? getRowId(row.original) : row.id;
+    const toggleExpanded = (id: string) => {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
 
     // Export functions
     const exportToCSV = () => {
@@ -714,30 +788,77 @@ export function createDataTableWithToolbar<TData>(
         {/* Table */}
         <div className="rounded-md border">
           <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    const alignClass = getAlignCellClass(header.column.columnDef.meta?.align);
-                    return (
-                      <TableHead
-                        key={header.id}
-                        className={`${getDensityClasses()} ${alignClass}`.trim()}
-                      >
-                        {header.isPlaceholder
-                          ? null
-                          : (flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            ) as React.ReactNode)}
-                      </TableHead>
-                    );
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
+            {/* Header suppressed in renderRow mode (custom rows own their layout). */}
+            {!renderRow && (
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => {
+                      const alignClass = getAlignCellClass(header.column.columnDef.meta?.align);
+                      return (
+                        <TableHead
+                          key={header.id}
+                          className={`${getDensityClasses()} ${alignClass}`.trim()}
+                        >
+                          {header.isPlaceholder
+                            ? null
+                            : (flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              ) as React.ReactNode)}
+                        </TableHead>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableHeader>
+            )}
             <TableBody>
-              {table.getRowModel().rows?.length ? (
+              {renderRow ? (
+                table.getRowModel().rows?.length ? (
+                  table.getRowModel().rows.map((row, index) => {
+                    const rowId = resolveRowId(row);
+                    const canExpand = rowCanExpand(row.original);
+                    const isExpanded = canExpand && expandedIds.has(rowId);
+                    const visibleLeafCount = table.getVisibleLeafColumns().length || 1;
+                    return (
+                      <React.Fragment key={rowId}>
+                        <TableRow
+                          data-state={row.getIsSelected() ? 'selected' : undefined}
+                          className={getDensityClasses()}
+                        >
+                          <TableCell colSpan={visibleLeafCount} className="p-0">
+                            {renderRow(row.original, {
+                              row,
+                              index,
+                              isExpanded,
+                              toggleExpanded: () => {
+                                if (canExpand) toggleExpanded(rowId);
+                              },
+                            }) as React.ReactNode}
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && renderExpanded && (
+                          <TableRow>
+                            <TableCell colSpan={visibleLeafCount} className="p-0">
+                              {renderExpanded(row.original) as React.ReactNode}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={table.getVisibleLeafColumns().length || 1}
+                      className="h-24 text-center"
+                    >
+                      No {entityName} found.
+                    </TableCell>
+                  </TableRow>
+                )
+              ) : table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
                   <TableRow
                     key={row.id}
