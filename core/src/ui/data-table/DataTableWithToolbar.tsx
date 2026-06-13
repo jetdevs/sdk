@@ -289,11 +289,15 @@ export interface DataTableWithToolbarProps<TData> {
   getRowId?: (row: TData) => string;
 
   /**
-   * Wrapper semantics for renderRow mode. p6 ships `'list'` only (stacked
-   * full-width rows in the existing `<Table>`). `'cards'` is reserved, not
-   * implemented. Default `'list'`.
+   * Wrapper semantics for renderRow mode.
+   *   - `'list'` (default): stacked full-width rows inside the existing
+   *     `<Table>` (bordered box, divider rows — no gaps/rounding).
+   *   - `'cards'`: a spaced vertical stack of standalone blocks (NOT a table),
+   *     where each consumer `renderRow` output owns its own card chrome
+   *     (rounded/border/bg/padding) and `space-y` provides the gap. Pagination,
+   *     sorting and expand state still come from the table instance.
    */
-  rowLayout?: 'list';
+  rowLayout?: 'list' | 'cards';
 
   /**
    * Suppress the built-in toolbar (search + filters + results count + refresh +
@@ -450,8 +454,7 @@ export function createDataTableWithToolbar<TData>(
     renderExpanded,
     getRowCanExpand,
     getRowId,
-    // rowLayout is 'list'-only for p6; accepted for API parity, no branch needed.
-    rowLayout: _rowLayout = 'list',
+    rowLayout = 'list',
     hideToolbar = false,
   }: DataTableWithToolbarProps<TData>) {
     const [sorting, setSorting] = useState<SortingState>([]);
@@ -798,7 +801,40 @@ export function createDataTableWithToolbar<TData>(
           </div>
         )}
 
-        {/* Table */}
+        {/* Card layout (renderRow + rowLayout:'cards'): a spaced stack of
+            consumer-styled cards instead of the bordered table. Each renderRow
+            output owns its own rounded/border/bg/padding; `space-y` is the gap.
+            Pagination / sort / expand state still come from the table instance. */}
+        {renderRow && rowLayout === 'cards' ? (
+          <div className="space-y-2">
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row, index) => {
+                const rowId = resolveRowId(row);
+                const canExpand = rowCanExpand(row.original);
+                const isExpanded = canExpand && expandedIds.has(rowId);
+                return (
+                  <React.Fragment key={rowId}>
+                    {renderRow(row.original, {
+                      row,
+                      index,
+                      isExpanded,
+                      toggleExpanded: () => {
+                        if (canExpand) toggleExpanded(rowId);
+                      },
+                    }) as React.ReactNode}
+                    {isExpanded &&
+                      renderExpanded &&
+                      (renderExpanded(row.original) as React.ReactNode)}
+                  </React.Fragment>
+                );
+              })
+            ) : (
+              <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
+                No {entityName} found.
+              </div>
+            )}
+          </div>
+        ) : (
         <div className="rounded-md border">
           <Table>
             {/* Header suppressed in renderRow mode (custom rows own their layout). */}
@@ -901,6 +937,7 @@ export function createDataTableWithToolbar<TData>(
             </TableBody>
           </Table>
         </div>
+        )}
 
         {/* Pagination */}
         <div className="flex items-center justify-between space-x-2 py-4">
