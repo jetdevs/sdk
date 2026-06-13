@@ -294,6 +294,15 @@ export interface DataTableWithToolbarProps<TData> {
    * implemented. Default `'list'`.
    */
   rowLayout?: 'list';
+
+  /**
+   * Suppress the built-in toolbar (search + filters + results count + refresh +
+   * export + view/density). OPT-IN, backwards-compatible: when unset the toolbar
+   * renders exactly as before. Intended for `renderRow` consumers that supply
+   * their own search/count chrome (e.g. the prototype-parity guest list), so the
+   * page doesn't show two stacked search bars. Pagination is unaffected.
+   */
+  hideToolbar?: boolean;
 }
 
 /**
@@ -443,6 +452,7 @@ export function createDataTableWithToolbar<TData>(
     getRowId,
     // rowLayout is 'list'-only for p6; accepted for API parity, no branch needed.
     rowLayout: _rowLayout = 'list',
+    hideToolbar = false,
   }: DataTableWithToolbarProps<TData>) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -602,7 +612,9 @@ export function createDataTableWithToolbar<TData>(
 
     return (
       <div className="space-y-4">
-        {/* Toolbar */}
+        {/* Toolbar — suppressed when `hideToolbar` (consumer owns its own
+            search/count chrome). GATED: byte-identical render when unset. */}
+        {!hideToolbar && (
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             {/* Search */}
@@ -746,6 +758,7 @@ export function createDataTableWithToolbar<TData>(
             )}
           </div>
         </div>
+        )}
 
         {/* Bulk Actions Bar */}
         {hasSelection && bulkActions.length > 0 && (
