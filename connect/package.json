@@ -11,23 +11,28 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./types": {
       "types": "./dist/types/index.d.ts",
-      "import": "./dist/types/index.js"
+      "import": "./dist/types/index.js",
+      "default": "./dist/types/index.js"
     },
     "./server": {
       "types": "./dist/server/index.d.ts",
-      "import": "./dist/server/index.js"
+      "import": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
     },
     "./next-auth": {
       "types": "./dist/next-auth/index.d.ts",
-      "import": "./dist/next-auth/index.js"
+      "import": "./dist/next-auth/index.js",
+      "default": "./dist/next-auth/index.js"
     },
     "./browser": {
       "types": "./dist/browser/index.d.ts",
-      "import": "./dist/browser/index.js"
+      "import": "./dist/browser/index.js",
+      "default": "./dist/browser/index.js"
     }
   },
   "scripts": {
