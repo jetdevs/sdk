@@ -22,7 +22,12 @@ export class MessagesResource {
   }
 
   async send(data: SendMessageData): Promise<ApiResponse<Message>> {
-    return this.http.post('/api/v1/messages', data);
+    // Canonical route is conversation-scoped: POST /api/v1/conversations/:uuid/messages
+    // (message-api/src/routes/v1/messages.ts). conversationUuid is carried in the path,
+    // not the body — the rest of SendMessageData is the body. Signature stays stable so
+    // existing consumers (CRM operator sends, AI-responder write-back) are unaffected.
+    const { conversationUuid, ...body } = data;
+    return this.http.post(`/api/v1/conversations/${conversationUuid}/messages`, body);
   }
 
   async sendTemplate(data: SendTemplateData): Promise<ApiResponse<Message>> {
