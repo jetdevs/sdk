@@ -278,6 +278,17 @@ export interface SendMessageData {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Accept-shape returned by POST /api/v1/conversations/:uuid/messages.
+ * The service enqueues delivery and responds HTTP 202 with just the message
+ * id + initial delivery status (message-api SendAcceptResponseSchema) — NOT a
+ * full Message. Fetch the persisted row via messages.get(uuid) if needed.
+ */
+export interface SendMessageAcceptResult {
+  messageUuid: string;
+  deliveryStatus: DeliveryStatus;
+}
+
 export interface SendTemplateData {
   conversationUuid: string;
   templateUuid: string;

@@ -62,6 +62,7 @@ export type {
   Message,
   MessageAttachment,
   SendMessageData,
+  SendMessageAcceptResult,
   SendTemplateData,
   AddNoteData,
   ListMessagesParams,

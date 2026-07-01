@@ -2,6 +2,7 @@ import type { HttpClient, ApiResponse, CursorPaginatedResponse } from '../http.j
 import type {
   Message,
   SendMessageData,
+  SendMessageAcceptResult,
   SendTemplateData,
   AddNoteData,
   ListMessagesParams,
@@ -21,11 +22,13 @@ export class MessagesResource {
     return this.http.get(`/api/v1/messages/${uuid}`);
   }
 
-  async send(data: SendMessageData): Promise<ApiResponse<Message>> {
+  async send(data: SendMessageData): Promise<ApiResponse<SendMessageAcceptResult>> {
     // Canonical route is conversation-scoped: POST /api/v1/conversations/:uuid/messages
     // (message-api/src/routes/v1/messages.ts). conversationUuid is carried in the path,
     // not the body — the rest of SendMessageData is the body. Signature stays stable so
     // existing consumers (CRM operator sends, AI-responder write-back) are unaffected.
+    // The service enqueues delivery and returns the 202 accept-shape ({ messageUuid,
+    // deliveryStatus }), NOT a full Message — see SendMessageAcceptResult.
     const { conversationUuid, ...body } = data;
     return this.http.post(`/api/v1/conversations/${conversationUuid}/messages`, body);
   }

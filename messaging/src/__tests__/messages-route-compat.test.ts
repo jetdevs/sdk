@@ -28,9 +28,15 @@ describe('MessagesResource — SDK <-> service route reconciliation (STORY-012)'
   // send() route compat — canonical conversation-scoped path
   // ------------------------------------------------------------------
 
+  // Accept-shape returned by the 202 service route (message-api SendAcceptResponseSchema).
+  const acceptResponse = {
+    data: { messageUuid: 'm1', deliveryStatus: 'QUEUED' as const },
+    meta: { requestId: 'r1', timestamp: '2026-07-01' },
+  };
+
   describe('send()', () => {
     it('POSTs the conversation-scoped service route /api/v1/conversations/:uuid/messages', async () => {
-      vi.mocked(http.post).mockResolvedValue({ data: { uuid: 'm1' }, meta: { requestId: 'r1', timestamp: '2026-07-01' } });
+      vi.mocked(http.post).mockResolvedValue(acceptResponse);
 
       const data: SendMessageData = {
         conversationUuid: CONVERSATION_UUID,
@@ -45,8 +51,20 @@ describe('MessagesResource — SDK <-> service route reconciliation (STORY-012)'
       );
     });
 
+    it('returns the 202 accept-shape ({ messageUuid, deliveryStatus }), not a full Message', async () => {
+      vi.mocked(http.post).mockResolvedValue(acceptResponse);
+
+      const result = await messages.send({ conversationUuid: CONVERSATION_UUID, content: 'Hello' });
+
+      expect(result.data.messageUuid).toBe('m1');
+      expect(result.data.deliveryStatus).toBe('QUEUED');
+      // Accept-shape carries only the id + status — no full Message fields.
+      expect(result.data).not.toHaveProperty('content');
+      expect(result.data).not.toHaveProperty('direction');
+    });
+
     it('NEGATIVE (SDK route compat): never posts the old mismatched /api/v1/messages route', async () => {
-      vi.mocked(http.post).mockResolvedValue({ data: { uuid: 'm1' }, meta: { requestId: 'r1', timestamp: '2026-07-01' } });
+      vi.mocked(http.post).mockResolvedValue(acceptResponse);
 
       await messages.send({ conversationUuid: CONVERSATION_UUID, content: 'Hello' });
 
@@ -56,7 +74,7 @@ describe('MessagesResource — SDK <-> service route reconciliation (STORY-012)'
     });
 
     it('carries conversationUuid in the PATH, not the body', async () => {
-      vi.mocked(http.post).mockResolvedValue({ data: { uuid: 'm1' }, meta: { requestId: 'r1', timestamp: '2026-07-01' } });
+      vi.mocked(http.post).mockResolvedValue(acceptResponse);
 
       await messages.send({
         conversationUuid: CONVERSATION_UUID,
@@ -78,7 +96,7 @@ describe('MessagesResource — SDK <-> service route reconciliation (STORY-012)'
     });
 
     it('signature stays stable: existing CRM-shaped payload is accepted unchanged', async () => {
-      vi.mocked(http.post).mockResolvedValue({ data: { uuid: 'm1' }, meta: { requestId: 'r1', timestamp: '2026-07-01' } });
+      vi.mocked(http.post).mockResolvedValue(acceptResponse);
 
       // Mirrors crm/src/extensions/messaging/router.ts sendMessage handler payload.
       await messages.send({
