@@ -90,6 +90,20 @@ export interface ServiceContext<TDb = any> {
  * Handler context with all necessary dependencies
  * This is what handlers receive - no more manual setup!
  */
+/**
+ * A callback registered via `afterCommit(...)` inside a route handler.
+ * It runs AFTER the wrapping `dbFunction` transaction has committed
+ * successfully, OUTSIDE the pinned DB connection. Use for post-commit
+ * side effects (e.g. enqueueing work, firing an HTTP POST) that must not
+ * hold a pooled connection for their duration.
+ *
+ * Callbacks only run on commit success — if the handler throws (rollback),
+ * registered callbacks are discarded. A callback that throws is caught and
+ * logged; it never fails the already-committed request. Callbacks run
+ * sequentially in registration order.
+ */
+export type AfterCommitCallback = () => void | Promise<void>;
+
 export interface HandlerContext<TInput = any, TDb = any, TRepo = any> {
   /** Validated input from the request */
   input: TInput;
@@ -113,6 +127,14 @@ export interface HandlerContext<TInput = any, TDb = any, TRepo = any> {
 
   /** Raw tRPC context (for advanced use cases) */
   ctx: any;
+
+  /**
+   * Register a callback to run AFTER the route's transaction commits,
+   * OUTSIDE the pinned DB connection. Opt-in: handlers that never call
+   * this behave exactly as before. Also exposed as `ctx.afterCommit`.
+   * See {@link AfterCommitCallback}.
+   */
+  afterCommit: (cb: AfterCommitCallback) => void;
 }
 
 /**
@@ -526,7 +548,15 @@ export function createRouterWithActor<TDb = any>(
           sessionExpiry: new Date(0).toISOString(),
         };
 
-        return withTelemetry(telemetryName, async () => {
+        // Public routes have no wrapping transaction; run any registered
+        // after-commit callbacks once the handler resolves.
+        const publicAfterCommit: AfterCommitCallback[] = [];
+        const afterCommit = (cb: AfterCommitCallback) => {
+          publicAfterCommit.push(cb);
+        };
+        (ctx as any).afterCommit = afterCommit;
+
+        const publicResult = await withTelemetry(telemetryName, async () => {
           let result = await route.handler({
             input,
             service: { db: ctx.db, orgId: 0, userId: '', actor: emptyActor },
@@ -534,10 +564,21 @@ export function createRouterWithActor<TDb = any>(
             db: ctx.db,
             repo,
             ctx,
+            afterCommit,
           });
 
           return result;
         });
+
+        for (const cb of publicAfterCommit) {
+          try {
+            await cb();
+          } catch (err) {
+            console.error(`[withActor:afterCommit] public callback failed for ${name}:`, err);
+          }
+        }
+
+        return publicResult;
       }
 
       // This is the boilerplate we're eliminating:
@@ -631,8 +672,19 @@ export function createRouterWithActor<TDb = any>(
         userId: actor.userId,
       };
 
+      // After-commit hook (opt-in). Callbacks registered via `afterCommit(...)`
+      // inside the handler run AFTER `dbFunction` resolves/commits, OUTSIDE the
+      // pinned DB connection. Handlers that never register a callback keep the
+      // exact previous behavior (empty list → the post-commit loop is a no-op).
+      const afterCommitCallbacks: AfterCommitCallback[] = [];
+      const afterCommit = (cb: AfterCommitCallback) => {
+        afterCommitCallbacks.push(cb);
+      };
+      // Also expose on the raw ctx for the `ctx.afterCommit(...)` convention.
+      (ctx as any).afterCommit = afterCommit;
+
       // Execute within RLS context (both AsyncLocalStorage and database session)
-      return withRLSContext(rlsContext, async () => {
+      const result = await withRLSContext(rlsContext, async () => {
         return dbFunction(async (db: TDb) => {
           const serviceContext = adapter.createServiceContext(db, actor, effectiveOrgId);
 
@@ -653,6 +705,7 @@ export function createRouterWithActor<TDb = any>(
             db,
             repo,
             ctx,
+            afterCommit,
           });
 
           // Validate result if ensureResult is enabled
@@ -688,6 +741,22 @@ export function createRouterWithActor<TDb = any>(
         });
         });
       });
+
+      // Transaction has committed (dbFunction resolved) and the pooled DB
+      // connection is released. Run any registered after-commit callbacks now,
+      // outside the pinned connection. A failing callback is caught + logged so
+      // it never fails the already-committed request.
+      if (afterCommitCallbacks.length > 0) {
+        for (const cb of afterCommitCallbacks) {
+          try {
+            await cb();
+          } catch (err) {
+            console.error(`[withActor:afterCommit] callback failed for ${name}:`, err);
+          }
+        }
+      }
+
+      return result;
     };
 
     // 6. Attach as query or mutation
