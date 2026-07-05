@@ -1,4 +1,4 @@
-import type { HttpClient, ApiResponse, PaginatedResponse } from '../http.js';
+import type { HttpClient, ApiResponse, PaginatedResponse, CursorPaginatedResponse } from '../http.js';
 import type {
   PlatformMetrics,
   PlatformConnection,
@@ -15,6 +15,12 @@ import type {
   QueryAuditLogParams,
   Template,
   ListPlatformTemplatesParams,
+  PlatformConversation,
+  PlatformConversationsPage,
+  ListPlatformConversationsParams,
+  ListMessagesParams,
+  Message,
+  RealtimeToken,
 } from '../types/index.js';
 
 /** Tier 2 platform operations (requires platformKey / X-Platform-Key). */
@@ -26,6 +32,10 @@ export class PlatformResource {
   readonly rateLimits: PlatformRateLimitsResource;
   readonly auditLog: PlatformAuditLogResource;
   readonly templates: PlatformTemplatesResource;
+  /** Cross-org conversation reads (Phase B) — READ-ONLY by design. */
+  readonly conversations: PlatformConversationsResource;
+  /** Scoped SSE token mint for the cross-org stream (Phase B). */
+  readonly realtime: PlatformRealtimeResource;
 
   constructor(http: HttpClient) {
     this.metrics = new PlatformMetricsResource(http);
@@ -35,6 +45,8 @@ export class PlatformResource {
     this.rateLimits = new PlatformRateLimitsResource(http);
     this.auditLog = new PlatformAuditLogResource(http);
     this.templates = new PlatformTemplatesResource(http);
+    this.conversations = new PlatformConversationsResource(http);
+    this.realtime = new PlatformRealtimeResource(http);
   }
 }
 
@@ -147,5 +159,34 @@ class PlatformTemplatesResource {
 
   async reject(uuid: string, data: { reason: string }): Promise<ApiResponse<Template>> {
     return this.http.post(`/api/v1/platform/templates/${uuid}/reject`, data);
+  }
+}
+
+/**
+ * Cross-org conversation reads (Phase B, spec Part 3). View-only is structural:
+ * this resource deliberately has NO send/assign/status/note method — the
+ * platform tier has no such route.
+ */
+class PlatformConversationsResource {
+  constructor(private http: HttpClient) {}
+
+  async list(params?: ListPlatformConversationsParams): Promise<PlatformConversationsPage> {
+    return this.http.get('/api/v1/platform/conversations', params as Record<string, unknown>);
+  }
+
+  async get(uuid: string): Promise<ApiResponse<PlatformConversation>> {
+    return this.http.get(`/api/v1/platform/conversations/${uuid}`);
+  }
+
+  async messages(uuid: string, params?: ListMessagesParams): Promise<CursorPaginatedResponse<Message>> {
+    return this.http.get(`/api/v1/platform/conversations/${uuid}/messages`, params as Record<string, unknown>);
+  }
+}
+
+class PlatformRealtimeResource {
+  constructor(private http: HttpClient) {}
+
+  async createToken(data: { userId: string }): Promise<ApiResponse<RealtimeToken>> {
+    return this.http.post('/api/v1/platform/realtime/token', data);
   }
 }
