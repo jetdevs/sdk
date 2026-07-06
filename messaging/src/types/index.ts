@@ -21,6 +21,18 @@ export type DeliveryStatus = 'PENDING' | 'QUEUED' | 'SENT' | 'DELIVERED' | 'READ
 // Do NOT normalize AI->BOT — the distinction feeds Phase A's AI/Human badge.
 export type AuthorType = 'USER' | 'CONTACT' | 'SYSTEM' | 'BOT' | 'AI';
 
+// System-turn vocabulary (Phase A, D22). msg-api stamps SYSTEM rows with one of
+// these on the AI<->human handoff path; the CRM renders them as centered chips
+// (unknown values fall back to the raw-content chip). Persisted as a nullable
+// column — a normal message row carries systemEventType: null.
+export type SystemEventType =
+  | 'handoff.requested'
+  | 'handoff.joined'
+  | 'handoff.released'
+  | 'welcome'
+  | 'holding'
+  | 'apology';
+
 export type ConnectionStatus = 'ACTIVE' | 'ERROR' | 'DISCONNECTED' | 'PENDING' | 'SYNCING';
 
 export type TemplateStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
@@ -254,6 +266,8 @@ export interface Message {
   deliveryStatus: DeliveryStatus;
   authorType: AuthorType;
   authorId: string | null;
+  // Set only on SYSTEM handoff turns (Phase A); null on every ordinary row.
+  systemEventType?: SystemEventType | null;
   replyToUuid: string | null;
   attachments: MessageAttachment[];
   metadata: Record<string, unknown>;

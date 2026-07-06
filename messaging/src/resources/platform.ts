@@ -32,7 +32,7 @@ export class PlatformResource {
   readonly rateLimits: PlatformRateLimitsResource;
   readonly auditLog: PlatformAuditLogResource;
   readonly templates: PlatformTemplatesResource;
-  /** Cross-org conversation reads (Phase B) — READ-ONLY by design. */
+  /** Cross-org conversation reads (Phase B) + console mutations (Phase A). */
   readonly conversations: PlatformConversationsResource;
   /** Scoped SSE token mint for the cross-org stream (Phase B). */
   readonly realtime: PlatformRealtimeResource;
@@ -163,9 +163,12 @@ class PlatformTemplatesResource {
 }
 
 /**
- * Cross-org conversation reads (Phase B, spec Part 3). View-only is structural:
- * this resource deliberately has NO send/assign/status/note method — the
- * platform tier has no such route.
+ * Cross-org conversation reads (Phase B, spec Part 3) + console mutations
+ * (Phase A, spec Part 8). B's view-only invariant is superseded by design: A
+ * turns the cross-org inbox into a write console. Every mutation asserts the
+ * operator `userId` (the consumer owns the RBAC check — D13) and 409s on a
+ * losing race; the SDK surfaces that as a `MessagingApiError` with `status:409`
+ * so the CRM's handleSdkError can map it to TRPC CONFLICT.
  */
 class PlatformConversationsResource {
   constructor(private http: HttpClient) {}
@@ -180,6 +183,44 @@ class PlatformConversationsResource {
 
   async messages(uuid: string, params?: ListMessagesParams): Promise<CursorPaginatedResponse<Message>> {
     return this.http.get(`/api/v1/platform/conversations/${uuid}/messages`, params as Record<string, unknown>);
+  }
+
+  /**
+   * Operator claims the conversation (AI -> human). Returns the full formatted
+   * platform row (carries handoffState/responderMode/takenOverByUserId/binding
+   * for the driver badge). 409 `"already taken over by {user}"` on a losing race.
+   */
+  async takeOver(uuid: string, data: { userId: string }): Promise<ApiResponse<PlatformConversation>> {
+    return this.http.post(`/api/v1/platform/conversations/${uuid}/take-over`, data);
+  }
+
+  /**
+   * Hand the conversation back to the AI (human -> ai). 409 when there is no
+   * AI responder bound, or when the conversation is not currently human-driven.
+   */
+  async releaseToAi(uuid: string, data: { userId: string }): Promise<ApiResponse<PlatformConversation>> {
+    return this.http.post(`/api/v1/platform/conversations/${uuid}/release-to-ai`, data);
+  }
+
+  /**
+   * Clear a pending escalation (handoffState pending_human -> none; mode stays
+   * ai). No customer-facing turn. 409 when the conversation is not pending a human.
+   */
+  async dismissEscalation(uuid: string, data: { userId: string }): Promise<ApiResponse<PlatformConversation>> {
+    return this.http.post(`/api/v1/platform/conversations/${uuid}/dismiss-escalation`, data);
+  }
+
+  /**
+   * Console reply while human_active. State-gated at write time: 409 `"conversation
+   * is AI-driven; take over before replying"` if the conversation flipped back to
+   * AI. Returns the 202 accept-shape `{ messageUuid, deliveryStatus }` — NOT a full
+   * Message (delivery is enqueued; the outcome arrives via the status flow / SSE).
+   */
+  async sendMessage(
+    uuid: string,
+    data: { userId: string; content: string; messageType?: string; metadata?: Record<string, unknown> },
+  ): Promise<ApiResponse<{ messageUuid: string; deliveryStatus: string }>> {
+    return this.http.post(`/api/v1/platform/conversations/${uuid}/messages`, data);
   }
 }
 

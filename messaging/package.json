@@ -1,6 +1,6 @@
 {
   "name": "@jetdevs/messaging",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "TypeScript client SDK for the Messaging Service - conversations, messages, channels, templates, and real-time events",
   "type": "module",
   "publishConfig": {
