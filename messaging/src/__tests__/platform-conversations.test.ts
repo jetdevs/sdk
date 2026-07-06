@@ -205,6 +205,35 @@ describe('MessagingApiError — a 409 is catchable as a conflict (Phase A)', () 
       platform.conversations.sendMessage('c1', { userId: '7', content: 'hi' }),
     ).rejects.toMatchObject({ status: 409, message: 'Conversation is AI-driven; take over before replying' });
   });
+
+  it('a 409 in the msg-api/Fastify TOP-LEVEL shape ({message}, not {error:{message}}) still surfaces the message', async () => {
+    // msg-api (Fastify) serializes errors as { statusCode, code, error:"Conflict",
+    // message } — message/code at TOP LEVEL. The SDK must NOT drop it to "HTTP 409"
+    // (the CRM's takeover-conflict-banner renders this text). The tests above mock
+    // only the nested { error:{ message } } envelope — that is exactly why this
+    // regressed against the real service; assert the real Fastify shape here too.
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 409,
+      headers: { get: () => null },
+      json: async () => ({
+        statusCode: 409,
+        code: 'CONFLICT',
+        error: 'Conflict',
+        message: 'Conversation already taken over by 2185',
+      }),
+    }) as unknown as typeof fetch;
+
+    const http = new HttpClient({ baseUrl: 'https://msg.example.test', platformKey: 'k', maxRetries: 0 });
+    const platform = new PlatformResource(http);
+
+    await expect(platform.conversations.takeOver('c1', { userId: '7' })).rejects.toMatchObject({
+      name: 'MessagingApiError',
+      status: 409,
+      code: 'CONFLICT',
+      message: 'Conversation already taken over by 2185',
+    });
+  });
 });
 
 describe('AuthorType — AI passthrough (Phase B Step 0)', () => {

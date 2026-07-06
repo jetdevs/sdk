@@ -113,10 +113,18 @@ export class HttpClient {
           // Non-JSON error body
         }
 
+        // msg-api (Fastify) serializes errors as { statusCode, code, error:"<name>",
+        // message } with `message`/`code` at TOP LEVEL — NOT this SDK's nested
+        // { error: { message } } envelope. Read the nested shape first (own envelope),
+        // then fall back to the Fastify top-level fields, so a 409's real message
+        // ("Conversation already taken over by …") surfaces instead of "HTTP 409"
+        // (the CRM conflict banner shows this text). A mock of only the nested shape
+        // hid this against the real service.
+        const fastifyErr = apiError as unknown as { message?: string; code?: string } | undefined;
         throw new MessagingApiError(
-          apiError?.error?.message ?? `HTTP ${response.status}`,
+          apiError?.error?.message ?? fastifyErr?.message ?? `HTTP ${response.status}`,
           response.status,
-          apiError?.error?.code ?? 'UNKNOWN_ERROR',
+          apiError?.error?.code ?? fastifyErr?.code ?? 'UNKNOWN_ERROR',
           apiError?.error?.details,
           apiError?.meta?.requestId,
         );
