@@ -8,6 +8,39 @@ export { MessagingApiError } from './http.js';
 export { SSEClient } from './realtime/sse-client.js';
 export type { SSEClientConfig } from './realtime/sse-client.js';
 
+// WEBCHAT channel (in-app copilot) — ingress client, delivery HMAC, wire types
+export { ChannelsResource } from './webchat/channels-resource.js';
+export {
+  WEBCHAT_SYSTEM_EVENT_TYPES,
+  isWebchatDeliveryPayload,
+  isWebchatAiRouted,
+  isWebchatStartFailure,
+  isWebchatDuplicate,
+} from './webchat/types.js';
+export type {
+  WebchatNormalizedMessage,
+  WebchatIngressRequest,
+  WebchatIngressResponse,
+  WebchatIngressAiResponse,
+  WebchatIngressHumanResponse,
+  WebchatIngressStartFailureResponse,
+  WebchatIngressDuplicateResponse,
+  WebchatSystemEventType,
+  WebchatDeliveryTurn,
+  WebchatDeliveryPayload,
+} from './webchat/types.js';
+export {
+  WEBCHAT_DELIVERY_FRESHNESS_MS,
+  webchatDeliveryBaseString,
+  signWebchatDelivery,
+  verifyWebchatDelivery,
+} from './webchat/delivery-hmac.js';
+export type {
+  VerifyWebchatDeliveryInput,
+  WebchatDeliveryVerifyResult,
+  WebchatDeliveryVerifyReason,
+} from './webchat/delivery-hmac.js';
+
 // Types - re-export everything
 export type {
   // Enums

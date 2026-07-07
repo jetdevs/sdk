@@ -11,6 +11,7 @@ import { AuditLogResource } from './resources/audit-log.js';
 import { MetricsResource } from './resources/metrics.js';
 import { RealtimeResource } from './resources/realtime.js';
 import { PlatformResource } from './resources/platform.js';
+import { ChannelsResource } from './webchat/channels-resource.js';
 import type { MessagingClientConfig } from './types/index.js';
 
 /**
@@ -62,6 +63,8 @@ export class MessagingClient {
   readonly realtime: RealtimeResource;
   /** Platform-level operations (Tier 2, requires platformKey) */
   readonly platform: PlatformResource;
+  /** Internal channel ingress (Tier 3, requires serviceSecret) — WEBCHAT + Slack T5 */
+  readonly channels: ChannelsResource;
 
   constructor(config: MessagingClientConfig) {
     this.http = new HttpClient(config);
@@ -78,5 +81,6 @@ export class MessagingClient {
     this.metrics = new MetricsResource(this.http);
     this.realtime = new RealtimeResource(this.http);
     this.platform = new PlatformResource(this.http);
+    this.channels = new ChannelsResource(this.http);
   }
 }

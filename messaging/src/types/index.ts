@@ -4,7 +4,7 @@
 
 // --- Enums ---
 
-export type ChannelType = 'WHATSAPP' | 'WHATSAPP_DEVICE' | 'TELEGRAM' | 'LINE' | 'KAKAO' | 'EMAIL' | 'INTERNAL' | 'SLACK' | 'DISCORD';
+export type ChannelType = 'WHATSAPP' | 'WHATSAPP_DEVICE' | 'TELEGRAM' | 'LINE' | 'KAKAO' | 'EMAIL' | 'INTERNAL' | 'SLACK' | 'DISCORD' | 'WEBCHAT';
 
 export type ConversationStatus = 'OPEN' | 'PENDING' | 'SNOOZED' | 'RESOLVED' | 'CLOSED';
 
