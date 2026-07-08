@@ -16,7 +16,22 @@ export type MessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT' | 'L
 
 export type DeliveryStatus = 'PENDING' | 'QUEUED' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
 
-export type AuthorType = 'USER' | 'CONTACT' | 'SYSTEM' | 'BOT';
+// 'AI' is a first-class author: msg-api persists AND streams AI responder replies
+// with authorType:'AI' (message-api/src/services/responder-completion.ts:243,353).
+// Do NOT normalize AI->BOT — the distinction feeds Phase A's AI/Human badge.
+export type AuthorType = 'USER' | 'CONTACT' | 'SYSTEM' | 'BOT' | 'AI';
+
+// System-turn vocabulary (Phase A, D22). msg-api stamps SYSTEM rows with one of
+// these on the AI<->human handoff path; the CRM renders them as centered chips
+// (unknown values fall back to the raw-content chip). Persisted as a nullable
+// column — a normal message row carries systemEventType: null.
+export type SystemEventType =
+  | 'handoff.requested'
+  | 'handoff.joined'
+  | 'handoff.released'
+  | 'welcome'
+  | 'holding'
+  | 'apology';
 
 export type ConnectionStatus = 'ACTIVE' | 'ERROR' | 'DISCONNECTED' | 'PENDING' | 'SYNCING';
 
@@ -251,6 +266,8 @@ export interface Message {
   deliveryStatus: DeliveryStatus;
   authorType: AuthorType;
   authorId: string | null;
+  // Set only on SYSTEM handoff turns (Phase A); null on every ordinary row.
+  systemEventType?: SystemEventType | null;
   replyToUuid: string | null;
   attachments: MessageAttachment[];
   metadata: Record<string, unknown>;
@@ -551,6 +568,64 @@ export interface ListPlatformTemplatesParams extends PageParams {
   channel?: ChannelType;
   status?: TemplateStatus;
   orgId?: string;
+  search?: string;
+}
+
+// --- Platform Cross-Org Conversations (Phase B) ---
+
+export interface ConversationOrgRef {
+  uuid: string;
+  name: string;
+}
+
+/** Redacted binding summary (p4 §9.2) — never the raw responder ref. */
+export interface ConversationBindingSummary {
+  kind: 'agent' | 'team' | 'human';
+  name: string | null;
+  agentUuid?: string | null;
+  teamUuid?: string | null;
+}
+
+/**
+ * Cross-org conversation row: the Tier-1 Conversation shape plus attribution.
+ * `channel` is a PLAIN STRING (channel-agnostic invariant): a new msg-api
+ * channel appears here with zero SDK changes.
+ */
+export interface PlatformConversation extends Omit<Conversation, 'channel' | 'contact' | 'connection'> {
+  channel: string;
+  org: ConversationOrgRef;
+  contact: { uuid: string; name: string | null; identifier: string | null } | null;
+  connection: { uuid: string; name: string; channel: string } | null;
+  binding: ConversationBindingSummary | null;
+  // Switchboard passthrough — inert in B, rendered by Phase A.
+  responderMode: 'ai' | 'human';
+  handoffState: 'none' | 'pending_human' | 'human_active';
+  takenOverByUserId: string | null;
+  // Org-attribution (S1, org-attribution §10): SNAKE_CASE on the wire — the
+  // frozen contract msg-api's formatPlatformConversation emits. NULL =
+  // unattributed (non-webchat / pre-attribution rows).
+  target_org_id: number | null;
+  target_org_name: string | null;
+}
+
+/** Cross-org list response = the cursor page PLUS the complete org facet (CS filter source). */
+export interface PlatformConversationsPage extends CursorPaginatedResponse<PlatformConversation> {
+  facets: { orgs: Array<{ uuid: string; name: string; conversationCount: number }> };
+}
+
+export interface ListPlatformConversationsParams {
+  /** Opaque keyset cursor from the previous page's pagination.cursor. */
+  cursor?: string;
+  limit?: number;
+  /** Org UUID filter. */
+  orgId?: string;
+  /** Plain string equality — no enum (channel-agnostic invariant). */
+  channel?: string;
+  status?: ConversationStatus;
+  assignedTo?: string;
+  unassigned?: boolean;
+  responderMode?: 'ai' | 'human';
+  handoffState?: 'none' | 'pending_human' | 'human_active';
   search?: string;
 }
 
