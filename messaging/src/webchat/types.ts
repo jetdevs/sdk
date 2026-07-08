@@ -54,6 +54,18 @@ export interface WebchatIngressRequest {
   message: WebchatNormalizedMessage;
   /** Opaque signed X-Execution-Context envelope (base64). Never parsed by msg-api. */
   executionContext: string;
+  /**
+   * Merchant-org attribution (org-attribution §10), sent PLAIN beside the
+   * signed envelope — msg-api persists it first-class (the envelope stays
+   * opaque, D3). Optional: old callers omit both; old msg-api ignores them.
+   */
+  targetOrgId?: number;
+  /**
+   * Merchant org display name (`session.user.currentOrg.name`). Senders must
+   * suppress the `Organization ${id}` placeholder — id-only turns attribute
+   * on a later named turn (§13).
+   */
+  targetOrgName?: string;
 }
 
 /** AI-routed: the pane attaches its EXISTING SDK telemetry stream by executionId (NO streamUrl — F3). */

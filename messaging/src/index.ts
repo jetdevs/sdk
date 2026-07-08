@@ -51,6 +51,7 @@ export type {
   MessageType,
   DeliveryStatus,
   AuthorType,
+  SystemEventType,
   ConnectionStatus,
   TemplateStatus,
   WebhookEventStatus,
@@ -139,6 +140,12 @@ export type {
   PlatformConnection,
   ListPlatformConnectionsParams,
   ListPlatformTemplatesParams,
+  // Platform Cross-Org Conversations (Phase B) + console mutations (Phase A)
+  ConversationOrgRef,
+  ConversationBindingSummary,
+  PlatformConversation,
+  PlatformConversationsPage,
+  ListPlatformConversationsParams,
   // Client config
   MessagingClientConfig,
 } from './types/index.js';
