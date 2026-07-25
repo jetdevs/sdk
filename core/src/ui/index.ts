@@ -159,6 +159,21 @@ export type {
 } from './display';
 
 // =============================================================================
+// FORM COMPONENTS
+// =============================================================================
+
+export {
+  // Image upload drop zone - factory (needs Button + icons injected)
+  createImageUpload,
+} from './forms';
+
+export type {
+  ImageUploadUIComponents,
+  ImageUploadProps,
+  ImageUploadFactoryConfig,
+} from './forms';
+
+// =============================================================================
 // SKELETON COMPONENTS
 // =============================================================================
 

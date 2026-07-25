@@ -99,6 +99,16 @@
       "import": "./dist/ui/display/index.js",
       "require": "./dist/ui/display/index.js"
     },
+    "./ui/forms": {
+      "types": "./dist/ui/forms/index.d.ts",
+      "import": "./dist/ui/forms/index.js",
+      "require": "./dist/ui/forms/index.js"
+    },
+    "./media": {
+      "types": "./dist/media/index.d.ts",
+      "import": "./dist/media/index.js",
+      "require": "./dist/media/index.js"
+    },
     "./ui/skeletons": {
       "types": "./dist/ui/skeletons/index.d.ts",
       "import": "./dist/ui/skeletons/index.js",
@@ -308,6 +318,7 @@
     "@tanstack/react-table": "^8.0.0",
     "@trpc/client": "^11.0.0",
     "@trpc/server": "^11.0.0",
+    "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.0",
     "drizzle-orm": "^0.30.0 || ^0.44.0",
     "immer": "^10.0.0",
@@ -397,6 +408,9 @@
     },
     "mysql2": {
       "optional": true
+    },
+    "browser-image-compression": {
+      "optional": true
     }
   },
   "files": [
@@ -423,6 +437,7 @@
     "@types/pg": "^8.16.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.2.3",
+    "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.0",
     "drizzle-orm": "^0.44.7",
     "happy-dom": "^14.12.3",
