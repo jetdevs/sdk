@@ -9,6 +9,8 @@ const clientEntries = [
   'ui/auth/index',
   'ui/feedback/index',
   'ui/display/index',
+  'ui/forms/index',
+  'media/index',
   'ui/skeletons/index',
   'ui/theme/index',
   'ui/admin/index',
