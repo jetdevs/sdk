@@ -34,6 +34,7 @@ export type {
   SendMessageResponse, SendTemplateMessageRequest, TemplateComponent, TemplateStatusOptions,
   TemplateStatusResponse, WabaConfig,
   WhatsAppCredentials,
+  WhatsAppTemplateButtonParameter,
   WhatsAppTokenResponse
 } from './types';
 

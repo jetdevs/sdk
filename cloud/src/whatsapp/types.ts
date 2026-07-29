@@ -116,6 +116,22 @@ export interface DeleteTemplateOptions extends WabaConfig {
 }
 
 /**
+ * Runtime button parameters for approved WhatsApp templates.
+ * URL parameters fill dynamic URL placeholders such as {{1}}.
+ */
+export type WhatsAppTemplateButtonParameter =
+  | {
+      type: 'url';
+      index: number;
+      text: string;
+    }
+  | {
+      type: 'quick_reply';
+      index: number;
+      payload: string;
+    };
+
+/**
  * Send template message request
  */
 export interface SendTemplateMessageRequest extends WabaConfig {
@@ -140,6 +156,11 @@ export interface SendTemplateMessageRequest extends WabaConfig {
     url?: string;
     order: number;
   }>;
+  /**
+   * Runtime button parameters for approved templates. Omit this field to
+   * preserve legacy send behavior.
+   */
+  buttonParameters?: WhatsAppTemplateButtonParameter[];
   /** Document filename (required when mediaType is 'document') */
   documentFilename?: string;
 }
