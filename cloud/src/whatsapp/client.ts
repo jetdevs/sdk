@@ -27,6 +27,7 @@ import type {
   SendCarouselMessageRequest,
   SendMessageResponse,
   ConfigCheckResult,
+  WhatsAppTemplateButtonParameter,
 } from './types';
 
 const log = createLogger('WhatsAppClient');
@@ -51,6 +52,65 @@ function withWabaConfig<T extends Record<string, unknown>>(
   }
 
   return result;
+}
+
+type RuntimeButtonComponent =
+  | {
+      type: 'button';
+      sub_type: 'url';
+      index: number;
+      parameters: [{ type: 'text'; text: string }];
+    }
+  | {
+      type: 'button';
+      sub_type: 'quick_reply';
+      index: number;
+      parameters: [{ type: 'payload'; payload: string }];
+    };
+
+function validateButtonParameter(parameter: WhatsAppTemplateButtonParameter): void {
+  if (!Number.isInteger(parameter.index) || parameter.index < 0) {
+    throw new Error('WhatsApp button parameter index must be a non-negative integer');
+  }
+
+  if (parameter.type === 'url') {
+    if (!parameter.text || /[\r\n\t]/.test(parameter.text)) {
+      throw new Error('WhatsApp URL button parameter must be a non-empty single-line string');
+    }
+    return;
+  }
+
+  if (!parameter.payload || /[\r\n\t]/.test(parameter.payload)) {
+    throw new Error('WhatsApp quick reply button payload must be a non-empty single-line string');
+  }
+}
+
+function buildRuntimeButtonComponents(
+  buttonParameters?: WhatsAppTemplateButtonParameter[]
+): RuntimeButtonComponent[] {
+  if (!buttonParameters || buttonParameters.length === 0) {
+    return [];
+  }
+
+  return buttonParameters.map((parameter) => {
+    validateButtonParameter(parameter);
+
+    if (parameter.type === 'url') {
+      return {
+        type: 'button',
+        sub_type: 'url',
+        index: parameter.index,
+        parameters: [{ type: 'text', text: parameter.text }],
+      };
+    }
+
+    return {
+      type: 'button',
+      sub_type: 'quick_reply',
+      index: parameter.index,
+      parameters: [{ type: 'payload', payload: parameter.payload }],
+    };
+  });
 }
 
 export class WhatsAppClient {
@@ -384,8 +444,18 @@ export class WhatsAppClient {
    * @param params - Send template message request with optional WABA config
    */
   async sendTemplateMessage(params: SendTemplateMessageRequest): Promise<SendMessageResponse> {
-    const { templateId, phoneNumber, metadata, bodyParameters, wabaId, senderLabel, mediaType, buttons, documentFilename } =
-      params;
+    const {
+      templateId,
+      phoneNumber,
+      metadata,
+      bodyParameters,
+      wabaId,
+      senderLabel,
+      mediaType,
+      buttons,
+      buttonParameters,
+      documentFilename,
+    } = params;
 
     // Accept either `media` (new) or `imageUrl` (deprecated) as the media resource
     const media = params.media ?? params.imageUrl;
@@ -398,14 +468,16 @@ export class WhatsAppClient {
 
     log.debug('Sending template message', {
       templateId,
-      phoneNumber,
+      hasPhoneNumber: !!phoneNumber,
       hasMedia: !!media,
       mediaMode: media ? (isUrl ? 'link' : 'id') : 'none',
       mediaType: effectiveMediaType,
-      hasButtons: !!buttons && buttons.length > 0,
-      buttonCount: buttons?.length || 0,
+      bodyParameterCount: bodyParameters?.length || 0,
+      legacyButtonCount: buttons?.length || 0,
+      buttonParameterCount: buttonParameters?.length || 0,
       documentFilename: isDocument ? documentFilename : undefined,
-      wabaId,
+      hasWabaId: !!wabaId,
+      senderLabel,
     });
 
     // Build body parameters
@@ -439,6 +511,7 @@ export class WhatsAppClient {
 
     // Build button components (only Quick Reply buttons)
     const buttonComponents = this.buildButtonComponents(buttons);
+    const runtimeButtonComponents = buildRuntimeButtonComponents(buttonParameters);
 
     const baseRequestBody = {
       provider_template_id: templateId,
@@ -460,13 +533,23 @@ export class WhatsAppClient {
         },
         // Add button components (only if Quick Reply buttons exist)
         ...buttonComponents,
+        ...runtimeButtonComponents,
       ],
     };
 
     // Add WABA config
     const requestBody = withWabaConfig(baseRequestBody, { wabaId, senderLabel });
 
-    log.debug('Template message request payload', { requestBody: JSON.stringify(requestBody) });
+    log.debug('Template message request prepared', {
+      templateId,
+      componentCount: requestBody.components.length,
+      hasHeaderComponent: !!media,
+      bodyParameterCount: bodyParameters?.length || 0,
+      legacyButtonComponentCount: buttonComponents.length,
+      runtimeButtonComponentCount: runtimeButtonComponents.length,
+      hasWabaId: !!wabaId,
+      senderLabel: requestBody.sender_label,
+    });
 
     const response = (await this.request('POST', '/api/v1/whatsapp/send/template', requestBody)) as {
       ProviderMessageID?: string;
