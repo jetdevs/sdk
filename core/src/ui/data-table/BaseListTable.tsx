@@ -855,8 +855,8 @@ export function createBaseListTable(ui: DataTableUIComponents) {
 
         {/* Pagination Controls */}
         {pagination && (
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-3 px-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm text-muted-foreground">
                 {pagination.totalCount !== undefined ? (
                   <>
@@ -883,7 +883,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-1 sm:gap-2">
               <Button
                 variant="outline"
                 size="sm"
