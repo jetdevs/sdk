@@ -45,3 +45,11 @@ yarn-error.log*
 cloud/.npmrc
 cloud/.serena
 graphify*
+# --- env secrets (enforced) ---
+# Every env file is a secret unless it is an example/template. A narrow pattern
+# like `.env.*.local` does NOT match `.env.dev` — that gap put live
+# credentials on a remote once. Match broadly, allow-list narrowly.
+.env*
+!.env.example
+!.env*.example
+!.env*.template
