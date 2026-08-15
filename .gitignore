@@ -53,3 +53,6 @@ graphify*
 !.env.example
 !.env*.example
 !.env*.template
+
+# Claude Code local workspace (agents, settings, worktrees)
+.claude/
