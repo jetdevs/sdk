@@ -1,6 +1,6 @@
 {
   "name": "@jetdevs/core",
-  "version": "0.1.35-dev",
+  "version": "0.1.36-dev",
   "description": "Core SDK components, UI primitives, and utilities for Core SaaS",
   "type": "module",
   "publishConfig": {
@@ -38,6 +38,16 @@
       "types": "./dist/auth/providers/index.d.ts",
       "import": "./dist/auth/providers/index.js",
       "require": "./dist/auth/providers/index.js"
+    },
+    "./password-reset": {
+      "types": "./dist/password-reset/index.d.ts",
+      "import": "./dist/password-reset/index.js",
+      "require": "./dist/password-reset/index.js"
+    },
+    "./password-reset/policy": {
+      "types": "./dist/password-reset/policy.d.ts",
+      "import": "./dist/password-reset/policy.js",
+      "require": "./dist/password-reset/policy.js"
     },
     "./trpc": {
       "types": "./dist/trpc/index.d.ts",

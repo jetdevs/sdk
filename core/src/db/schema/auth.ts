@@ -295,3 +295,45 @@ export type AuthSession = typeof authSessions.$inferSelect;
 export type NewAuthSession = typeof authSessions.$inferInsert;
 export type AuthLog = typeof authLogs.$inferSelect;
 export type NewAuthLog = typeof authLogs.$inferInsert;
+
+// =============================================================================
+// PASSWORD RESET TOKENS TABLE
+// =============================================================================
+
+/**
+ * Single-use password reset tokens issued by the forgot-password flow.
+ *
+ * A token is valid while `used_at` is NULL and `expires_at` is in the future.
+ * Requesting a new reset deletes the user's outstanding unused tokens, so at
+ * most one live link exists per user at a time.
+ */
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: serial("id").notNull().primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: varchar("token", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("password_reset_tokens_user_id_idx").on(table.userId),
+    index("password_reset_tokens_token_idx").on(table.token),
+    index("password_reset_tokens_expires_at_idx").on(table.expiresAt),
+  ],
+);
+
+export const passwordResetTokensRelations = relations(passwordResetTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [passwordResetTokens.userId],
+    references: [users.id],
+  }),
+}));
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type NewPasswordResetToken = typeof passwordResetTokens.$inferInsert;

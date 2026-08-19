@@ -33,6 +33,8 @@ const serverEntries = {
   'db/seeds/index': 'src/db/seeds/index.ts',
   'auth/index': 'src/modules/auth/index.ts',
   'auth/providers/index': 'src/modules/auth/providers/index.ts',
+  'password-reset/index': 'src/modules/password-reset/index.ts',
+  'password-reset/policy': 'src/modules/password-reset/password-policy.ts',
   'trpc/index': 'src/trpc/index.ts',
   'trpc/routers/index': 'src/trpc/routers/index.ts',
   'permissions/index': 'src/modules/permissions/index.ts',
