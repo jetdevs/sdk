@@ -34,12 +34,18 @@
 export interface WebchatNormalizedMessage {
   /** The logged-in app user's uuid — the contact key (parent D13, uuids only). */
   userUuid: string;
+  /** Channel-native sender key. Defaults to userUuid when omitted. */
+  senderIdentifier?: string;
   /** The user's turn text. */
   text: string;
   /** App-minted client-turn uuid (M5) — the inbound externalId / dedupe key. */
   externalId: string;
   /** Optional display name supplied at ingress. */
   senderName?: string;
+  /** Channel-native routing context, such as Slack channel/thread ids. */
+  contentRich?: Record<string, unknown> | null;
+  /** Provider-native message/thread id this turn replies to. */
+  replyToExternalId?: string;
 }
 
 /**
@@ -53,7 +59,7 @@ export interface WebchatIngressRequest {
   connectionUuid: string;
   message: WebchatNormalizedMessage;
   /** Opaque signed X-Execution-Context envelope (base64). Never parsed by msg-api. */
-  executionContext: string;
+  executionContext?: string;
   /**
    * Merchant-org attribution (org-attribution §10), sent PLAIN beside the
    * signed envelope — msg-api persists it first-class (the envelope stays
@@ -66,6 +72,13 @@ export interface WebchatIngressRequest {
    * on a later named turn (§13).
    */
   targetOrgName?: string;
+  /** App-resolved Cadra team for webchat. */
+  teamUuid?: string;
+  /** Per-turn responder selected by the calling app; never persisted as a binding. */
+  responderRef?: {
+    kind: string;
+    ref: Record<string, unknown>;
+  };
 }
 
 /** AI-routed: the pane attaches its EXISTING SDK telemetry stream by executionId (NO streamUrl — F3). */
