@@ -15,7 +15,8 @@ import {
     VisibilityState
 } from '@tanstack/react-table';
 import * as React from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { PaginationConfig } from './BaseListTable';
 import { getAlignCellClass } from './column-meta';
 
 // =============================================================================
@@ -153,7 +154,10 @@ export interface DataTableWithToolbarUIComponents {
     children: React.ReactNode
   }>;
   SelectTrigger: React.ComponentType<{ className?: string; children: React.ReactNode }>;
-  SelectValue: React.ComponentType<{ placeholder?: string }>;
+  // `children` is optional and additive: Radix's real SelectValue already
+  // accepts it, and it is what lets a ServerFilterConfig render a custom
+  // trigger label (e.g. a flag emoji) instead of the raw value.
+  SelectValue: React.ComponentType<{ placeholder?: string; children?: React.ReactNode }>;
   SelectContent: React.ComponentType<{ side?: 'top' | 'bottom'; children: React.ReactNode }>;
   SelectItem: React.ComponentType<{ value: string; children: React.ReactNode }>;
 
@@ -189,6 +193,55 @@ export interface FilterColumnConfig {
   columnId: string;
   label: string;
   options: Array<{ label: string; value: string }>;
+}
+
+/**
+ * Server-driven sorting. When supplied, TanStack stops re-sorting rows locally
+ * (`manualSorting: true`) and the consumer is responsible for translating the
+ * `SortingState` into a backend `sortBy`/`sortOrder`.
+ *
+ * Without this, a server-paginated table sorts only the rows of the CURRENT
+ * page — a wrong-answer bug, not a cosmetic one. Always pair this with
+ * `pagination` when the backend pages.
+ */
+export interface ServerSortingConfig {
+  /** Controlled sorting state (usually a single entry). */
+  state: SortingState;
+  /** Called with the next state when a column header is clicked. */
+  onChange: (next: SortingState) => void;
+}
+
+/**
+ * Server-driven search. When supplied, the toolbar's search box drives this
+ * instead of TanStack's client-side `globalFilter`, so a search matches rows on
+ * every page rather than only the loaded ones.
+ */
+export interface ServerSearchConfig {
+  /** Current (undebounced) input value — the consumer owns this state. */
+  value: string;
+  /** Called after `debounceMs` with the new value. */
+  onChange: (value: string) => void;
+  placeholder?: string;
+  /** Debounce applied before `onChange` fires. Default 300ms. */
+  debounceMs?: number;
+}
+
+/**
+ * A server-evaluated dropdown filter. Unlike `filterColumns` (which filter the
+ * loaded rows via TanStack `columnFilters`), these are round-tripped to the
+ * backend so they apply across the whole result set.
+ */
+export interface ServerFilterConfig {
+  /** Stable key — used for the React key only, not a column id. */
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ label: string; value: string }>;
+  /** Trigger width class. Default `w-[130px]`. */
+  className?: string;
+  /** Optional custom trigger text (e.g. to render a flag emoji). */
+  renderValue?: (value: string) => React.ReactNode;
 }
 
 /**
@@ -307,6 +360,69 @@ export interface DataTableWithToolbarProps<TData> {
    * page doesn't show two stacked search bars. Pagination is unaffected.
    */
   hideToolbar?: boolean;
+
+  // ---------------------------------------------------------------------------
+  // Server-side mode (OPT-IN, backwards-compatible).
+  //
+  // Every prop below is independently optional. When ALL of them are unset the
+  // `useReactTable` options object is byte-identical to before this addition,
+  // so existing client-side consumers (cadra-web roles, crm, core-saas, the yobo
+  // connectors tab, …) are untouched.
+  //
+  // Before this existed, `DataTableWithToolbar` was client-only, which is why
+  // every server-paginated backoffice list forked into a bespoke table. Reach
+  // for these instead of forking.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Server-side pagination. When set, the table pages via the backend
+   * (`manualPagination`) and `pageCount` is derived from `totalCount` — the
+   * built-in pager drives `onPageChange`/`onPageSizeChange` instead of slicing
+   * the loaded array.
+   */
+  pagination?: PaginationConfig;
+
+  /**
+   * Server-side sorting. When set, `manualSorting` is enabled so TanStack does
+   * NOT re-sort the loaded page. Required for correctness alongside
+   * `pagination`. Columns still need `DataTableColumnHeader` headers to render
+   * a clickable sort affordance; mark the non-sortable ones `enableSorting: false`
+   * so no dead affordance is shown.
+   */
+  sorting?: ServerSortingConfig;
+
+  /**
+   * Server-side search. When set, the toolbar search box becomes controlled and
+   * debounced, and the client-side `globalFilter` is left untouched.
+   */
+  search?: ServerSearchConfig;
+
+  /**
+   * Server-evaluated dropdown filters, rendered alongside any `filterColumns`.
+   * Use these when the filter must apply across the whole result set rather
+   * than the loaded page.
+   */
+  serverFilters?: ServerFilterConfig[];
+
+  /**
+   * Export source override. Client-side exports only ever see the loaded rows;
+   * a server-paginated table must page through the backend to export the full
+   * filtered set. When set, CSV/JSON export awaits this instead.
+   */
+  onExportData?: () => Promise<TData[]>;
+
+  /**
+   * Override the toolbar result label (default `"<shown> of <loaded> <entity>"`,
+   * which is misleading under server pagination). Pair with
+   * `formatResultLabel(shown, totalCount)` from the app convention layer.
+   */
+  resultLabel?: string;
+
+  /**
+   * True while a background refetch is in flight (e.g. after a filter change).
+   * Renders a small spinner in the toolbar without swapping in the skeleton.
+   */
+  isFetching?: boolean;
 }
 
 /**
@@ -456,6 +572,13 @@ export function createDataTableWithToolbar<TData>(
     getRowId,
     rowLayout = 'list',
     hideToolbar = false,
+    pagination: serverPagination,
+    sorting: serverSorting,
+    search: serverSearch,
+    serverFilters,
+    onExportData,
+    resultLabel,
+    isFetching,
   }: DataTableWithToolbarProps<TData>) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -470,19 +593,65 @@ export function createDataTableWithToolbar<TData>(
     // survives pagination/refetch (renderRow consumers MUST pass getRowId).
     const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
+    // Server-search mirror: the input stays responsive locally while `onChange`
+    // is pushed up on a debounce. `lastPushedSearch` is what the consumer last
+    // saw, so an external reset (Clear filters) flows back DOWN without the
+    // debounce immediately echoing the stale value back up.
+    const [searchInput, setSearchInput] = useState(serverSearch?.value ?? '');
+    const lastPushedSearch = useRef(serverSearch?.value ?? '');
+    const serverSearchValue = serverSearch?.value;
+    const serverSearchDebounce = serverSearch?.debounceMs ?? 300;
+    const serverSearchOnChange = serverSearch?.onChange;
+
+    useEffect(() => {
+      if (serverSearchValue === undefined) return;
+      if (serverSearchValue !== lastPushedSearch.current) {
+        lastPushedSearch.current = serverSearchValue;
+        setSearchInput(serverSearchValue);
+      }
+    }, [serverSearchValue]);
+
+    useEffect(() => {
+      if (!serverSearchOnChange) return;
+      if (searchInput === lastPushedSearch.current) return;
+      const timer = setTimeout(() => {
+        lastPushedSearch.current = searchInput;
+        serverSearchOnChange(searchInput);
+      }, serverSearchDebounce);
+      return () => clearTimeout(timer);
+    }, [searchInput, serverSearchDebounce, serverSearchOnChange]);
+
+    // Server-side mode. Each block below is inert when its prop is unset, so
+    // the options object stays byte-identical for client-side consumers.
+    const isServerSorted = serverSorting !== undefined;
+    const isServerPaginated = serverPagination !== undefined;
+
     const table = useReactTable({
       data,
       columns,
       state: {
-        sorting,
+        sorting: isServerSorted ? serverSorting.state : sorting,
         columnFilters,
         globalFilter,
         rowSelection,
         columnVisibility,
+        ...(isServerPaginated
+          ? {
+              pagination: {
+                pageIndex: serverPagination.pageIndex,
+                pageSize: serverPagination.pageSize,
+              },
+            }
+          : {}),
       },
       enableRowSelection,
       onRowSelectionChange: setRowSelection,
-      onSortingChange: setSorting,
+      onSortingChange: isServerSorted
+        ? (updater) =>
+            serverSorting.onChange(
+              typeof updater === 'function' ? updater(serverSorting.state) : updater,
+            )
+        : setSorting,
       onColumnFiltersChange: setColumnFilters,
       onGlobalFilterChange: setGlobalFilter,
       onColumnVisibilityChange: setColumnVisibility,
@@ -494,11 +663,41 @@ export function createDataTableWithToolbar<TData>(
       // is byte-identical to before when the card/expand props are unused. An
       // unconditional getRowId would re-key RowSelectionState and break bulk-select.
       ...(renderRow && getRowId ? { getRowId } : {}),
-      initialState: {
-        pagination: {
-          pageSize: defaultPageSize,
-        },
-      },
+      // GATED: `manualSorting` stops TanStack re-sorting the loaded page on top
+      // of the backend's ordering — without it a server sort would be silently
+      // overwritten by a client sort over 1 page of N.
+      ...(isServerSorted ? { manualSorting: true as const } : {}),
+      ...(isServerPaginated
+        ? {
+            manualPagination: true as const,
+            pageCount:
+              serverPagination.totalCount !== undefined
+                ? Math.ceil(serverPagination.totalCount / serverPagination.pageSize)
+                : -1,
+            onPaginationChange: (updater: unknown) => {
+              const prev = {
+                pageIndex: serverPagination.pageIndex,
+                pageSize: serverPagination.pageSize,
+              };
+              const next =
+                typeof updater === 'function'
+                  ? (updater as (p: typeof prev) => typeof prev)(prev)
+                  : (updater as typeof prev);
+              if (next.pageSize !== prev.pageSize) {
+                serverPagination.onPageSizeChange?.(next.pageSize);
+              }
+              if (next.pageIndex !== prev.pageIndex) {
+                serverPagination.onPageChange?.(next.pageIndex);
+              }
+            },
+          }
+        : {
+            initialState: {
+              pagination: {
+                pageSize: defaultPageSize,
+              },
+            },
+          }),
     });
 
     const selectedRows = table.getFilteredSelectedRowModel().rows;
@@ -519,12 +718,27 @@ export function createDataTableWithToolbar<TData>(
     };
 
     // Export functions
-    const exportToCSV = () => {
+    //
+    // `onExportData` exists because the client-side path below can only ever see
+    // the LOADED rows — under server pagination that silently exports page 1 of
+    // N. When supplied it pages the backend for the full filtered set, and the
+    // rows come back as raw `TData` (no TanStack row wrapper), so values are
+    // read off the object rather than via `row.getValue`.
+    const exportToCSV = async () => {
       const headers = table.getVisibleFlatColumns()
         .filter(col => col.id !== 'select' && col.id !== 'actions')
         .map(col => col.id);
 
-      const csvData = table.getFilteredRowModel().rows.map(row => {
+      const csvData = onExportData
+        ? (await onExportData()).map(item => {
+            const rowData: Record<string, unknown> = {};
+            headers.forEach(header => {
+              const cell = (item as Record<string, unknown>)[header];
+              rowData[header] = typeof cell === 'object' ? JSON.stringify(cell) : cell;
+            });
+            return rowData;
+          })
+        : table.getFilteredRowModel().rows.map(row => {
         const rowData: Record<string, unknown> = {};
         headers.forEach(header => {
           const cell = row.getValue(header);
@@ -547,8 +761,10 @@ export function createDataTableWithToolbar<TData>(
       toast.success(`${entityName} exported to CSV`);
     };
 
-    const exportToJSON = () => {
-      const exportData = table.getFilteredRowModel().rows.map(row => row.original);
+    const exportToJSON = async () => {
+      const exportData = onExportData
+        ? await onExportData()
+        : table.getFilteredRowModel().rows.map(row => row.original);
       const jsonContent = JSON.stringify(exportData, null, 2);
 
       const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
@@ -565,9 +781,21 @@ export function createDataTableWithToolbar<TData>(
       setGlobalFilter('');
       setColumnFilters([]);
       table.resetColumnFilters();
+      // Server-side equivalents (inert when the props are unset).
+      if (serverSearch) {
+        setSearchInput('');
+        lastPushedSearch.current = '';
+        serverSearch.onChange('');
+      }
+      serverFilters?.forEach(filter => filter.onChange('all'));
     };
 
-    const hasActiveFilters = globalFilter || columnFilters.length > 0;
+    const hasActiveFilters = Boolean(
+      globalFilter ||
+        columnFilters.length > 0 ||
+        searchInput ||
+        serverFilters?.some(filter => filter.value !== 'all'),
+    );
 
     // Density classes
     const getDensityClasses = () => {
@@ -620,16 +848,58 @@ export function createDataTableWithToolbar<TData>(
         {!hideToolbar && (
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            {/* Search */}
+            {/* Search — server-driven (debounced) when `search` is supplied,
+                otherwise the original client-side globalFilter. */}
             <div className="relative">
               <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={`Search ${entityName}...`}
-                value={globalFilter ?? ''}
-                onChange={(event) => setGlobalFilter(String(event.target.value))}
-                className="pl-8 max-w-sm"
-              />
+              {serverSearch ? (
+                <Input
+                  placeholder={serverSearch.placeholder ?? `Search ${entityName}...`}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(String(event.target.value))}
+                  className="pl-8 max-w-sm"
+                />
+              ) : (
+                <Input
+                  placeholder={`Search ${entityName}...`}
+                  value={globalFilter ?? ''}
+                  onChange={(event) => setGlobalFilter(String(event.target.value))}
+                  className="pl-8 max-w-sm"
+                />
+              )}
             </div>
+
+            {/* Server-evaluated filters (apply across the whole result set). */}
+            {serverFilters?.map((filterConfig) => (
+              <Select
+                key={filterConfig.id}
+                value={filterConfig.value}
+                onValueChange={filterConfig.onChange}
+              >
+                <SelectTrigger className={filterConfig.className ?? 'w-[130px]'}>
+                  {filterConfig.renderValue ? (
+                    <SelectValue>{filterConfig.renderValue(filterConfig.value)}</SelectValue>
+                  ) : (
+                    <SelectValue placeholder={filterConfig.label} />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {filterConfig.options.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ))}
+
+            {/* Background refetch indicator (server-side mode). */}
+            {isFetching && !isLoading && (
+              <span
+                aria-label="Loading"
+                className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+              />
+            )}
 
             {/* Column Filters */}
             {filterColumns.map((filterConfig) => (
@@ -670,9 +940,11 @@ export function createDataTableWithToolbar<TData>(
           </div>
 
           <div className="flex items-center space-x-2">
-            {/* Results Count */}
+            {/* Results Count — the default counts LOADED rows, which is
+                misleading under server pagination; `resultLabel` overrides it. */}
             <div className="text-sm text-muted-foreground">
-              {table.getFilteredRowModel().rows.length} of {data.length} {entityName}
+              {resultLabel ??
+                `${table.getFilteredRowModel().rows.length} of ${data.length} ${entityName}`}
             </div>
 
             {/* Refresh */}
@@ -953,7 +1225,7 @@ export function createDataTableWithToolbar<TData>(
                 <SelectValue placeholder={String(table.getState().pagination.pageSize)} />
               </SelectTrigger>
               <SelectContent side="top">
-                {pageSizeOptions.map((pageSize) => (
+                {(serverPagination?.pageSizeOptions ?? pageSizeOptions).map((pageSize) => (
                   <SelectItem key={pageSize} value={`${pageSize}`}>
                     {pageSize}
                   </SelectItem>

@@ -303,8 +303,14 @@ export function createOrgRepositoryClass(schema: OrgRepositorySchema) {
             orderByClause = sortOrder === 'asc' ? asc(orgs.createdAt) : desc(orgs.createdAt);
           }
           break;
+        case 'isActive':
+          orderByClause = sortOrder === 'asc' ? asc(orgs.isActive) : desc(orgs.isActive);
+          break;
         case 'createdAt':
         default:
+          // Apps may extend `sortBy` with their own columns (the type is an open
+          // union for exactly that). Unknown keys fall through to createdAt here
+          // rather than throwing — the app's own repository implements them.
           orderByClause = sortOrder === 'asc' ? asc(orgs.createdAt) : desc(orgs.createdAt);
           break;
       }

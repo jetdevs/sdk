@@ -20,7 +20,10 @@ export const orgListSchema = z.object({
   pageSize: z.number().int().min(1).max(100).default(20),
   search: z.string().optional(),
   isActive: z.boolean().optional(),
-  sortBy: z.enum(['name', 'createdAt', 'updatedAt', 'userCount']).default('name'),
+  // Generic, every-app sort keys only. Apps with extra sortable columns extend
+  // this field in their own router override (yobo adds isIndonesian /
+  // creditBalance) rather than widening the shared enum.
+  sortBy: z.enum(['name', 'createdAt', 'updatedAt', 'userCount', 'isActive']).default('name'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
   crossOrgAccess: z.boolean().default(false),
   includeStats: z.boolean().default(false),

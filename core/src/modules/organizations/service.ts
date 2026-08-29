@@ -132,7 +132,7 @@ export interface OrgListParams {
   pageSize: number;
   search?: string;
   isActive?: boolean;
-  sortBy: 'name' | 'createdAt' | 'updatedAt' | 'userCount';
+  sortBy: 'name' | 'createdAt' | 'updatedAt' | 'userCount' | 'isActive' | (string & {});
   sortOrder: 'asc' | 'desc';
   crossOrgAccess?: boolean;
   includeStats?: boolean;

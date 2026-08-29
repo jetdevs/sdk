@@ -68,6 +68,9 @@ export type { DataTablePaginationProps } from './DataTablePagination';
 // DataTableWithToolbar types
 export type {
     BulkAction,
-    DataTableWithToolbarConfig, DataTableWithToolbarFactoryConfig, DataTableWithToolbarProps, FilterColumnConfig, ToastInterface
+    DataTableWithToolbarConfig, DataTableWithToolbarFactoryConfig, DataTableWithToolbarProps, FilterColumnConfig,
+    // Server-side mode (opt-in) — see the props docs on DataTableWithToolbarProps.
+    ServerFilterConfig, ServerSearchConfig, ServerSortingConfig,
+    ToastInterface
 } from './DataTableWithToolbar';
 
