@@ -59,6 +59,14 @@ describe('ConnectionsResource', () => {
       expect(http.delete).toHaveBeenCalledWith('/api/v1/connections/c1');
     });
 
+    it('setIdentityGate() uses the dedicated gate endpoint', async () => {
+      vi.mocked(http.put).mockResolvedValue({ data: { connectionUuid: 'c1', identityGate: 'chat_identity' } });
+      await connections.setIdentityGate('c1', 'chat_identity');
+      expect(http.put).toHaveBeenCalledWith('/api/v1/connections/c1/identity-gate', {
+        identityGate: 'chat_identity',
+      });
+    });
+
     it('test() calls POST /api/v1/connections/test', async () => {
       const data = { channel: 'WHATSAPP' as const, config: { token: 'abc' } };
       vi.mocked(http.post).mockResolvedValue({ data: { success: true, message: 'ok' } });

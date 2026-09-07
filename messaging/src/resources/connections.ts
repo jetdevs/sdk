@@ -33,6 +33,13 @@ export class ConnectionsResource {
     return this.http.patch(`/api/v1/connections/${uuid}`, data);
   }
 
+  async setIdentityGate(
+    uuid: string,
+    identityGate: 'connection_pin' | 'chat_identity' | null,
+  ): Promise<ApiResponse<{ connectionUuid: string; identityGate: string | null }>> {
+    return this.http.put(`/api/v1/connections/${uuid}/identity-gate`, { identityGate });
+  }
+
   async delete(uuid: string): Promise<void> {
     await this.http.delete(`/api/v1/connections/${uuid}`);
   }
