@@ -13,6 +13,10 @@
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { IUserRepository } from './repository';
+import {
+  askLocalCredentialGuard,
+  type LocalCredentialWriteGuard,
+} from '../auth/local-credential-policy';
 import type {
     UserPermissionsData,
     UserRecord,
@@ -273,6 +277,15 @@ export interface UserServiceHooks {
    * Required for password verification.
    */
   comparePassword: (password: string, hash: string) => Promise<boolean>;
+
+  /**
+   * Optional guard asked BEFORE any local verifier is hashed or stored
+   * (invite of a new user, update with a password, changePassword). A refusal
+   * becomes a FORBIDDEN `UserServiceError` carrying the guard's reason and
+   * nothing is written. Absent, every write is allowed — the pre-existing
+   * behaviour. Same contract as `UserRouterDeps.canWriteLocalCredential`.
+   */
+  canWriteLocalCredential?: LocalCredentialWriteGuard;
 }
 
 /**
@@ -301,6 +314,20 @@ export class UserServiceError extends Error {
   ) {
     super(message);
     this.name = 'UserServiceError';
+  }
+}
+
+/**
+ * Ask the app's `canWriteLocalCredential` hook (if any) and turn a refusal
+ * into this module's error shape.
+ */
+async function assertLocalCredentialWritable(
+  hooks: Pick<UserServiceHooks, 'canWriteLocalCredential'>,
+  args: Parameters<LocalCredentialWriteGuard>[0],
+): Promise<void> {
+  const verdict = await askLocalCredentialGuard(hooks.canWriteLocalCredential, args);
+  if (!verdict.allowed) {
+    throw new UserServiceError('FORBIDDEN', verdict.reason);
   }
 }
 
@@ -723,6 +750,14 @@ export function createUserService(deps: UserServiceDeps): IUserService {
           }
         }
 
+        // The write would allocate a new user: ask before hashing anything.
+        await assertLocalCredentialWritable(hooks, {
+          db: ctx.db,
+          operation: 'invite',
+          user: null,
+          email: params.email,
+        });
+
         // Hash password if provided
         let hashedPassword: string | null = null;
         if (params.password) {
@@ -849,9 +884,16 @@ export function createUserService(deps: UserServiceDeps): IUserService {
         }
       }
 
-      // Hash password if provided
+      // Hash password if provided — only then is a local verifier written,
+      // so only then is the guard asked.
       let hashedPassword: string | undefined;
       if (password) {
+        await assertLocalCredentialWritable(hooks, {
+          db: ctx.db,
+          operation: 'update',
+          user: existingUser,
+          email: existingUser.email ?? null,
+        });
         hashedPassword = await hooks.hashPassword(password, 12);
       }
 
@@ -1133,6 +1175,15 @@ export function createUserService(deps: UserServiceDeps): IUserService {
       if (!user) {
         throw new UserServiceError('NOT_FOUND', 'User not found');
       }
+
+      // Asked BEFORE the compare: a refused account must not leak whether the
+      // supplied current password was right.
+      await assertLocalCredentialWritable(hooks, {
+        db: ctx.db,
+        operation: 'change-password',
+        user,
+        email: user.email ?? null,
+      });
 
       if (!user.password) {
         throw new UserServiceError(

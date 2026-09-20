@@ -11,7 +11,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createAuthRouterConfig } from '../auth/router-config';
-import { createUserRouterConfig } from './router-config';
+import { createUserRouterConfig, type UserRouterDeps } from './router-config';
 
 /** A repository stub that records writes; the routers only touch these methods. */
 function stubRepo(existing: Record<string, any> = {}) {
@@ -34,7 +34,9 @@ function stubRepo(existing: Record<string, any> = {}) {
     async hasRoleInOrg() { return true; }
     async assignRole() { /* not under test */ }
   }
-  return { Repo, writes };
+  // The stub implements only what these handlers call; present it as the
+  // full repository type so the config builders typecheck.
+  return { Repo: Repo as unknown as UserRouterDeps['Repository'], writes };
 }
 
 const hashPassword = async (p: string) => `hashed:${p}`;
