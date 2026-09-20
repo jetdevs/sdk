@@ -7,6 +7,8 @@
  * every app's own routes rather than a copy per repo.
  */
 
+import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
+
 /** Minimal drizzle-like client the service needs. Kept loose so any driver fits. */
 export type PasswordResetDb = any;
 
@@ -29,6 +31,16 @@ export interface SendResetEmailArgs {
 }
 
 export interface PasswordResetServiceDeps {
+  /**
+   * Optional guard consulted before a reset link is minted (`reset-request`)
+   * and again before the new password is written (`reset`). Apps that hand
+   * password ownership to an external identity provider inject their rule.
+   * A refused `reset-request` still answers `{ success: true }` — the endpoint
+   * must not reveal which accounts exist — but mints no token and sends no
+   * email. A refused `reset` answers `{ ok: false, reason: 'refused' }` and
+   * writes nothing.
+   */
+  canWriteLocalCredential?: LocalCredentialWriteGuard;
   /**
    * Runs a callback with a privileged (RLS-bypassing) db client. The flow is
    * pre-authentication, so there is no actor to scope by.
@@ -92,7 +104,7 @@ export interface ResetPasswordArgs {
 
 export type ResetPasswordResult =
   | { ok: true }
-  | { ok: false; error: string; reason: 'validation' | TokenInvalidReason };
+  | { ok: false; error: string; reason: 'validation' | 'refused' | TokenInvalidReason };
 
 export interface PasswordResetService {
   requestReset(args: RequestResetArgs): Promise<RequestResetResult>;

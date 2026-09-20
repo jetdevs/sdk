@@ -88,6 +88,14 @@ export type {
     UserHandlerContext, UserRouterDeps
 } from './router-config';
 
+// The caller-injected guard `UserRouterDeps.canWriteLocalCredential` takes.
+export type {
+    LocalCredentialWriteArgs,
+    LocalCredentialWriteGuard,
+    LocalCredentialWriteOperation,
+    LocalCredentialWriteVerdict,
+} from '../auth/local-credential-policy';
+
 // =============================================================================
 // SERVICE
 // =============================================================================

@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 
+import { askLocalCredentialGuard } from '../auth/local-credential-policy';
 import { validatePassword } from './password-policy';
 import type {
   PasswordResetDb,
@@ -44,6 +45,7 @@ export function createPasswordResetService(
     tokenTtlMs = DEFAULT_TOKEN_TTL_MS,
     generateToken = () => randomBytes(32).toString('hex'),
     onPasswordChanged,
+    canWriteLocalCredential,
     logger = console,
   } = deps;
 
@@ -54,12 +56,7 @@ export function createPasswordResetService(
     const normalized = email.toLowerCase().trim();
 
     const [user] = await runPrivileged(async (db: PasswordResetDb) =>
-      db.select({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        firstName: users.firstName,
-      })
+      db.select()
         .from(users)
         .where(eq(users.email, normalized))
         .limit(1),
@@ -68,6 +65,22 @@ export function createPasswordResetService(
     // No account: stop here but report success, so the response is identical
     // either way and the endpoint reveals nothing about who has an account.
     if (!user) {
+      return { success: true };
+    }
+
+    // Password owned elsewhere: same silent success — a link that could only
+    // be refused on consumption is not worth minting, and the response shape
+    // must not change.
+    const mintVerdict = await runPrivileged(async (db: PasswordResetDb) =>
+      askLocalCredentialGuard(canWriteLocalCredential, {
+        db,
+        operation: 'reset-request',
+        user,
+        email: normalized,
+      }),
+    );
+    if (!mintVerdict.allowed) {
+      logger.warn(`[password-reset] reset link refused for user ${user.id}: ${mintVerdict.reason}`);
       return { success: true };
     }
 
@@ -181,11 +194,25 @@ export function createPasswordResetService(
     }
 
     const [currentUser] = await runPrivileged(async (db: PasswordResetDb) =>
-      db.select({ password: users.password })
+      db.select()
         .from(users)
         .where(eq(users.id, resetToken.userId))
         .limit(1),
     );
+
+    // Server-side closure, checked at CONSUMPTION: a link minted while the
+    // password was still local must not write a verifier once it is not.
+    const writeVerdict = await runPrivileged(async (db: PasswordResetDb) =>
+      askLocalCredentialGuard(canWriteLocalCredential, {
+        db,
+        operation: 'reset',
+        user: currentUser ?? null,
+        email: currentUser?.email ?? null,
+      }),
+    );
+    if (!writeVerdict.allowed) {
+      return { ok: false, error: writeVerdict.reason, reason: 'refused' };
+    }
 
     if (currentUser?.password) {
       const isSamePassword = await comparePassword(password, currentUser.password);

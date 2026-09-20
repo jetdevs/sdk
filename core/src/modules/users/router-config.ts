@@ -12,6 +12,10 @@ import { and, ilike, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { IUserRepository } from './repository';
 import {
+  askLocalCredentialGuard,
+  type LocalCredentialWriteGuard,
+} from '../auth/local-credential-policy';
+import {
     assignRoleSchema,
     changePasswordSchema,
     checkUsernameSchema,
@@ -63,6 +67,16 @@ export interface UserRouterDeps {
    * the db handle. Errors should be swallowed by the implementer (non-fatal).
    */
   onUserInvited?: (args: { user: any; orgId: number | null; db: any }) => Promise<void>;
+
+  /**
+   * Optional guard consulted before any procedure here writes a local
+   * verifier — `invite` and `create` (a new user), `update` (a password on an
+   * existing user) and `changePassword`. Apps that hand password ownership to
+   * an external identity provider inject their rule; the SDK has no opinion.
+   * A refusal is surfaced as `UserRouterError('FORBIDDEN', reason)` and
+   * nothing is written.
+   */
+  canWriteLocalCredential?: LocalCredentialWriteGuard;
 }
 
 /**
@@ -97,6 +111,20 @@ export class UserRouterError extends Error {
   ) {
     super(message);
     this.name = 'UserRouterError';
+  }
+}
+
+/**
+ * Ask the app's `canWriteLocalCredential` guard (if any) and turn a refusal
+ * into this module's error shape.
+ */
+async function assertLocalCredentialWritable(
+  deps: Pick<UserRouterDeps, 'canWriteLocalCredential'>,
+  args: Parameters<LocalCredentialWriteGuard>[0],
+): Promise<void> {
+  const verdict = await askLocalCredentialGuard(deps.canWriteLocalCredential, args);
+  if (!verdict.allowed) {
+    throw new UserRouterError('FORBIDDEN', verdict.reason);
   }
 }
 
@@ -376,6 +404,15 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           return existing;
         }
 
+        // Server-side closure: a new user is a new identity, and may carry a
+        // local verifier. Ask the app before allocating either.
+        await assertLocalCredentialWritable(deps, {
+          db,
+          operation: 'invite',
+          user: null,
+          email: input.email,
+        });
+
         // Hash password before storing
         const hashedPassword = input.password
           ? await deps.hashPassword(input.password, 10)
@@ -436,6 +473,14 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         if (existing) {
           throw new UserRouterError('CONFLICT', 'User with this email already exists');
         }
+
+        // Server-side closure: same question as `invite`.
+        await assertLocalCredentialWritable(deps, {
+          db,
+          operation: 'create',
+          user: null,
+          email: input.email,
+        });
 
         // Hash password before storing
         const hashedPassword = input.password
@@ -510,6 +555,14 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         // Hash password if provided
         const finalUpdateData = { ...updateData } as typeof updateData & { password?: string };
         if (password) {
+          // Server-side closure: an admin setting a password IS a local
+          // verifier write. Ask before hashing.
+          await assertLocalCredentialWritable(deps, {
+            db,
+            operation: 'update',
+            user: existing,
+            email: existing.email ?? null,
+          });
           finalUpdateData.password = await deps.hashPassword(password, 10);
           console.log('[SDK User Update] Password hashed and added to finalUpdateData');
         }
@@ -622,6 +675,15 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         if (!user) {
           throw new UserRouterError('NOT_FOUND', 'User not found');
         }
+
+        // Server-side closure: refuse BEFORE the compare, so a refused user
+        // learns nothing about their stale local hash.
+        await assertLocalCredentialWritable(deps, {
+          db,
+          operation: 'change-password',
+          user,
+          email: user.email ?? null,
+        });
 
         // Verify current password
         const isValid = user.password

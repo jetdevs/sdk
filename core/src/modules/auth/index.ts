@@ -189,3 +189,16 @@ export type {
   AuthContext,
   AuthHandlerContext,
 } from './router-config';
+
+// =============================================================================
+// LOCAL CREDENTIAL WRITE POLICY (caller-injected guard)
+// =============================================================================
+
+export { askLocalCredentialGuard } from './local-credential-policy';
+
+export type {
+  LocalCredentialWriteArgs,
+  LocalCredentialWriteGuard,
+  LocalCredentialWriteOperation,
+  LocalCredentialWriteVerdict,
+} from './local-credential-policy';

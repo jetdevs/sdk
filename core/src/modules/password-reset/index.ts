@@ -19,6 +19,14 @@ export {
 
 export type { PasswordRule, PasswordPolicyResult } from './password-policy';
 
+// The caller-injected guard `PasswordResetServiceDeps.canWriteLocalCredential` takes.
+export type {
+  LocalCredentialWriteArgs,
+  LocalCredentialWriteGuard,
+  LocalCredentialWriteOperation,
+  LocalCredentialWriteVerdict,
+} from '../auth/local-credential-policy';
+
 export type {
   PasswordResetDb,
   PasswordResetService,

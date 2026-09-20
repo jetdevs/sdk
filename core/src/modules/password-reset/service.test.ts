@@ -157,6 +157,67 @@ describe('password reset service', () => {
     });
   });
 
+  describe('canWriteLocalCredential guard (caller-injected)', () => {
+    const liveToken = [{ id: 1, userId: 7, expiresAt: new Date(Date.now() + 60_000) }];
+    const owned = { id: 7, email: 'owned@example.com', password: 'hashed:Old!Pass123', ownedElsewhere: true };
+
+    it('requestReset: a refused mint still answers success, but issues no token and sends no email', async () => {
+      const guard = vi.fn().mockResolvedValue({ allowed: false, reason: 'owned elsewhere' });
+      const { service, db, sendResetEmail } = build(
+        { users: [owned] },
+        { canWriteLocalCredential: guard },
+      );
+
+      const result = await service.requestReset({ email: 'owned@example.com' });
+
+      expect(result).toEqual({ success: true });
+      expect(db.__calls.inserted).toHaveLength(0);
+      expect(db.__calls.deleted).toBe(0);
+      expect(sendResetEmail).not.toHaveBeenCalled();
+      // The guard sees the WHOLE row, not a projection — the app's rule may
+      // live in any column.
+      expect(guard).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'reset-request', user: owned, email: 'owned@example.com' }),
+      );
+    });
+
+    it('resetPassword: a refused write is reported as refused and writes nothing', async () => {
+      const guard = vi.fn().mockResolvedValue({ allowed: false, reason: 'owned elsewhere' });
+      const { service, db } = build(
+        { tokens: liveToken, users: [owned] },
+        { canWriteLocalCredential: guard },
+      );
+
+      const result = await service.resetPassword({ token: 'good', password: 'Str0ng!Pass' });
+
+      expect(result).toEqual({ ok: false, error: 'owned elsewhere', reason: 'refused' });
+      expect(db.__calls.updated).toHaveLength(0);
+      expect(db.__calls.inserted).toHaveLength(0);
+      expect(guard).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'reset', user: owned }),
+      );
+    });
+
+    it('an allowing guard changes nothing about the happy path', async () => {
+      const { service, db } = build(
+        { tokens: liveToken, users: [owned] },
+        { canWriteLocalCredential: async () => ({ allowed: true }) },
+      );
+
+      const result = await service.resetPassword({ token: 'good', password: 'Str0ng!Pass' });
+
+      expect(result).toEqual({ ok: true });
+      expect(db.__calls.updated[0].values.password).toBe('hashed:Str0ng!Pass');
+    });
+
+    it('no guard injected: every write is allowed (pre-existing consumers unchanged)', async () => {
+      const { service, db } = build({ tokens: liveToken, users: [owned] });
+      const result = await service.resetPassword({ token: 'good', password: 'Str0ng!Pass' });
+      expect(result).toEqual({ ok: true });
+      expect(db.__calls.updated[0].values.password).toBe('hashed:Str0ng!Pass');
+    });
+  });
+
   describe('resetPassword', () => {
     const liveToken = [{ id: 1, userId: 7, expiresAt: new Date(Date.now() + 60_000) }];
 

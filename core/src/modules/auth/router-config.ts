@@ -11,6 +11,10 @@
 import { z } from 'zod';
 import type { IAuthRepository } from './repository';
 import { registerSchema, updateProfileSchema } from './schemas';
+import {
+  askLocalCredentialGuard,
+  type LocalCredentialWriteGuard,
+} from './local-credential-policy';
 
 // =============================================================================
 // TYPES
@@ -55,6 +59,14 @@ export interface AuthRouterDeps {
    * Defaults to checking NEXT_PUBLIC_ENABLE_PUBLIC_REGISTRATION env var
    */
   isRegistrationEnabled?: () => boolean;
+
+  /**
+   * Optional guard consulted before `register` writes a local verifier.
+   * Apps that hand password ownership to an external identity provider inject
+   * their rule here; the SDK itself has no opinion. A refusal is surfaced as
+   * `AuthRouterError('FORBIDDEN', reason)` and nothing is written.
+   */
+  canWriteLocalCredential?: LocalCredentialWriteGuard;
 }
 
 /**
@@ -181,7 +193,7 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
       public: true,
       input: registerSchema,
       repository: deps.Repository,
-      handler: async ({ input, repo }: AuthHandlerContext<z.infer<typeof registerSchema>>) => {
+      handler: async ({ input, repo, db }: AuthHandlerContext<z.infer<typeof registerSchema>>) => {
         // Check if public registration is enabled
         if (!isRegistrationEnabled()) {
           throw new AuthRouterError('FORBIDDEN', 'Public registration is disabled');
@@ -191,6 +203,17 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
 
         if (existingUser) {
           throw new AuthRouterError('CONFLICT', 'User already exists');
+        }
+
+        // Server-side closure: ask the app before allocating a local verifier.
+        const verdict = await askLocalCredentialGuard(deps.canWriteLocalCredential, {
+          db,
+          operation: 'register',
+          user: null,
+          email: input.email,
+        });
+        if (!verdict.allowed) {
+          throw new AuthRouterError('FORBIDDEN', verdict.reason);
         }
 
         const hashedPassword = await deps.hashPassword(input.password, 12);
