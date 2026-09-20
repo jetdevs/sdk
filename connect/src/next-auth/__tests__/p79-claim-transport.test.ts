@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { ConnectProvider, mapConnectClaimsToToken } from '../index.js'
+import type { ConnectProviderConfig } from '../index.js'
 
 const config = {
   baseUrl: 'https://connect.example.com',
@@ -77,12 +78,21 @@ describe('AC2 — the issuer is available alongside the subject', () => {
     expect(user).toHaveProperty('connectIssuer', 'https://connect.example.com')
   })
 
-  it('prefers an issuer the IdP actually asserted over the configured baseUrl', () => {
+  // The retired contract (through 95bd4bd) preferred `profile.iss`. It is the
+  // response body: `iss: ''` survived the `??` and produced an empty issuer,
+  // and any other value was taken verbatim — for the one field whose job is to
+  // be a trust anchor.
+  it('ignores a payload iss and keeps the configured baseUrl', () => {
     const user = ConnectProvider(config).profile(
-      { sub: 'user-uuid-123', iss: 'https://connect.cadraos.com' },
+      { sub: 'user-uuid-123', iss: 'https://evil.example' },
       {} as never,
     )
-    expect(user.connectIssuer).toBe('https://connect.cadraos.com')
+    expect(user.connectIssuer).toBe('https://connect.example.com')
+  })
+
+  it('is not emptied by an empty-string iss', () => {
+    const user = ConnectProvider(config).profile({ sub: 's', iss: '' }, {} as never)
+    expect(user.connectIssuer).toBe('https://connect.example.com')
   })
 
   it('leaves user.id on profile.sub — crm and yobo resolve by it today', () => {
@@ -133,12 +143,96 @@ describe('AC4 — a configured resource and scope both appear as request paramet
     expect(params.scope).toBe('openid profile email offline_access copilot:use')
   })
 
+  const scopeOf = (cfg: ConnectProviderConfig) =>
+    (ConnectProvider(cfg).authorization as { params: Record<string, string> }).params.scope
+
   it('does not repeat a scope already in defaultScopes', () => {
-    const params = (
-      ConnectProvider({ ...config, additionalScopes: ['openid', 'copilot:use'] })
-        .authorization as { params: Record<string, string> }
-    ).params
-    expect(params.scope).toBe('openid profile email offline_access copilot:use')
+    expect(scopeOf({ ...config, additionalScopes: ['openid', 'copilot:use'] })).toBe(
+      'openid profile email offline_access copilot:use',
+    )
+  })
+
+  it('does not repeat a scope additionalScopes lists twice', () => {
+    expect(scopeOf({ ...config, additionalScopes: ['copilot:use', 'copilot:use'] })).toBe(
+      'openid profile email offline_access copilot:use',
+    )
+  })
+
+  it('drops an empty scope rather than emitting a double separator', () => {
+    expect(scopeOf({ ...config, additionalScopes: [''] })).toBe(
+      'openid profile email offline_access',
+    )
+    expect(scopeOf({ ...config, additionalScopes: ['', 'copilot:use'] })).toBe(
+      'openid profile email offline_access copilot:use',
+    )
+  })
+
+  it('keeps the base list first and in order', () => {
+    expect(scopeOf({ ...config, additionalScopes: ['copilot:use', 'openid'] })).toBe(
+      'openid profile email offline_access copilot:use',
+    )
+  })
+})
+
+describe('§12.1a — the resource reaches the TOKEN request, not only /authorize', () => {
+  const resource = 'https://app.cadraos.com/copilot'
+
+  /** Stand-in for the openid-client instance NextAuth hands the handler. */
+  function fakeClient() {
+    const calls: unknown[][] = []
+    return {
+      calls,
+      client: {
+        callback: (...args: unknown[]) => {
+          calls.push(args)
+          return { access_token: 'at', id_token: 'it' }
+        },
+      },
+    }
+  }
+
+  async function exchange(cfg: ConnectProviderConfig) {
+    const provider = ConnectProvider(cfg)
+    const { client, calls } = fakeClient()
+    const handler = provider.token as {
+      request: (ctx: Record<string, unknown>) => Promise<{ tokens: unknown }>
+    }
+    const result = await handler.request({
+      client,
+      provider: { ...provider, callbackUrl: 'https://rp.example/api/auth/callback/connect' },
+      params: { code: 'the-code', state: 'the-state' },
+      checks: { code_verifier: 'the-verifier', state: 'the-state', nonce: 'the-nonce' },
+    })
+    return { calls, result }
+  }
+
+  it('installs no token handler at all when no resource is configured', () => {
+    // AC3: with nothing configured the provider object itself is unchanged.
+    expect(Object.keys(ConnectProvider(config))).not.toContain('token')
+  })
+
+  it('sends the resource in the exchange BODY, not as a callback parameter', async () => {
+    // A resource on `authorization.params` alone leaves the access token
+    // identity-bound with no audience: NextAuth merges `token.params` into the
+    // callback parameters and openid-client drops every non-callback key before
+    // building the exchange body. `extras.exchangeBody` is the only way in.
+    const { calls } = await exchange({ ...config, resource })
+    expect(calls).toHaveLength(1)
+    expect(calls[0][3]).toEqual({ exchangeBody: { resource } })
+    expect(calls[0][1]).not.toHaveProperty('resource')
+  })
+
+  it('leaves the redirect uri, callback params and checks untouched', async () => {
+    const { calls, result } = await exchange({ ...config, resource })
+    expect(calls[0][0]).toBe('https://rp.example/api/auth/callback/connect')
+    expect(calls[0][1]).toEqual({ code: 'the-code', state: 'the-state' })
+    // PKCE/state/nonce must reach openid-client exactly as NextAuth built them.
+    expect(calls[0][2]).toEqual({
+      code_verifier: 'the-verifier',
+      state: 'the-state',
+      nonce: 'the-nonce',
+    })
+    expect(result.tokens).toEqual({ access_token: 'at', id_token: 'it' })
   })
 })
 
@@ -176,14 +270,53 @@ describe('mapConnectClaimsToToken carries the same claims onto the JWT', () => {
     expect(token).toHaveProperty('connectSub', 'user-uuid-123')
   })
 
-  it('prefers an asserted iss over the configured issuer', () => {
+  it('prefers the configured issuer over one asserted in the payload', () => {
     const token: Record<string, unknown> = {}
     mapConnectClaimsToToken(token, {
       account: { provider: 'connect' },
       issuer: 'https://connect.example.com',
+      profile: { sub: 's', iss: 'https://evil.example' },
+    })
+    expect(token.connectIssuer).toBe('https://connect.example.com')
+  })
+
+  it('falls back to the payload iss only when the caller configured none', () => {
+    const token: Record<string, unknown> = {}
+    mapConnectClaimsToToken(token, {
+      account: { provider: 'connect' },
       profile: { sub: 's', iss: 'https://connect.cadraos.com' },
     })
     expect(token.connectIssuer).toBe('https://connect.cadraos.com')
+  })
+
+  it('clears an epoch the IdP has stopped asserting (no fail-open on refresh)', () => {
+    const token: Record<string, unknown> = {
+      connectCv: 7,
+      connectAeid: 'epoch-uuid-abc',
+      connectGrantId: 'grant-uuid-xyz',
+      connectOrgId: 42,
+    }
+    mapConnectClaimsToToken(token, {
+      account: { provider: 'connect' },
+      issuer: 'https://connect.example.com',
+      profile: { sub: 'user-uuid-123' },
+    })
+    // Absence means "not asserted", not "unchanged" — a stale cv surviving a
+    // re-authentication is the fail-open STORY-014 enforcement would read.
+    expect(Object.keys(token)).not.toContain('connectCv')
+    expect(Object.keys(token)).not.toContain('connectAeid')
+    expect(Object.keys(token)).not.toContain('connectGrantId')
+    // Org state is resolved state, not an enforcement input: it is left alone.
+    expect(token).toHaveProperty('connectOrgId', 42)
+  })
+
+  it('leaves a non-Connect provider token untouched, epoch keys included', () => {
+    const token: Record<string, unknown> = { connectCv: 7 }
+    mapConnectClaimsToToken(token, {
+      account: { provider: 'google' },
+      profile: { sub: 's' },
+    })
+    expect(token).toHaveProperty('connectCv', 7)
   })
 
   it('stays a no-op for a non-Connect provider', () => {
