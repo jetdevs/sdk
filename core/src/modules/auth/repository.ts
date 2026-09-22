@@ -7,7 +7,7 @@
  * @module @jetdevs/core/auth
  */
 
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
@@ -127,13 +127,20 @@ export function createAuthRepositoryClass(schema: AuthRepositorySchema) {
     }
 
     /**
-     * Find user by email
+     * Find user by email.
+     *
+     * Case-insensitive on the STORED address as well as the argument (p79
+     * STORY-046, the same rule the users repository took in STORY-042): this
+     * is `register`'s duplicate check, and while it was exact equality a row
+     * saved as `Sean@x.com` was invisible to `sean@x.com`, so a second local
+     * user was allocated for the same person. Apps that want an index on it
+     * own that DDL (cadra-web: migration 0136, `lower(email)` unique).
      */
     async findByEmail(email: string): Promise<AuthUserRecord | null> {
       const [user] = await this._db
         .select()
         .from(schema.users)
-        .where(eq(schema.users.email, email))
+        .where(sql`lower(${schema.users.email}) = lower(${email})`)
         .limit(1);
 
       return (user as unknown as AuthUserRecord) || null;
@@ -322,14 +329,15 @@ export const SDKAuthRepository = class SDKAuthRepository implements IAuthReposit
   }
 
   /**
-   * Find user by email
+   * Find user by email — case-insensitive on the stored address (see
+   * `createAuthRepositoryClass`).
    */
   async findByEmail(email: string): Promise<AuthUserRecord | null> {
     const schema = getSDKAuthSchema();
     const [user] = await this._db
       .select()
       .from(schema.users)
-      .where(eq(schema.users.email, email))
+      .where(sql`lower(${schema.users.email}) = lower(${email})`)
       .limit(1);
 
     return (user as unknown as AuthUserRecord) || null;
