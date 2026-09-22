@@ -61,8 +61,9 @@ export async function seedRoles(
     const permissionBySlug = new Map(
       existingPermissions.map((p: any) => [p.slug, p])
     );
-    const roleByNameAndOrg = new Map(
-      existingRoles.map((r: any) => [`${r.name}-${r.orgId || 'null'}`, r])
+    // Key includes roleCategory since unique constraint is (name, orgId, roleCategory)
+    const roleByNameOrgCategory = new Map(
+      existingRoles.map((r: any) => [`${r.name}-${r.orgId || 'null'}-${r.roleCategory || 'user'}`, r])
     );
     const existingMappingSet = new Set(
       existingMappings.map((m: any) => `${m.roleId}-${m.permissionId}`)
@@ -78,9 +79,10 @@ export async function seedRoles(
         roleData.orgId === null
           ? null
           : roleData.orgId ?? (roleData.isSystemRole || roleData.isGlobalRole ? null : defaultOrgId);
+      const roleCategory = roleData.roleCategory || 'user';
 
-      const roleKey = `${roleData.name}-${roleOrgId || 'null'}`;
-      const existingRole = roleByNameAndOrg.get(roleKey);
+      const roleKey = `${roleData.name}-${roleOrgId || 'null'}-${roleCategory}`;
+      const existingRole = roleByNameOrgCategory.get(roleKey);
 
       let roleId: number;
 
@@ -93,6 +95,8 @@ export async function seedRoles(
           isGlobalRole: roleData.isGlobalRole,
           orgId: roleOrgId,
           isActive: true,
+          // Include roleCategory if specified (defaults to 'user' in schema)
+          ...(roleData.roleCategory && { roleCategory: roleData.roleCategory }),
         });
         // We'll get the roleId after batch insert
       } else {
@@ -142,7 +146,8 @@ export async function seedRoles(
         const roleData = rolesData.find(
           (r) =>
             r.name === newRole.name &&
-            (r.orgId ?? (r.isSystemRole || r.isGlobalRole ? null : defaultOrgId)) === newRole.orgId
+            (r.orgId ?? (r.isSystemRole || r.isGlobalRole ? null : defaultOrgId)) === newRole.orgId &&
+            (r.roleCategory || 'user') === (newRole.roleCategory || 'user')
         );
 
         if (!roleData) continue;

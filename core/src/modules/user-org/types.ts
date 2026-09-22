@@ -105,6 +105,8 @@ export interface AssignableRole {
   isGlobalRole: boolean;
   isSystemRole: boolean;
   orgId: number | null;
+  /** Role category - 'user' for human users, 'service' for API keys */
+  roleCategory?: 'user' | 'service';
 }
 
 /**

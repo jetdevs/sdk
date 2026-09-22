@@ -76,9 +76,14 @@ export function applyTheme(
     extension = '.css',
   } = options ?? {};
 
-  // Remove all existing theme links
-  const existingThemeLinks = document.querySelectorAll('link[data-theme]');
-  existingThemeLinks.forEach((link) => link.remove());
+  // Check if theme is already applied - avoid unnecessary DOM manipulation
+  const currentTheme = document.documentElement.getAttribute(dataAttribute);
+  const existingLink = document.querySelector(`link[data-theme="${theme}"]`);
+
+  // If same theme is already active with its link, do nothing
+  if (currentTheme === theme && existingLink) {
+    return;
+  }
 
   // Create new theme link
   const link = document.createElement('link');
@@ -87,10 +92,20 @@ export function applyTheme(
   link.setAttribute('data-theme', theme);
   link.setAttribute('precedence', 'high');
 
+  // Wait for new stylesheet to load before removing old ones (prevents FOUC)
+  link.onload = () => {
+    const existingThemeLinks = document.querySelectorAll('link[data-theme]');
+    existingThemeLinks.forEach((existingLink) => {
+      if (existingLink !== link) {
+        existingLink.remove();
+      }
+    });
+  };
+
   // Insert at the end of head to ensure it overrides other styles
   document.head.appendChild(link);
 
-  // Update data attribute
+  // Update data attribute immediately for CSS selectors
   document.documentElement.setAttribute(dataAttribute, theme);
 }
 

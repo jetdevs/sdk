@@ -7,6 +7,81 @@
  * @module @jetdevs/core/rbac
  */
 
+import type { RoleCategory } from './types';
+
+// =============================================================================
+// ROLE CATEGORY UTILITIES
+// =============================================================================
+
+/**
+ * Check if a role is a service role (for API keys/integrations)
+ * @param role Role object with roleCategory field
+ * @returns true if role has roleCategory: 'service'
+ *
+ * @example
+ * ```typescript
+ * if (isServiceRole(role)) {
+ *   // Role is intended for API keys
+ * }
+ * ```
+ */
+export function isServiceRole(role: { roleCategory?: RoleCategory | string }): boolean {
+  return role.roleCategory === 'service';
+}
+
+/**
+ * Check if a role is a user role (for human users)
+ * @param role Role object with roleCategory field
+ * @returns true if role has roleCategory: 'user' or undefined (default)
+ *
+ * @example
+ * ```typescript
+ * if (isUserRole(role)) {
+ *   // Role is intended for human users
+ * }
+ * ```
+ */
+export function isUserRole(role: { roleCategory?: RoleCategory | string }): boolean {
+  return role.roleCategory === 'user' || role.roleCategory === undefined;
+}
+
+/**
+ * Filter an array of roles by category
+ * @param roles Array of role objects
+ * @param category Category to filter by ('user' or 'service')
+ * @returns Filtered array of roles matching the category
+ *
+ * @example
+ * ```typescript
+ * const serviceRoles = filterRolesByCategory(roles, 'service');
+ * const userRoles = filterRolesByCategory(roles, 'user');
+ * ```
+ */
+export function filterRolesByCategory<T extends { roleCategory?: RoleCategory | string }>(
+  roles: T[],
+  category: RoleCategory
+): T[] {
+  if (category === 'user') {
+    return roles.filter(role => isUserRole(role));
+  }
+  return roles.filter(role => isServiceRole(role));
+}
+
+/**
+ * Get the role category, defaulting to 'user' if not set
+ * @param role Role object with optional roleCategory field
+ * @returns The role category ('user' or 'service')
+ *
+ * @example
+ * ```typescript
+ * const category = getRoleCategory(role);
+ * console.log(`Role is a ${category} role`);
+ * ```
+ */
+export function getRoleCategory(role: { roleCategory?: RoleCategory | string }): RoleCategory {
+  return role.roleCategory === 'service' ? 'service' : 'user';
+}
+
 // =============================================================================
 // ROLE TYPE CHECKS
 // =============================================================================

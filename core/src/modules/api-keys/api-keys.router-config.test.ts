@@ -76,7 +76,8 @@ describe('apiKeys create handler — permission resolution', () => {
 
   it('does NOT override permissions derived from a resolved default role', async () => {
     listMock.mockResolvedValue({
-      roles: [{ id: 7, permissions: [{ slug: 'agents:read' }, { slug: 'agents:execute' }] }],
+      // findRoleByName matches the name exactly; 'Full API Access' is the default.
+      roles: [{ id: 7, name: 'Full API Access', permissions: [{ slug: 'agents:read' }, { slug: 'agents:execute' }] }],
     });
     const repo = makeRepo();
 

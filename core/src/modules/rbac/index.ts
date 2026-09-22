@@ -51,7 +51,10 @@ export type {
     // Permission types
     Permission, PermissionCreateData, PermissionStats, PermissionUpdateData, PermissionWithUsage, RbacServiceContext,
     // Role types
-    Role, RoleAssignPermissionsParams, RoleBulkDeleteParams, RoleBulkUpdateParams, RoleCreateData, RoleCreateParams, RoleDeleteParams, RoleFilters, RoleGetByIdParams, RoleListOptions,
+    Role, RoleAssignPermissionsParams, RoleBulkDeleteParams, RoleBulkUpdateParams,
+    // Role category type
+    RoleCategory,
+    RoleCreateData, RoleCreateParams, RoleDeleteParams, RoleFilters, RoleGetByIdParams, RoleListOptions,
     // Service params types
     RoleListParams, RoleListResult, RolePermission, RolePermissionAssignment, RolePermissionStats, RoleRemovePermissionsParams, RoleStats, RoleUpdateData, RoleUpdateParams, RoleWithStats, UserRoleStats
 } from "./types";
@@ -94,6 +97,11 @@ export type {
 // =============================================================================
 
 export {
+    // Role category utilities (service roles separation)
+    filterRolesByCategory,
+    getRoleCategory,
+    isServiceRole,
+    isUserRole,
     ORG_ROLES,
     // Legacy exports (deprecated)
     SYSTEM_ROLES, canAssignPermissions, canManageRoles,

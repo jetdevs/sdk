@@ -39,6 +39,7 @@ import type { HandlerContext } from '../../trpc/routers/types';
 import {
     assignRoleSchema,
     getAvailableRolesSchema,
+    getAvailableServiceRolesSchema,
     getUserRolesAllOrgsSchema,
     getUsersByRoleSchema,
     removeRoleSchema,
@@ -229,6 +230,23 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       repository: Repository,
       handler: async (context: HandlerContext<{ userId: number; orgId: number; roleId: number }>) => {
         const { input, service, repo } = context;
+
+        // P2-SR-005: Validate role is not a service role
+        // Service roles are intended for API keys, not user assignments
+        const role = await repo!.getRoleById(input.roleId);
+        if (!role) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Role not found',
+          });
+        }
+        if (role.roleCategory === 'service') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Cannot assign service roles to users. Service roles are intended for API keys only.',
+          });
+        }
+
         // Check if role assignment already exists
         const existing = await repo!.findRoleAssignment(
           input.userId,
@@ -352,9 +370,25 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       cache: { ttl: 300, tags: ['roles'] },
       crossOrg: true, // Required to see global roles (orgId = null)
       repository: Repository,
+      handler: async (context: HandlerContext<{ orgId: number; category?: 'user' | 'service' }>) => {
+        const { input, repo } = context;
+        // Default to 'user' category for backwards compatibility
+        return repo!.getAvailableRolesForOrg(input.orgId, { category: input.category });
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // GET AVAILABLE SERVICE ROLES FOR AN ORGANIZATION
+    // -------------------------------------------------------------------------
+    getAvailableServiceRoles: {
+      type: 'query' as const,
+      input: getAvailableServiceRolesSchema,
+      cache: { ttl: 300, tags: ['roles', 'service-roles'] },
+      crossOrg: true, // Required to see global service roles (orgId = null)
+      repository: Repository,
       handler: async (context: HandlerContext<{ orgId: number }>) => {
         const { input, repo } = context;
-        return repo!.getAvailableRolesForOrg(input.orgId);
+        return repo!.getAvailableServiceRoles(input.orgId);
       },
     },
 

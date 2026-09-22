@@ -61,6 +61,20 @@ export const getUsersByRoleSchema = z.object({
  */
 export const getAvailableRolesSchema = z.object({
   orgId: z.number().int().positive(),
+  /**
+   * Role category filter. Defaults to 'user' for backwards compatibility.
+   * - 'user': Roles for human users (default)
+   * - 'service': Roles for API keys/integrations
+   */
+  category: z.enum(['user', 'service']).optional(),
+});
+
+/**
+ * Schema for getting available service roles
+ * Convenience endpoint that always returns service roles only
+ */
+export const getAvailableServiceRolesSchema = z.object({
+  orgId: z.number().int().positive(),
 });
 
 /**
@@ -148,6 +162,8 @@ export const assignableRoleSchema = z.object({
   isGlobalRole: z.boolean(),
   isSystemRole: z.boolean(),
   orgId: z.number().nullable(),
+  /** Role category - 'user' for human users, 'service' for API keys */
+  roleCategory: z.enum(['user', 'service']).optional(),
 });
 
 /**
@@ -172,6 +188,7 @@ export type AssignRoleInput = z.infer<typeof assignRoleSchema>;
 export type RemoveRoleInput = z.infer<typeof removeRoleSchema>;
 export type GetUsersByRoleInput = z.infer<typeof getUsersByRoleSchema>;
 export type GetAvailableRolesInput = z.infer<typeof getAvailableRolesSchema>;
+export type GetAvailableServiceRolesInput = z.infer<typeof getAvailableServiceRolesSchema>;
 export type GetUserRolesAllOrgsInput = z.infer<typeof getUserRolesAllOrgsSchema>;
 export type UserOrgContextOutput = z.infer<typeof userOrgContextSchema>;
 export type UserOrgMembershipOutput = z.infer<typeof userOrgMembershipSchema>;

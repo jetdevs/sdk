@@ -10,6 +10,19 @@
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 // =============================================================================
+// ROLE CATEGORY
+// =============================================================================
+
+/**
+ * Role Category Type
+ *
+ * Distinguishes between roles for human users and roles for programmatic access:
+ * - 'user': Roles intended for human users (shown in user role assignment)
+ * - 'service': Roles intended for API keys/integrations (shown in API key creation)
+ */
+export type RoleCategory = 'user' | 'service';
+
+// =============================================================================
 // ROLE TYPES
 // =============================================================================
 
@@ -24,6 +37,8 @@ export interface Role {
   isGlobalRole: boolean;
   isActive: boolean;
   orgId: number | null;
+  /** Role category - 'user' for human users, 'service' for API keys */
+  roleCategory?: RoleCategory;
   createdAt: Date;
   updatedAt: Date;
 }

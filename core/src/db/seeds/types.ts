@@ -47,6 +47,8 @@ export interface RoleSeedData {
   isSystemRole: boolean;
   isGlobalRole: boolean;
   orgId?: number | null;
+  /** Role category: 'user' for human users (default), 'service' for API keys */
+  roleCategory?: 'user' | 'service';
 }
 
 export interface RoleSeedSchema {

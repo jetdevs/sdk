@@ -7,6 +7,26 @@
 
 import type { PermissionModule, PermissionRegistry } from './registry';
 
+/**
+ * Converts a module name to a valid TypeScript object key (camelCase).
+ * Removes spaces and converts to camelCase.
+ *
+ * Examples:
+ * - "Prompt Management" -> "promptManagement"
+ * - "Skills Library" -> "skillsLibrary"
+ * - "admin" -> "admin"
+ */
+function toModuleKey(moduleName: string): string {
+  const words = moduleName.split(/\s+/);
+  return words
+    .map((word, index) =>
+      index === 0
+        ? word.charAt(0).toLowerCase() + word.slice(1)
+        : word.charAt(0).toUpperCase() + word.slice(1)
+    )
+    .join('');
+}
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -60,10 +80,11 @@ export function mergePermissions(
   const allPermissionKeys = new Set<string>();
 
   // Normalize extensions: handle both array and registry object
-  const extensionModules: PermissionModule[] = Array.isArray(extensions)
-    ? extensions
+  // When receiving a registry, preserve the module keys (not just values)
+  const extensionModulesWithKeys: Array<{ key: string; module: PermissionModule }> = Array.isArray(extensions)
+    ? extensions.map(m => ({ key: toModuleKey(m.name), module: m }))
     : extensions?.modules
-      ? Object.values(extensions.modules)
+      ? Object.entries(extensions.modules).map(([key, module]) => ({ key, module }))
       : [];
 
   // Collect core permission keys
@@ -73,37 +94,38 @@ export function mergePermissions(
     }
   }
 
-  for (const ext of extensionModules) {
-    // Check for module collision
-    if (merged.modules[ext.name] && !allowOverride) {
+  for (const { key: moduleKey, module: ext } of extensionModulesWithKeys) {
+    // Check for module collision (use the preserved key, not ext.name)
+    if (merged.modules[moduleKey] && !allowOverride) {
       // Module exists - merge permissions but check for key collisions
-      for (const [key, perm] of Object.entries(ext.permissions)) {
-        if (allPermissionKeys.has(key)) {
+      for (const [permKey, perm] of Object.entries(ext.permissions)) {
+        if (allPermissionKeys.has(permKey)) {
           if (strict) {
             throw new Error(
-              `Permission collision: "${key}" already exists. ` +
+              `Permission collision: "${permKey}" already exists. ` +
               `Set allowOverride: true to override, or use a unique key.`
             );
           }
-          console.warn(`[WARN] Permission "${key}" overridden by extension "${ext.name}"`);
+          console.warn(`[WARN] Permission "${permKey}" overridden by extension "${ext.name}"`);
         }
-        merged.modules[ext.name].permissions[key] = perm;
-        allPermissionKeys.add(key);
+        merged.modules[moduleKey].permissions[permKey] = perm;
+        allPermissionKeys.add(permKey);
       }
     } else {
       // New module - check individual permission keys
-      for (const key of Object.keys(ext.permissions)) {
-        if (allPermissionKeys.has(key)) {
+      for (const permKey of Object.keys(ext.permissions)) {
+        if (allPermissionKeys.has(permKey)) {
           if (strict) {
             throw new Error(
-              `Permission collision: "${key}" from extension "${ext.name}" ` +
+              `Permission collision: "${permKey}" from extension "${ext.name}" ` +
               `conflicts with existing permission.`
             );
           }
         }
-        allPermissionKeys.add(key);
+        allPermissionKeys.add(permKey);
       }
-      merged.modules[ext.name] = ext;
+      // Use the preserved module key, not ext.name
+      merged.modules[moduleKey] = ext;
     }
   }
 
@@ -135,6 +157,12 @@ export function mergePermissionsWithResult(
   const overridden: string[] = [];
   const warnings: string[] = [];
 
+  // Convert array to key-module pairs using sanitized module names as keys
+  const extensionModulesWithKeys = extensions.map(m => ({
+    key: toModuleKey(m.name),
+    module: m
+  }));
+
   // Collect core permission keys
   for (const module of Object.values(core.modules)) {
     for (const key of Object.keys(module.permissions)) {
@@ -142,47 +170,48 @@ export function mergePermissionsWithResult(
     }
   }
 
-  for (const ext of extensions) {
-    if (merged.modules[ext.name]) {
+  for (const { key: moduleKey, module: ext } of extensionModulesWithKeys) {
+    if (merged.modules[moduleKey]) {
       // Module exists - merge permissions
-      for (const [key, perm] of Object.entries(ext.permissions)) {
-        if (allPermissionKeys.has(key)) {
+      for (const [permKey, perm] of Object.entries(ext.permissions)) {
+        if (allPermissionKeys.has(permKey)) {
           if (strict && !allowOverride) {
             throw new Error(
-              `Permission collision: "${key}" already exists. ` +
+              `Permission collision: "${permKey}" already exists. ` +
               `Set allowOverride: true to override, or use a unique key.`
             );
           }
           if (allowOverride) {
-            overridden.push(key);
-            warnings.push(`Permission "${key}" overridden by extension "${ext.name}"`);
+            overridden.push(permKey);
+            warnings.push(`Permission "${permKey}" overridden by extension "${ext.name}"`);
           }
         } else {
-          added.push(key);
+          added.push(permKey);
         }
-        merged.modules[ext.name].permissions[key] = perm;
-        allPermissionKeys.add(key);
+        merged.modules[moduleKey].permissions[permKey] = perm;
+        allPermissionKeys.add(permKey);
       }
     } else {
       // New module
-      for (const key of Object.keys(ext.permissions)) {
-        if (allPermissionKeys.has(key)) {
+      for (const permKey of Object.keys(ext.permissions)) {
+        if (allPermissionKeys.has(permKey)) {
           if (strict && !allowOverride) {
             throw new Error(
-              `Permission collision: "${key}" from extension "${ext.name}" ` +
+              `Permission collision: "${permKey}" from extension "${ext.name}" ` +
               `conflicts with existing permission.`
             );
           }
           if (allowOverride) {
-            overridden.push(key);
-            warnings.push(`Permission "${key}" overridden by extension "${ext.name}"`);
+            overridden.push(permKey);
+            warnings.push(`Permission "${permKey}" overridden by extension "${ext.name}"`);
           }
         } else {
-          added.push(key);
+          added.push(permKey);
         }
-        allPermissionKeys.add(key);
+        allPermissionKeys.add(permKey);
       }
-      merged.modules[ext.name] = ext;
+      // Use the sanitized module key, not ext.name
+      merged.modules[moduleKey] = ext;
     }
   }
 

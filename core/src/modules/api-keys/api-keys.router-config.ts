@@ -75,7 +75,7 @@ export interface CreateApiKeysRouterConfigOptions {
   /**
    * Default role name to use when creating API keys without explicit roleId
    * If specified, the router will look up this role and assign its permissions
-   * @default 'Admin'
+   * @default 'Full API Access' (P2-SR-007: Changed from 'API Key')
    */
   defaultRoleName?: string;
 
@@ -95,6 +95,23 @@ export interface CreateApiKeysRouterConfigOptions {
    * failed role lookup).
    */
   defaultPermissions?: string[];
+
+  /**
+   * Get privileged database client for looking up system roles.
+   * This is needed because system roles (like "API Key") have org_id = NULL,
+   * which is blocked by RLS policies. If not provided, the system role
+   * lookup will fail silently and API keys will be created without a role.
+   *
+   * @example
+   * ```typescript
+   * import { privilegedDb } from '@/db/clients';
+   *
+   * const apiKeysRouterConfig = createApiKeysRouterConfig({
+   *   getPrivilegedDb: () => privilegedDb,
+   * });
+   * ```
+   */
+  getPrivilegedDb?: () => any;
 }
 
 /**
@@ -122,30 +139,73 @@ async function getRolePermissions(
 }
 
 /**
- * Helper function to find the default admin role for an org
+ * Helper function to find a role by name for API key creation.
+ * Searches both org-specific roles and global/system roles (orgId = null).
+ * Priority: org-specific role first, then global/system role.
+ *
+ * IMPORTANT: System roles (like "API Key") have org_id = NULL in the database.
+ * RLS policies filter out these rows for non-superuser connections.
+ * To find system roles, a privilegedDb must be provided that bypasses RLS.
+ *
+ * @param db - Regular database connection (for org-specific roles)
+ * @param orgId - Organization ID to search in
+ * @param roleName - Role name to find (default: 'API Key')
+ * @param privilegedDb - Optional privileged database connection (bypasses RLS for system roles)
  */
-async function findAdminRole(
+async function findRoleByName(
   db: any,
   orgId: number,
-  roleName: string = 'Admin'
+  roleName: string = 'API Key',
+  privilegedDb?: any
 ): Promise<{ id: number; permissions: string[] } | null> {
   const roleRepo = new SDKRoleRepository(db);
-  const result = await roleRepo.list({
-    limit: 1,
+
+  // First try to find an org-specific role with exact name match
+  let result = await roleRepo.list({
+    limit: 10, // Get more results to filter for exact match
     offset: 0,
     filters: { search: roleName, isActive: true },
     orgId,
     includePermissions: true,
   });
 
-  if (result.roles.length === 0) {
+  // Filter for exact name match (search uses LIKE which is fuzzy)
+  let exactMatch = result.roles.find((r) => r.name === roleName);
+
+  // If no org-specific role found, look for a system role
+  // System roles have org_id = NULL, which is blocked by RLS.
+  // We MUST use a privileged connection to find them.
+  if (!exactMatch && privilegedDb) {
+    // Use privileged connection to bypass RLS and find system roles
+    const privilegedRoleRepo = new SDKRoleRepository(privilegedDb);
+
+    result = await privilegedRoleRepo.list({
+      limit: 10,
+      offset: 0,
+      filters: { search: roleName, isActive: true, isSystemRole: true },
+      orgId: undefined, // Don't filter by org for system roles
+      includeSystemRoles: true, // CRITICAL: Include system roles in results
+      includePermissions: true,
+    });
+
+    // Filter for exact name match
+    exactMatch = result.roles.find((r) => r.name === roleName);
+  } else if (!exactMatch && !privilegedDb) {
+    // No privileged connection available - log warning
+    console.warn(
+      `[API Keys] Cannot find system role "${roleName}" without privilegedDb. ` +
+      `System roles have org_id = NULL which is blocked by RLS. ` +
+      `Pass getPrivilegedDb option to createApiKeysRouterConfig to enable system role lookup.`
+    );
+  }
+
+  if (!exactMatch) {
     return null;
   }
 
-  const role = result.roles[0];
   return {
-    id: role.id,
-    permissions: role.permissions?.map((p) => p.slug) || [],
+    id: exactMatch.id,
+    permissions: exactMatch.permissions?.map((p) => p.slug) || [],
   };
 }
 
@@ -183,18 +243,23 @@ export function createApiKeysRouterConfig(
     keyPrefix = 'yobo',
     invalidationTags = ['api-keys'],
     Repository = SDKApiKeysRepository,
-    defaultRoleName = 'Admin',
+    // P2-SR-007: Changed default from 'API Key' to 'Full API Access'
+    defaultRoleName = 'Full API Access',
     defaultPermissions,
+    getPrivilegedDb,
   } = options;
 
   return {
     /**
      * Create a new API key
      *
+     * P2-SR-006: Updated for service roles separation with backwards compatibility
+     *
      * Role-based permissions:
-     * - If roleId is provided, permissions are derived from that role
-     * - If no roleId is provided, attempts to find and use the default Admin role
-     * - Falls back to manually specified permissions if no role is available
+     * - If serviceRoleId is provided (preferred), permissions are derived from that role
+     * - If roleId is provided (deprecated), it maps to serviceRoleId for backwards compatibility
+     * - If no role is specified, attempts to find and use the default service role
+     * - Falls back to manually specified permissions if no role is available (legacy mode)
      */
     create: {
       permission,
@@ -210,8 +275,10 @@ export function createApiKeysRouterConfig(
         actor,
       }: HandlerContext<{
         name: string;
+        serviceRoleId?: number;
         roleId?: number;
         permissions: string[];
+        permissionMode?: 'cached' | 'fresh';
         rateLimit?: number;
         expiresAt?: Date;
         environment: ApiKeyEnvironment;
@@ -234,21 +301,26 @@ export function createApiKeysRouterConfig(
         // Repository is guaranteed by the repository config
         const repository = repo!;
 
-        // Determine role and permissions
-        let roleId = input.roleId;
+        // P2-SR-006: Map serviceRoleId or roleId to a single role ID
+        // serviceRoleId takes precedence (new preferred field)
+        // roleId is deprecated but supported for backwards compatibility
+        let roleId = input.serviceRoleId ?? input.roleId;
         let permissions = input.permissions;
+        const permissionMode = input.permissionMode ?? 'cached';
 
         // If we have a database connection, derive permissions from role
         if (db) {
           if (roleId) {
-            // Explicit roleId provided - get permissions from that role
+            // Explicit role provided - get permissions from that role
             permissions = await getRolePermissions(db, roleId, effectiveOrgId);
           } else if (permissions.length === 0) {
-            // No roleId and no explicit permissions - try to use default admin role
-            const adminRole = await findAdminRole(db, effectiveOrgId, defaultRoleName);
-            if (adminRole) {
-              roleId = adminRole.id;
-              permissions = adminRole.permissions;
+            // No role and no explicit permissions - try to use the default service role
+            // Pass privilegedDb to allow finding system roles that have org_id = NULL
+            const privilegedDb = getPrivilegedDb?.();
+            const defaultRole = await findRoleByName(db, effectiveOrgId, defaultRoleName, privilegedDb);
+            if (defaultRole) {
+              roleId = defaultRole.id;
+              permissions = defaultRole.permissions;
             }
           }
         }
@@ -275,6 +347,8 @@ export function createApiKeysRouterConfig(
           keyHash,
           roleId,
           permissions,
+          permissionMode,
+          permissionsSyncedAt: roleId ? new Date() : null, // Set sync time if role-based
           rateLimit: input.rateLimit ?? 1000,
           expiresAt: input.expiresAt,
           createdBy: parseInt(service.userId),
@@ -497,9 +571,11 @@ export function createApiKeysRouterConfig(
         // Get current permissions from the role
         const permissions = await getRolePermissions(db, apiKey.roleId, service.orgId);
 
-        // Update the API key with the new permissions
+        // P2-SR-016: Update the API key with new permissions and sync timestamp
+        const syncedAt = new Date();
         const updatedKey = await repository.update(input.id, service.orgId, {
           permissions,
+          permissionsSyncedAt: syncedAt,
         });
 
         if (!updatedKey) {
@@ -512,6 +588,7 @@ export function createApiKeysRouterConfig(
         return {
           ...updatedKey,
           syncedPermissionsCount: permissions.length,
+          permissionsSyncedAt: syncedAt,
         };
       },
     },

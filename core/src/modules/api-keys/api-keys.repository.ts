@@ -29,6 +29,10 @@ export interface ApiKeysTableSchema {
   keyHash: PgColumn<any>;
   roleId: PgColumn<any>;
   permissions: PgColumn<any>;
+  /** P2-SR-002: Permission resolution mode column */
+  permissionMode?: PgColumn<any>;
+  /** P2-SR-002: Permission sync timestamp column */
+  permissionsSyncedAt?: PgColumn<any>;
   rateLimit: PgColumn<any>;
   expiresAt: PgColumn<any>;
   lastUsedAt: PgColumn<any>;
@@ -80,6 +84,9 @@ export function createApiKeysRepository(
           keyHash: data.keyHash,
           roleId: data.roleId,
           permissions: data.permissions,
+          // P2-SR-006: Support permission mode and sync timestamp
+          permissionMode: data.permissionMode ?? 'cached',
+          permissionsSyncedAt: data.permissionsSyncedAt,
           rateLimit: data.rateLimit,
           expiresAt: data.expiresAt,
           createdBy: data.createdBy,
@@ -233,6 +240,9 @@ export function createApiKeysRepository(
       if (data.name !== undefined) updates.name = data.name;
       if (data.roleId !== undefined) updates.roleId = data.roleId;
       if (data.permissions !== undefined) updates.permissions = data.permissions;
+      // P2-SR-016: Support permissionMode and permissionsSyncedAt updates
+      if (data.permissionMode !== undefined) updates.permissionMode = data.permissionMode;
+      if (data.permissionsSyncedAt !== undefined) updates.permissionsSyncedAt = data.permissionsSyncedAt;
       if (data.rateLimit !== undefined) updates.rateLimit = data.rateLimit;
       if (data.expiresAt !== undefined) updates.expiresAt = data.expiresAt;
 
