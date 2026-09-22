@@ -23,6 +23,10 @@ import {
   type ResolveCredentialOwnerArgs,
 } from '../auth/credential-owner';
 import {
+  announceCredentialWritten,
+  type OnCredentialWritten,
+} from '../auth/credential-written';
+import {
     assignRoleSchema,
     changePasswordSchema,
     checkUsernameSchema,
@@ -102,6 +106,19 @@ export interface UserRouterDeps {
    * `UserRouterError('FORBIDDEN', reason)` and nothing written.
    */
   canWriteLocalCredential?: LocalCredentialWriteGuard;
+
+  /**
+   * Optional hook fired ONCE after a procedure here has successfully stored a
+   * local verifier — `invite` and `create` when the input CARRIED a password
+   * (`firstSet: true`), `update` with a password, and `changePassword`. It is
+   * never fired on a refusal (`external` → redirect, `frozen` → FORBIDDEN,
+   * `none` → NOT_FOUND), on a wrong current password, on an invite that only
+   * added an existing user to an org, or on an invite/create with no password:
+   * no verifier was written in any of those. None of these procedures runs in
+   * a transaction, so it fires immediately after the write, on the same `db`
+   * handle; errors propagate to the caller.
+   */
+  onCredentialWritten?: OnCredentialWritten;
 }
 
 /**
@@ -484,6 +501,18 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           });
         }
 
+        // Only an invite that CARRIED a password stored a verifier.
+        if (hashedPassword) {
+          await announceCredentialWritten(deps.onCredentialWritten, {
+            db,
+            userId: newUser.id,
+            operation: 'invite',
+            actorUserId: parseInt(service.userId),
+            firstSet: true,
+            at: new Date(),
+          });
+        }
+
         await deps.onUserInvited?.({ user: newUser, orgId: service.orgId ?? null, db });
 
         return newUser;
@@ -540,6 +569,18 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           isActive: input.isActive,
           currentOrgId: input.orgId,
         });
+
+        // Only a create that CARRIED a password stored a verifier.
+        if (hashedPassword) {
+          await announceCredentialWritten(deps.onCredentialWritten, {
+            db,
+            userId: newUser.id,
+            operation: 'create',
+            actorUserId: parseInt(service.userId),
+            firstSet: true,
+            at: new Date(),
+          });
+        }
 
         // Assign role if provided
         if (input.roleId && input.orgId) {
@@ -617,7 +658,21 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           allKeys: Object.keys(finalUpdateData),
         }));
 
-        return repo.update(db, id, finalUpdateData);
+        const updated = await repo.update(db, id, finalUpdateData);
+
+        // Only an update that actually SET a password wrote a verifier.
+        if (finalUpdateData.password) {
+          await announceCredentialWritten(deps.onCredentialWritten, {
+            db,
+            userId: id,
+            operation: 'update',
+            actorUserId: parseInt(service.userId),
+            firstSet: !existing.password,
+            at: new Date(),
+          });
+        }
+
+        return updated;
       },
     },
 
@@ -747,6 +802,16 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         // Hash and update new password
         const hashedPassword = await deps.hashPassword(input.newPassword, 10);
         await repo.updatePassword(db, userId, hashedPassword);
+
+        // The compare above succeeded, so a verifier existed: never a first set.
+        await announceCredentialWritten(deps.onCredentialWritten, {
+          db,
+          userId,
+          operation: 'change-password',
+          actorUserId: userId,
+          firstSet: false,
+          at: new Date(),
+        });
 
         return { success: true };
       },

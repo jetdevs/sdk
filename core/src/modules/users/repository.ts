@@ -19,6 +19,7 @@ import {
     like,
     not,
     or,
+    sql,
     type SQL,
 } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
@@ -331,10 +332,18 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
      * Get user by email
      */
     async findByEmail(db: PostgresJsDatabase<any>, email: string): Promise<UserWithRoles | null> {
+      // Case-insensitive on the STORED address as well as the argument: a row
+      // saved as `Sean@x.com` must be found by `sean@x.com`, or the writers
+      // that use this as their existence check allocate a second account for
+      // the same person (STORY-040 / STORY-042).
+      //
+      // INDEX: `lower(email)` does not use a plain b-tree on `email`. The SDK
+      // ships no such index — the app owns its DDL; cadra-web adds one in its
+      // migration 0136. Absent one, this is a sequential scan on `users`.
       const result = await db
         .select()
         .from(users)
-        .where(eq(users.email, email))
+        .where(sql`lower(${users.email}) = lower(${email})`)
         .limit(1);
 
       return (result[0] as unknown as UserWithRoles) || null;

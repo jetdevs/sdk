@@ -25,6 +25,10 @@ import {
   type ResolveCredentialOwner,
   type ResolveCredentialOwnerArgs,
 } from '../auth/credential-owner';
+import {
+  announceCredentialWritten,
+  type OnCredentialWritten,
+} from '../auth/credential-written';
 import type {
     UserPermissionsData,
     UserRecord,
@@ -305,6 +309,20 @@ export interface UserServiceHooks {
    * Same contract as `UserRouterDeps.canWriteLocalCredential`.
    */
   canWriteLocalCredential?: LocalCredentialWriteGuard;
+
+  /**
+   * Optional hook fired ONCE after a method here has successfully stored a
+   * local verifier — `invite` of a NEW user whose params carried a password
+   * (`firstSet: true`), `update` with a password, and `changePassword`. Never
+   * fired on a refusal, on a wrong current password, on an invite that only
+   * added an existing user to an org, or on an invite with no password.
+   *
+   * These writes go through `withPrivilegedDb`, so the hook is called INSIDE
+   * that same callback and receives the privileged handle the write used — an
+   * app recording an RLS-protected audit row needs exactly that handle.
+   * Errors propagate. Same contract as `UserRouterDeps.onCredentialWritten`.
+   */
+  onCredentialWritten?: OnCredentialWritten;
 }
 
 /**
@@ -800,11 +818,26 @@ export function createUserService(deps: UserServiceDeps): IUserService {
 
         const createdUser = await hooks.withPrivilegedDb(async (db) => {
           const repo = getRepo(db);
-          return await repo.create(db, {
+          const created = await repo.create(db, {
             ...params,
             password: hashedPassword,
             currentOrgId: sessionOrgId,
           });
+
+          // Only an invite that CARRIED a password stored a verifier. Fired on
+          // the privileged handle the write used, inside the same callback.
+          if (hashedPassword) {
+            await announceCredentialWritten(hooks.onCredentialWritten, {
+              db,
+              userId: created.id,
+              operation: 'invite',
+              actorUserId: ctx.userId,
+              firstSet: true,
+              at: new Date(),
+            });
+          }
+
+          return created;
         });
 
         userId = createdUser.id;
@@ -941,10 +974,24 @@ export function createUserService(deps: UserServiceDeps): IUserService {
 
       const updatedUser = await hooks.withPrivilegedDb(async (db) => {
         const repo = getRepo(db);
-        return await repo.update(db, id, {
+        const result = await repo.update(db, id, {
           ...updateData,
           ...(hashedPassword && { password: hashedPassword }),
         });
+
+        // Only an update that actually SET a password wrote a verifier.
+        if (hashedPassword) {
+          await announceCredentialWritten(hooks.onCredentialWritten, {
+            db,
+            userId: id,
+            operation: 'update',
+            actorUserId: ctx.userId,
+            firstSet: !existingUser.password,
+            at: new Date(),
+          });
+        }
+
+        return result;
       });
 
       // Broadcast permission update if activation status changed
@@ -1260,7 +1307,23 @@ export function createUserService(deps: UserServiceDeps): IUserService {
 
       const updatedUser = await hooks.withPrivilegedDb(async (db) => {
         const repo = getRepo(db);
-        return await repo.updatePassword(db, userId, hashedPassword);
+        const result = await repo.updatePassword(db, userId, hashedPassword);
+
+        // `result` is the repository's confirmation; announce only once the
+        // row came back, so a no-op update never produces a record. The
+        // compare above succeeded, so a verifier existed: never a first set.
+        if (result) {
+          await announceCredentialWritten(hooks.onCredentialWritten, {
+            db,
+            userId,
+            operation: 'change-password',
+            actorUserId: userId,
+            firstSet: false,
+            at: new Date(),
+          });
+        }
+
+        return result;
       });
 
       if (!updatedUser) {

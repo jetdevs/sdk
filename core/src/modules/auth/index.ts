@@ -233,6 +233,19 @@ export type {
   ResolveCredentialOwnerArgs,
 } from './credential-owner';
 
+// =============================================================================
+// CREDENTIAL WRITTEN (announcement port: a successful local verifier write)
+// =============================================================================
+
+export { announceCredentialWritten } from './credential-written';
+
+export type {
+  CredentialWriteOperation,
+  CredentialWrittenArgs,
+  CredentialWrittenDeps,
+  OnCredentialWritten,
+} from './credential-written';
+
 export { verifyLocalCredential } from './verify-local-credential';
 
 export type {

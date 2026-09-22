@@ -9,6 +9,7 @@
 
 import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
 import type { ResolveCredentialOwner } from '../auth/credential-owner';
+import type { OnCredentialWritten } from '../auth/credential-written';
 
 /** Minimal drizzle-like client the service needs. Kept loose so any driver fits. */
 export type PasswordResetDb = any;
@@ -86,11 +87,31 @@ export interface PasswordResetServiceDeps {
    * Runs inside the password-change transaction, after the new password is
    * written and before the token is marked used. Use it to revoke sessions or
    * other credential-derived access.
+   *
+   * This is the older, reset-only alias of `onCredentialWritten`. Both still
+   * fire, in this order: `onPasswordChanged` FIRST (its position is unchanged
+   * from before the hook existed), then `onCredentialWritten`. An app that
+   * implements both sees each call once per successful reset.
    */
   onPasswordChanged?: (
     tx: PasswordResetDb,
     ctx: { userId: number; at: Date },
   ) => Promise<void>;
+  /**
+   * Fired ONCE inside the same transaction as a successful reset write, after
+   * `onPasswordChanged` and before the token is marked used, with
+   * `operation: 'reset'` and `firstSet` true when the account held no verifier
+   * before (a reset that sets the first password). It never fires for
+   * `requestReset` — minting a link writes no verifier — nor for a refused or
+   * invalid consumption. Errors propagate and roll the whole reset back.
+   *
+   * NOTE for consumers that also pass `tables.authLogs`: the service already
+   * inserts its own `password_reset` row in this transaction. An app whose
+   * hook inserts an audit row too will produce TWO rows per reset. Pick one —
+   * either omit `authLogs` and log from the hook, or skip `'reset'` in the
+   * hook.
+   */
+  onCredentialWritten?: OnCredentialWritten;
   logger?: Pick<Console, 'error' | 'warn'>;
 }
 

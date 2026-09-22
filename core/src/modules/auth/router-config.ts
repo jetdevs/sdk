@@ -19,6 +19,10 @@ import {
   selectCredentialOwnerResolver,
   type ResolveCredentialOwner,
 } from './credential-owner';
+import {
+  announceCredentialWritten,
+  type OnCredentialWritten,
+} from './credential-written';
 
 // =============================================================================
 // TYPES
@@ -82,6 +86,16 @@ export interface AuthRouterDeps {
    * `AuthRouterError('FORBIDDEN', reason)` and nothing written.
    */
   canWriteLocalCredential?: LocalCredentialWriteGuard;
+
+  /**
+   * Optional hook fired ONCE after `register` has successfully stored a local
+   * verifier, with `operation: 'register'` and `firstSet: true`. It is never
+   * fired on a refusal (`external` or `frozen` owner), on a disabled
+   * registration, or on a duplicate email — nothing was written in those
+   * cases. `register` has no transaction, so it fires immediately after the
+   * row is created, on the same `db` handle; errors propagate to the caller.
+   */
+  onCredentialWritten?: OnCredentialWritten;
 }
 
 /**
@@ -242,6 +256,16 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
           email: input.email,
           password: hashedPassword,
           name: input.name || input.email.split('@')[0],
+        });
+
+        // The verifier is stored: announce it. No transaction here, so this
+        // runs immediately after the write, on the same handle.
+        await announceCredentialWritten(deps.onCredentialWritten, {
+          db,
+          userId: newUser.id,
+          operation: 'register',
+          firstSet: true,
+          at: new Date(),
         });
 
         return {

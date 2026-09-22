@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 
 import {
   askCredentialOwner,
   frozenCredentialMessage,
   selectCredentialOwnerResolver,
 } from '../auth/credential-owner';
+import { announceCredentialWritten } from '../auth/credential-written';
 import { validatePassword } from './password-policy';
 import type {
   PasswordResetDb,
@@ -31,8 +32,8 @@ const DEFAULT_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
  *     shows a "request a new one" screen instead of failing after the user has
  *     typed a password.
  *  3. `resetPassword` re-checks the token inside the write, updates the
- *     password, runs `onPasswordChanged`, marks the token used, and writes an
- *     auth log entry — all in one transaction.
+ *     password, runs `onPasswordChanged` and then `onCredentialWritten`, marks
+ *     the token used, and writes an auth log entry — all in one transaction.
  */
 export function createPasswordResetService(
   deps: PasswordResetServiceDeps,
@@ -49,6 +50,7 @@ export function createPasswordResetService(
     tokenTtlMs = DEFAULT_TOKEN_TTL_MS,
     generateToken = () => randomBytes(32).toString('hex'),
     onPasswordChanged,
+    onCredentialWritten,
     logger = console,
   } = deps;
   const resolveOwner = selectCredentialOwnerResolver(deps);
@@ -59,10 +61,18 @@ export function createPasswordResetService(
   async function requestReset({ email }: RequestResetArgs): Promise<RequestResetResult> {
     const normalized = email.toLowerCase().trim();
 
+    // Match the STORED address case-insensitively, not just the typed one.
+    // Lowercasing the input alone misses a legacy row saved as `Sean@x.com`,
+    // which then silently receives no reset mail (STORY-040).
+    //
+    // INDEX: this is `lower(email)`, so a plain b-tree on `email` no longer
+    // serves it. The SDK ships no `lower(email)` index — the app owns its own
+    // DDL; cadra-web adds one in its migration 0136. Without such an index
+    // this is a sequential scan on `users`.
     const [user] = await runPrivileged(async (db: PasswordResetDb) =>
       db.select()
         .from(users)
-        .where(eq(users.email, normalized))
+        .where(sql`lower(${users.email}) = lower(${normalized})`)
         .limit(1),
     );
 
@@ -272,9 +282,18 @@ export function createPasswordResetService(
         .set({ password: hashedPassword, updatedAt: at })
         .where(eq(users.id, resetToken.userId));
 
+      // Alias first, keeping its pre-existing position, then the general hook.
       if (onPasswordChanged) {
         await onPasswordChanged(tx, { userId: resetToken.userId, at });
       }
+
+      await announceCredentialWritten(onCredentialWritten, {
+        db: tx,
+        userId: resetToken.userId,
+        operation: 'reset',
+        firstSet: !currentUser?.password,
+        at,
+      });
 
       await tx.update(passwordResetTokens)
         .set({ usedAt: at })
