@@ -11,10 +11,14 @@
 import { z } from 'zod';
 import type { IAuthRepository } from './repository';
 import { registerSchema, updateProfileSchema } from './schemas';
+import type { LocalCredentialWriteGuard } from './local-credential-policy';
 import {
-  askLocalCredentialGuard,
-  type LocalCredentialWriteGuard,
-} from './local-credential-policy';
+  askCredentialOwner,
+  CredentialOwnedElsewhereError,
+  frozenCredentialMessage,
+  selectCredentialOwnerResolver,
+  type ResolveCredentialOwner,
+} from './credential-owner';
 
 // =============================================================================
 // TYPES
@@ -61,10 +65,21 @@ export interface AuthRouterDeps {
   isRegistrationEnabled?: () => boolean;
 
   /**
-   * Optional guard consulted before `register` writes a local verifier.
-   * Apps that hand password ownership to an external identity provider inject
-   * their rule here; the SDK itself has no opinion. A refusal is surfaced as
-   * `AuthRouterError('FORBIDDEN', reason)` and nothing is written.
+   * Optional resolver consulted before `register` allocates a user with a
+   * local verifier. Answers WHERE the credential for that email lives:
+   * `local` or `none` → the user is created; `external` → refused with
+   * `CredentialOwnedElsewhereError` (`code: 'OWNED_ELSEWHERE'`, carrying the
+   * owner's `accountUrl`); `frozen` → `AuthRouterError('FORBIDDEN', reason)`.
+   * Nothing is written on a refusal. Absent, `canWriteLocalCredential` is
+   * adapted if given, else every credential is local (today's behaviour).
+   */
+  resolveCredentialOwner?: ResolveCredentialOwner;
+
+  /**
+   * Legacy yes/no guard, kept for one minor. Ignored when
+   * `resolveCredentialOwner` is given; otherwise adapted onto it with the same
+   * outcomes as before: allow → write, refuse →
+   * `AuthRouterError('FORBIDDEN', reason)` and nothing written.
    */
   canWriteLocalCredential?: LocalCredentialWriteGuard;
 }
@@ -151,6 +166,7 @@ export class AuthRouterError extends Error {
 export function createAuthRouterConfig(deps: AuthRouterDeps) {
   const isRegistrationEnabled = deps.isRegistrationEnabled ||
     (() => process.env.NEXT_PUBLIC_ENABLE_PUBLIC_REGISTRATION === 'true');
+  const resolveOwner = selectCredentialOwnerResolver(deps);
 
   return {
     // -------------------------------------------------------------------------
@@ -205,15 +221,19 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
           throw new AuthRouterError('CONFLICT', 'User already exists');
         }
 
-        // Server-side closure: ask the app before allocating a local verifier.
-        const verdict = await askLocalCredentialGuard(deps.canWriteLocalCredential, {
+        // Server-side closure: ask WHERE this email's credential lives before
+        // allocating a local verifier. `local` and `none` both allocate.
+        const owner = await askCredentialOwner(resolveOwner, {
           db,
           operation: 'register',
           user: null,
           email: input.email,
         });
-        if (!verdict.allowed) {
-          throw new AuthRouterError('FORBIDDEN', verdict.reason);
+        if (owner.kind === 'external') {
+          throw new CredentialOwnedElsewhereError(owner, 'register');
+        }
+        if (owner.kind === 'frozen') {
+          throw new AuthRouterError('FORBIDDEN', frozenCredentialMessage(owner));
         }
 
         const hashedPassword = await deps.hashPassword(input.password, 12);

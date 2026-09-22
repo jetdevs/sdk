@@ -13,10 +13,18 @@
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { IUserRepository } from './repository';
+import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
 import {
-  askLocalCredentialGuard,
-  type LocalCredentialWriteGuard,
-} from '../auth/local-credential-policy';
+  askCredentialOwner,
+  CredentialOwnedElsewhereError,
+  credentialRedirect,
+  frozenCredentialMessage,
+  selectCredentialOwnerResolver,
+  type CredentialOwner,
+  type CredentialRedirect,
+  type ResolveCredentialOwner,
+  type ResolveCredentialOwnerArgs,
+} from '../auth/credential-owner';
 import type {
     UserPermissionsData,
     UserRecord,
@@ -279,11 +287,22 @@ export interface UserServiceHooks {
   comparePassword: (password: string, hash: string) => Promise<boolean>;
 
   /**
-   * Optional guard asked BEFORE any local verifier is hashed or stored
-   * (invite of a new user, update with a password, changePassword). A refusal
-   * becomes a FORBIDDEN `UserServiceError` carrying the guard's reason and
-   * nothing is written. Absent, every write is allowed — the pre-existing
-   * behaviour. Same contract as `UserRouterDeps.canWriteLocalCredential`.
+   * Optional resolver asked BEFORE any local verifier is hashed or stored
+   * (invite of a new user, update with a password, changePassword). It
+   * answers WHERE the credential lives. Per kind: `local` writes; `external`
+   * makes `invite` throw `CredentialOwnedElsewhereError` and makes `update` /
+   * `changePassword` RETURN a `CredentialRedirect` with nothing written;
+   * `frozen` is a FORBIDDEN `UserServiceError` with the reason; `none` lets
+   * `invite` allocate and makes `update` / `changePassword` NOT_FOUND.
+   * Same contract as `UserRouterDeps.resolveCredentialOwner`.
+   */
+  resolveCredentialOwner?: ResolveCredentialOwner;
+
+  /**
+   * Legacy yes/no guard, kept for one minor. Ignored when
+   * `resolveCredentialOwner` is given; otherwise adapted onto it with the same
+   * outcomes as before (allow → write, refuse → FORBIDDEN with the reason).
+   * Same contract as `UserRouterDeps.canWriteLocalCredential`.
    */
   canWriteLocalCredential?: LocalCredentialWriteGuard;
 }
@@ -318,17 +337,19 @@ export class UserServiceError extends Error {
 }
 
 /**
- * Ask the app's `canWriteLocalCredential` hook (if any) and turn a refusal
- * into this module's error shape.
+ * Ask where the credential lives and refuse `frozen` in this module's error
+ * shape. `external` and `none` are returned for the caller to route, since
+ * the right answer differs per writer (throw, redirect, allocate, 404).
  */
-async function assertLocalCredentialWritable(
-  hooks: Pick<UserServiceHooks, 'canWriteLocalCredential'>,
-  args: Parameters<LocalCredentialWriteGuard>[0],
-): Promise<void> {
-  const verdict = await askLocalCredentialGuard(hooks.canWriteLocalCredential, args);
-  if (!verdict.allowed) {
-    throw new UserServiceError('FORBIDDEN', verdict.reason);
+async function ownerOrFrozen(
+  resolveOwner: ResolveCredentialOwner,
+  args: ResolveCredentialOwnerArgs,
+): Promise<CredentialOwner> {
+  const owner = await askCredentialOwner(resolveOwner, args);
+  if (owner.kind === 'frozen') {
+    throw new UserServiceError('FORBIDDEN', frozenCredentialMessage(owner));
   }
+  return owner;
 }
 
 // =============================================================================
@@ -357,7 +378,11 @@ export interface IUserService {
   invite(params: UserInviteParams, ctx: UserServiceContext): Promise<UserWithRoles & { isNewUser: boolean; message: string }>;
 
   // User updates
-  update(params: UserUpdateParams, ctx: UserServiceContext): Promise<UserWithRoles>;
+  /**
+   * Resolves to a `CredentialRedirect` (not a user) only when `password` was
+   * supplied and the credential is owned elsewhere; nothing is stored then.
+   */
+  update(params: UserUpdateParams, ctx: UserServiceContext): Promise<UserWithRoles | CredentialRedirect>;
   delete(id: number, ctx: UserServiceContext): Promise<UserWithRoles>;
 
   // Bulk operations
@@ -386,7 +411,11 @@ export interface IUserService {
     success: boolean;
     themePreference: string | null;
   }>;
-  changePassword(params: ChangePasswordParams, ctx: UserServiceContext): Promise<{ success: boolean; message?: string }>;
+  /** `{ success: false, redirect, … }` when the credential is owned elsewhere. */
+  changePassword(params: ChangePasswordParams, ctx: UserServiceContext): Promise<
+    | { success: true; message?: string }
+    | ({ success: false; message?: string } & CredentialRedirect)
+  >;
   getCurrentUserSettings(userId: number, ctx: UserServiceContext): Promise<any>;
 
   // Username operations
@@ -435,6 +464,7 @@ export interface IUserService {
  */
 export function createUserService(deps: UserServiceDeps): IUserService {
   const { hooks, repository, RepositoryClass } = deps;
+  const resolveOwner = selectCredentialOwnerResolver(hooks);
 
   // Helper to get repository instance
   function getRepo(db: PostgresJsDatabase<any>): IUserRepository {
@@ -750,13 +780,17 @@ export function createUserService(deps: UserServiceDeps): IUserService {
           }
         }
 
-        // The write would allocate a new user: ask before hashing anything.
-        await assertLocalCredentialWritable(hooks, {
+        // The write would allocate a new user: ask WHERE its credential lives
+        // before hashing anything. `local` and `none` both allocate.
+        const inviteOwner = await ownerOrFrozen(resolveOwner, {
           db: ctx.db,
           operation: 'invite',
           user: null,
           email: params.email,
         });
+        if (inviteOwner.kind === 'external') {
+          throw new CredentialOwnedElsewhereError(inviteOwner, 'invite');
+        }
 
         // Hash password if provided
         let hashedPassword: string | null = null;
@@ -885,15 +919,23 @@ export function createUserService(deps: UserServiceDeps): IUserService {
       }
 
       // Hash password if provided — only then is a local verifier written,
-      // so only then is the guard asked.
+      // so only then is the owner asked.
       let hashedPassword: string | undefined;
       if (password) {
-        await assertLocalCredentialWritable(hooks, {
+        const owner = await ownerOrFrozen(resolveOwner, {
           db: ctx.db,
           operation: 'update',
           user: existingUser,
           email: existingUser.email ?? null,
         });
+        if (owner.kind === 'external') {
+          // Not ours to set: nothing is hashed or stored, the caller is told
+          // where the credential is managed.
+          return credentialRedirect(owner);
+        }
+        if (owner.kind === 'none') {
+          throw new UserServiceError('NOT_FOUND', 'User not found');
+        }
         hashedPassword = await hooks.hashPassword(password, 12);
       }
 
@@ -1176,14 +1218,20 @@ export function createUserService(deps: UserServiceDeps): IUserService {
         throw new UserServiceError('NOT_FOUND', 'User not found');
       }
 
-      // Asked BEFORE the compare: a refused account must not leak whether the
-      // supplied current password was right.
-      await assertLocalCredentialWritable(hooks, {
+      // Asked BEFORE the compare: an account owned elsewhere must not learn
+      // whether the supplied current password matched a stale local hash.
+      const owner = await ownerOrFrozen(resolveOwner, {
         db: ctx.db,
         operation: 'change-password',
         user,
         email: user.email ?? null,
       });
+      if (owner.kind === 'external') {
+        return { success: false as const, ...credentialRedirect(owner) };
+      }
+      if (owner.kind === 'none') {
+        throw new UserServiceError('NOT_FOUND', 'User not found');
+      }
 
       if (!user.password) {
         throw new UserServiceError(
@@ -1222,7 +1270,7 @@ export function createUserService(deps: UserServiceDeps): IUserService {
         );
       }
 
-      return { success: true, message: 'Password changed successfully' };
+      return { success: true as const, message: 'Password changed successfully' };
     },
 
     /**

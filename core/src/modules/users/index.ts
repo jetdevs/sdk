@@ -96,6 +96,20 @@ export type {
     LocalCredentialWriteVerdict,
 } from '../auth/local-credential-policy';
 
+// The caller-injected resolver `UserRouterDeps.resolveCredentialOwner` takes,
+// and the shapes its writers answer with.
+export {
+    CredentialOwnedElsewhereError, isCredentialRedirect, localOnlyOwner
+} from '../auth/credential-owner';
+
+export type {
+    CredentialOwner,
+    CredentialOwnerOperation,
+    CredentialRedirect,
+    ResolveCredentialOwner,
+    ResolveCredentialOwnerArgs,
+} from '../auth/credential-owner';
+
 // =============================================================================
 // SERVICE
 // =============================================================================

@@ -27,6 +27,16 @@ export type {
   LocalCredentialWriteVerdict,
 } from '../auth/local-credential-policy';
 
+// The caller-injected resolver `PasswordResetServiceDeps.resolveCredentialOwner` takes.
+export { localOnlyOwner } from '../auth/credential-owner';
+
+export type {
+  CredentialOwner,
+  CredentialOwnerOperation,
+  ResolveCredentialOwner,
+  ResolveCredentialOwnerArgs,
+} from '../auth/credential-owner';
+
 export type {
   PasswordResetDb,
   PasswordResetService,

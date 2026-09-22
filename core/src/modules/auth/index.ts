@@ -202,3 +202,41 @@ export type {
   LocalCredentialWriteOperation,
   LocalCredentialWriteVerdict,
 } from './local-credential-policy';
+
+// =============================================================================
+// CREDENTIAL OWNER (routing port: where a credential lives, for every writer
+// and the login path)
+// =============================================================================
+
+export {
+  askCredentialOwner,
+  credentialOwnerOf,
+  credentialRedirect,
+  CredentialOwnedElsewhereError,
+  FROZEN_CREDENTIAL_MESSAGE,
+  fromLocalCredentialGuard,
+  frozenCredentialMessage,
+  isCredentialRedirect,
+  localOnlyOwner,
+  selectCredentialOwnerResolver,
+} from './credential-owner';
+
+export type {
+  CredentialOwner,
+  CredentialOwnerDeps,
+  CredentialOwnerKind,
+  CredentialOwnerOperation,
+  CredentialRedirect,
+  ExternalCredentialOwner,
+  FrozenCredentialOwner,
+  ResolveCredentialOwner,
+  ResolveCredentialOwnerArgs,
+} from './credential-owner';
+
+export { verifyLocalCredential } from './verify-local-credential';
+
+export type {
+  VerifyLocalCredentialArgs,
+  VerifyLocalCredentialDeps,
+  VerifyLocalCredentialResult,
+} from './verify-local-credential';

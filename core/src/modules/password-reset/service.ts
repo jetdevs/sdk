@@ -1,7 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 
-import { askLocalCredentialGuard } from '../auth/local-credential-policy';
+import {
+  askCredentialOwner,
+  frozenCredentialMessage,
+  selectCredentialOwnerResolver,
+} from '../auth/credential-owner';
 import { validatePassword } from './password-policy';
 import type {
   PasswordResetDb,
@@ -45,9 +49,9 @@ export function createPasswordResetService(
     tokenTtlMs = DEFAULT_TOKEN_TTL_MS,
     generateToken = () => randomBytes(32).toString('hex'),
     onPasswordChanged,
-    canWriteLocalCredential,
     logger = console,
   } = deps;
+  const resolveOwner = selectCredentialOwnerResolver(deps);
 
   const { users, passwordResetTokens, authLogs } = tables;
   const expiryHours = Math.max(1, Math.round(tokenTtlMs / (60 * 60 * 1000)));
@@ -68,19 +72,38 @@ export function createPasswordResetService(
       return { success: true };
     }
 
-    // Password owned elsewhere: same silent success — a link that could only
-    // be refused on consumption is not worth minting, and the response shape
-    // must not change.
-    const mintVerdict = await runPrivileged(async (db: PasswordResetDb) =>
-      askLocalCredentialGuard(canWriteLocalCredential, {
+    // Where does the credential live? Anything but `local` answers the same
+    // silent success — the response shape must not change — and mints
+    // nothing here: a link that could only be refused on consumption is not
+    // worth minting. An external owner may be asked to mint its own.
+    const owner = await runPrivileged(async (db: PasswordResetDb) =>
+      askCredentialOwner(resolveOwner, {
         db,
         operation: 'reset-request',
         user,
         email: normalized,
       }),
     );
-    if (!mintVerdict.allowed) {
-      logger.warn(`[password-reset] reset link refused for user ${user.id}: ${mintVerdict.reason}`);
+    if (owner.kind === 'external') {
+      if (owner.forwardResetRequest) {
+        try {
+          await owner.forwardResetRequest(normalized);
+        } catch (error) {
+          // Same rule as our own delivery: a failure must not change the
+          // response shape, so it is logged and swallowed.
+          logger.error('[password-reset] failed to forward reset request to the credential owner:', error);
+        }
+      } else {
+        logger.warn(`[password-reset] reset link not minted for user ${user.id}: credential owned by ${owner.issuer}`);
+      }
+      return { success: true };
+    }
+    if (owner.kind === 'frozen') {
+      logger.warn(`[password-reset] reset link refused for user ${user.id}: ${frozenCredentialMessage(owner)}`);
+      return { success: true };
+    }
+    if (owner.kind === 'none') {
+      logger.warn(`[password-reset] reset link not minted for user ${user.id}: no credential owner`);
       return { success: true };
     }
 
@@ -202,16 +225,31 @@ export function createPasswordResetService(
 
     // Server-side closure, checked at CONSUMPTION: a link minted while the
     // password was still local must not write a verifier once it is not.
-    const writeVerdict = await runPrivileged(async (db: PasswordResetDb) =>
-      askLocalCredentialGuard(canWriteLocalCredential, {
+    const owner = await runPrivileged(async (db: PasswordResetDb) =>
+      askCredentialOwner(resolveOwner, {
         db,
         operation: 'reset',
         user: currentUser ?? null,
         email: currentUser?.email ?? null,
       }),
     );
-    if (!writeVerdict.allowed) {
-      return { ok: false, error: writeVerdict.reason, reason: 'refused' };
+    if (owner.kind === 'external') {
+      return {
+        ok: false,
+        error: `This account's password is managed by ${owner.issuer}`,
+        reason: 'refused',
+        redirect: owner.resetUrl,
+      };
+    }
+    if (owner.kind === 'frozen') {
+      return { ok: false, error: frozenCredentialMessage(owner), reason: 'refused' };
+    }
+    if (owner.kind === 'none') {
+      return {
+        ok: false,
+        error: 'Reset link is invalid or has expired. Please request a new one',
+        reason: 'invalid',
+      };
     }
 
     if (currentUser?.password) {

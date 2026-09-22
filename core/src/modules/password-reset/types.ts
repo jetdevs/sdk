@@ -8,6 +8,7 @@
  */
 
 import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
+import type { ResolveCredentialOwner } from '../auth/credential-owner';
 
 /** Minimal drizzle-like client the service needs. Kept loose so any driver fits. */
 export type PasswordResetDb = any;
@@ -32,13 +33,26 @@ export interface SendResetEmailArgs {
 
 export interface PasswordResetServiceDeps {
   /**
-   * Optional guard consulted before a reset link is minted (`reset-request`)
-   * and again before the new password is written (`reset`). Apps that hand
-   * password ownership to an external identity provider inject their rule.
-   * A refused `reset-request` still answers `{ success: true }` — the endpoint
-   * must not reveal which accounts exist — but mints no token and sends no
-   * email. A refused `reset` answers `{ ok: false, reason: 'refused' }` and
-   * writes nothing.
+   * Optional resolver consulted before a reset link is minted
+   * (`reset-request`) and again before the new password is written (`reset`).
+   * It answers WHERE the credential lives. `requestReset` always answers
+   * `{ success: true }` — the endpoint must not reveal which accounts exist —
+   * and per kind: `local` mints and emails; `external` calls the owner's
+   * `forwardResetRequest(email)` once when present (the owner sends the one
+   * email) and otherwise mints nothing; `frozen` and `none` mint nothing.
+   * `resetPassword` writes only for `local`: `external` answers
+   * `{ ok: false, reason: 'refused', redirect: resetUrl }`, `frozen` answers
+   * `{ ok: false, reason: 'refused' }` with its reason, `none` answers
+   * `{ ok: false, reason: 'invalid' }` — the link points at nobody this app
+   * can serve.
+   */
+  resolveCredentialOwner?: ResolveCredentialOwner;
+  /**
+   * Legacy yes/no guard, kept for one minor. Ignored when
+   * `resolveCredentialOwner` is given; otherwise adapted onto it with the same
+   * outcomes as before: a refused `reset-request` still answers
+   * `{ success: true }` but mints no token and sends no email; a refused
+   * `reset` answers `{ ok: false, reason: 'refused' }` and writes nothing.
    */
   canWriteLocalCredential?: LocalCredentialWriteGuard;
   /**
@@ -104,7 +118,13 @@ export interface ResetPasswordArgs {
 
 export type ResetPasswordResult =
   | { ok: true }
-  | { ok: false; error: string; reason: 'validation' | 'refused' | TokenInvalidReason };
+  | {
+      ok: false;
+      error: string;
+      reason: 'validation' | 'refused' | TokenInvalidReason;
+      /** Present when the credential is owned elsewhere: where to reset it. */
+      redirect?: string;
+    };
 
 export interface PasswordResetService {
   requestReset(args: RequestResetArgs): Promise<RequestResetResult>;

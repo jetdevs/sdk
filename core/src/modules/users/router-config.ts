@@ -11,10 +11,17 @@
 import { and, ilike, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { IUserRepository } from './repository';
+import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
 import {
-  askLocalCredentialGuard,
-  type LocalCredentialWriteGuard,
-} from '../auth/local-credential-policy';
+  askCredentialOwner,
+  CredentialOwnedElsewhereError,
+  credentialRedirect,
+  frozenCredentialMessage,
+  selectCredentialOwnerResolver,
+  type CredentialOwner,
+  type ResolveCredentialOwner,
+  type ResolveCredentialOwnerArgs,
+} from '../auth/credential-owner';
 import {
     assignRoleSchema,
     changePasswordSchema,
@@ -69,12 +76,30 @@ export interface UserRouterDeps {
   onUserInvited?: (args: { user: any; orgId: number | null; db: any }) => Promise<void>;
 
   /**
-   * Optional guard consulted before any procedure here writes a local
+   * Optional resolver consulted before any procedure here writes a local
    * verifier — `invite` and `create` (a new user), `update` (a password on an
-   * existing user) and `changePassword`. Apps that hand password ownership to
-   * an external identity provider inject their rule; the SDK has no opinion.
-   * A refusal is surfaced as `UserRouterError('FORBIDDEN', reason)` and
-   * nothing is written.
+   * existing user) and `changePassword`. It answers WHERE the credential
+   * lives; the SDK has no opinion of its own. Per kind:
+   *
+   * - `local`: write.
+   * - `external`: `invite`/`create` throw `CredentialOwnedElsewhereError`
+   *   (`code: 'OWNED_ELSEWHERE'`, carrying `accountUrl`); `update` and
+   *   `changePassword` RETURN a `CredentialRedirect` (`{ redirect: accountUrl,
+   *   ownedBy: 'external', … }`) without hashing or storing anything.
+   * - `frozen`: `UserRouterError('FORBIDDEN', reason)`; nothing written.
+   * - `none`: `invite`/`create` allocate; `update`/`changePassword` are
+   *   `NOT_FOUND`.
+   *
+   * Absent, `canWriteLocalCredential` is adapted if given, else every
+   * credential is local (today's behaviour).
+   */
+  resolveCredentialOwner?: ResolveCredentialOwner;
+
+  /**
+   * Legacy yes/no guard, kept for one minor. Ignored when
+   * `resolveCredentialOwner` is given; otherwise adapted onto it with the same
+   * outcomes as before: allow → write, refuse →
+   * `UserRouterError('FORBIDDEN', reason)` and nothing written.
    */
   canWriteLocalCredential?: LocalCredentialWriteGuard;
 }
@@ -115,17 +140,19 @@ export class UserRouterError extends Error {
 }
 
 /**
- * Ask the app's `canWriteLocalCredential` guard (if any) and turn a refusal
- * into this module's error shape.
+ * Ask where the credential lives and refuse `frozen` in this module's error
+ * shape. `external` and `none` are returned for the caller to route, since
+ * the right answer differs per writer (throw, redirect, allocate, 404).
  */
-async function assertLocalCredentialWritable(
-  deps: Pick<UserRouterDeps, 'canWriteLocalCredential'>,
-  args: Parameters<LocalCredentialWriteGuard>[0],
-): Promise<void> {
-  const verdict = await askLocalCredentialGuard(deps.canWriteLocalCredential, args);
-  if (!verdict.allowed) {
-    throw new UserRouterError('FORBIDDEN', verdict.reason);
+async function ownerOrFrozen(
+  resolveOwner: ResolveCredentialOwner,
+  args: ResolveCredentialOwnerArgs,
+): Promise<CredentialOwner> {
+  const owner = await askCredentialOwner(resolveOwner, args);
+  if (owner.kind === 'frozen') {
+    throw new UserRouterError('FORBIDDEN', frozenCredentialMessage(owner));
   }
+  return owner;
 }
 
 // =============================================================================
@@ -155,6 +182,8 @@ async function assertLocalCredentialWritable(
  * ```
  */
 export function createUserRouterConfig(deps: UserRouterDeps) {
+  const resolveOwner = selectCredentialOwnerResolver(deps);
+
   return {
     // -------------------------------------------------------------------------
     // GET ALL USERS WITH STATS (org-scoped)
@@ -405,13 +434,17 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         }
 
         // Server-side closure: a new user is a new identity, and may carry a
-        // local verifier. Ask the app before allocating either.
-        await assertLocalCredentialWritable(deps, {
+        // local verifier. Ask WHERE it lives before allocating either;
+        // `local` and `none` both allocate.
+        const inviteOwner = await ownerOrFrozen(resolveOwner, {
           db,
           operation: 'invite',
           user: null,
           email: input.email,
         });
+        if (inviteOwner.kind === 'external') {
+          throw new CredentialOwnedElsewhereError(inviteOwner, 'invite');
+        }
 
         // Hash password before storing
         const hashedPassword = input.password
@@ -475,12 +508,15 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         }
 
         // Server-side closure: same question as `invite`.
-        await assertLocalCredentialWritable(deps, {
+        const createOwner = await ownerOrFrozen(resolveOwner, {
           db,
           operation: 'create',
           user: null,
           email: input.email,
         });
+        if (createOwner.kind === 'external') {
+          throw new CredentialOwnedElsewhereError(createOwner, 'create');
+        }
 
         // Hash password before storing
         const hashedPassword = input.password
@@ -556,13 +592,21 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         const finalUpdateData = { ...updateData } as typeof updateData & { password?: string };
         if (password) {
           // Server-side closure: an admin setting a password IS a local
-          // verifier write. Ask before hashing.
-          await assertLocalCredentialWritable(deps, {
+          // verifier write. Ask WHERE the credential lives before hashing.
+          const owner = await ownerOrFrozen(resolveOwner, {
             db,
             operation: 'update',
             user: existing,
             email: existing.email ?? null,
           });
+          if (owner.kind === 'external') {
+            // Not ours to set: nothing is hashed or stored, the caller is
+            // told where the credential is managed.
+            return credentialRedirect(owner);
+          }
+          if (owner.kind === 'none') {
+            throw new UserRouterError('NOT_FOUND', `User with ID ${id} not found`);
+          }
           finalUpdateData.password = await deps.hashPassword(password, 10);
           console.log('[SDK User Update] Password hashed and added to finalUpdateData');
         }
@@ -676,14 +720,20 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('NOT_FOUND', 'User not found');
         }
 
-        // Server-side closure: refuse BEFORE the compare, so a refused user
-        // learns nothing about their stale local hash.
-        await assertLocalCredentialWritable(deps, {
+        // Server-side closure: route BEFORE the compare, so a user whose
+        // credential lives elsewhere learns nothing about a stale local hash.
+        const owner = await ownerOrFrozen(resolveOwner, {
           db,
           operation: 'change-password',
           user,
           email: user.email ?? null,
         });
+        if (owner.kind === 'external') {
+          return { success: false as const, ...credentialRedirect(owner) };
+        }
+        if (owner.kind === 'none') {
+          throw new UserRouterError('NOT_FOUND', 'User not found');
+        }
 
         // Verify current password
         const isValid = user.password
