@@ -14,6 +14,7 @@ const clientEntries = [
   'ui/skeletons/index',
   'ui/theme/index',
   'ui/admin/index',
+  'ui/auth-pages/index',
   'hooks/index',
   'stores/index',
   'providers/index',

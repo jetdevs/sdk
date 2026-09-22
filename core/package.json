@@ -1,6 +1,6 @@
 {
   "name": "@jetdevs/core",
-  "version": "0.1.39-dev",
+  "version": "0.1.40-dev",
   "description": "Core SDK components, UI primitives, and utilities for Core SaaS",
   "type": "module",
   "publishConfig": {
@@ -133,6 +133,11 @@
       "types": "./dist/ui/admin/index.d.ts",
       "import": "./dist/ui/admin/index.js",
       "require": "./dist/ui/admin/index.js"
+    },
+    "./ui/auth-pages": {
+      "types": "./dist/ui/auth-pages/index.d.ts",
+      "import": "./dist/ui/auth-pages/index.js",
+      "require": "./dist/ui/auth-pages/index.js"
     },
     "./hooks": {
       "types": "./dist/hooks/index.d.ts",
