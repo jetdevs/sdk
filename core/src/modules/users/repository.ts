@@ -19,6 +19,7 @@ import {
     like,
     not,
     or,
+    sql,
     type SQL,
 } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
@@ -123,8 +124,6 @@ export interface IUserRepository {
   findById(db: any, id: number): Promise<UserWithRoles | null>;
   findByEmail(db: any, email: string): Promise<UserWithRoles | null>;
   findByUsername(db: any, username: string): Promise<UserWithRoles | null>;
-  findOrCreateUser(db: any, data: { email: string; name?: string | null; image?: string | null }): Promise<{ user: any; created: boolean }>;
-  findUserByConnectSub(db: any, connectSub: string): Promise<any | null>;
   create(db: any, data: UserCreateData): Promise<UserWithRoles>;
   update(db: any, id: number, data: UserUpdateData): Promise<UserWithRoles>;
   softDelete(db: any, id: number): Promise<UserWithRoles>;
@@ -333,10 +332,18 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
      * Get user by email
      */
     async findByEmail(db: PostgresJsDatabase<any>, email: string): Promise<UserWithRoles | null> {
+      // Case-insensitive on the STORED address as well as the argument: a row
+      // saved as `Sean@x.com` must be found by `sean@x.com`, or the writers
+      // that use this as their existence check allocate a second account for
+      // the same person (STORY-040 / STORY-042).
+      //
+      // INDEX: `lower(email)` does not use a plain b-tree on `email`. The SDK
+      // ships no such index — the app owns its DDL; cadra-web adds one in its
+      // migration 0136. Absent one, this is a sequential scan on `users`.
       const result = await db
         .select()
         .from(users)
-        .where(eq(users.email, email))
+        .where(sql`lower(${users.email}) = lower(${email})`)
         .limit(1);
 
       return (result[0] as unknown as UserWithRoles) || null;
@@ -353,44 +360,6 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
         .limit(1);
 
       return (result[0] as unknown as UserWithRoles) || null;
-    }
-
-    /**
-     * Idempotent-by-email user provisioning (Yobo Connect). Returns the existing
-     * user when one matches the email, otherwise creates a minimal active user.
-     */
-    async findOrCreateUser(
-      db: PostgresJsDatabase<any>,
-      data: { email: string; name?: string | null; image?: string | null }
-    ): Promise<{ user: any; created: boolean }> {
-      const existing = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, data.email))
-        .limit(1);
-      if (existing[0]) return { user: existing[0], created: false };
-
-      const inserted = await db
-        .insert(users)
-        .values({
-          email: data.email,
-          name: data.name ?? data.email.split('@')[0],
-          isActive: true,
-        } as any)
-        .returning();
-      return { user: inserted[0], created: true };
-    }
-
-    /**
-     * Look up a shadow user by its stable yobo-auth OIDC `sub`.
-     */
-    async findUserByConnectSub(db: PostgresJsDatabase<any>, connectSub: string): Promise<any | null> {
-      const rows = await db
-        .select()
-        .from(users)
-        .where(eq(users.connectSub, connectSub))
-        .limit(1);
-      return rows[0] ?? null;
     }
 
     /**

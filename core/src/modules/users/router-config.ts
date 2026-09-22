@@ -11,6 +11,21 @@
 import { and, ilike, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { IUserRepository } from './repository';
+import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
+import {
+  askCredentialOwner,
+  CredentialOwnedElsewhereError,
+  credentialRedirect,
+  frozenCredentialMessage,
+  selectCredentialOwnerResolver,
+  type CredentialOwner,
+  type ResolveCredentialOwner,
+  type ResolveCredentialOwnerArgs,
+} from '../auth/credential-owner';
+import {
+  announceCredentialWritten,
+  type OnCredentialWritten,
+} from '../auth/credential-written';
 import {
     assignRoleSchema,
     changePasswordSchema,
@@ -63,6 +78,47 @@ export interface UserRouterDeps {
    * the db handle. Errors should be swallowed by the implementer (non-fatal).
    */
   onUserInvited?: (args: { user: any; orgId: number | null; db: any }) => Promise<void>;
+
+  /**
+   * Optional resolver consulted before any procedure here writes a local
+   * verifier — `invite` and `create` (a new user), `update` (a password on an
+   * existing user) and `changePassword`. It answers WHERE the credential
+   * lives; the SDK has no opinion of its own. Per kind:
+   *
+   * - `local`: write.
+   * - `external`: `invite`/`create` throw `CredentialOwnedElsewhereError`
+   *   (`code: 'OWNED_ELSEWHERE'`, carrying `accountUrl`); `update` and
+   *   `changePassword` RETURN a `CredentialRedirect` (`{ redirect: accountUrl,
+   *   ownedBy: 'external', … }`) without hashing or storing anything.
+   * - `frozen`: `UserRouterError('FORBIDDEN', reason)`; nothing written.
+   * - `none`: `invite`/`create` allocate; `update`/`changePassword` are
+   *   `NOT_FOUND`.
+   *
+   * Absent, `canWriteLocalCredential` is adapted if given, else every
+   * credential is local (today's behaviour).
+   */
+  resolveCredentialOwner?: ResolveCredentialOwner;
+
+  /**
+   * Legacy yes/no guard, kept for one minor. Ignored when
+   * `resolveCredentialOwner` is given; otherwise adapted onto it with the same
+   * outcomes as before: allow → write, refuse →
+   * `UserRouterError('FORBIDDEN', reason)` and nothing written.
+   */
+  canWriteLocalCredential?: LocalCredentialWriteGuard;
+
+  /**
+   * Optional hook fired ONCE after a procedure here has successfully stored a
+   * local verifier — `invite` and `create` when the input CARRIED a password
+   * (`firstSet: true`), `update` with a password, and `changePassword`. It is
+   * never fired on a refusal (`external` → redirect, `frozen` → FORBIDDEN,
+   * `none` → NOT_FOUND), on a wrong current password, on an invite that only
+   * added an existing user to an org, or on an invite/create with no password:
+   * no verifier was written in any of those. None of these procedures runs in
+   * a transaction, so it fires immediately after the write, on the same `db`
+   * handle; errors propagate to the caller.
+   */
+  onCredentialWritten?: OnCredentialWritten;
 }
 
 /**
@@ -100,6 +156,22 @@ export class UserRouterError extends Error {
   }
 }
 
+/**
+ * Ask where the credential lives and refuse `frozen` in this module's error
+ * shape. `external` and `none` are returned for the caller to route, since
+ * the right answer differs per writer (throw, redirect, allocate, 404).
+ */
+async function ownerOrFrozen(
+  resolveOwner: ResolveCredentialOwner,
+  args: ResolveCredentialOwnerArgs,
+): Promise<CredentialOwner> {
+  const owner = await askCredentialOwner(resolveOwner, args);
+  if (owner.kind === 'frozen') {
+    throw new UserRouterError('FORBIDDEN', frozenCredentialMessage(owner));
+  }
+  return owner;
+}
+
 // =============================================================================
 // ROUTER CONFIG FACTORY
 // =============================================================================
@@ -127,6 +199,8 @@ export class UserRouterError extends Error {
  * ```
  */
 export function createUserRouterConfig(deps: UserRouterDeps) {
+  const resolveOwner = selectCredentialOwnerResolver(deps);
+
   return {
     // -------------------------------------------------------------------------
     // GET ALL USERS WITH STATS (org-scoped)
@@ -376,6 +450,19 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           return existing;
         }
 
+        // Server-side closure: a new user is a new identity, and may carry a
+        // local verifier. Ask WHERE it lives before allocating either;
+        // `local` and `none` both allocate.
+        const inviteOwner = await ownerOrFrozen(resolveOwner, {
+          db,
+          operation: 'invite',
+          user: null,
+          email: input.email,
+        });
+        if (inviteOwner.kind === 'external') {
+          throw new CredentialOwnedElsewhereError(inviteOwner, 'invite');
+        }
+
         // Hash password before storing
         const hashedPassword = input.password
           ? await deps.hashPassword(input.password, 10)
@@ -414,6 +501,18 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           });
         }
 
+        // Only an invite that CARRIED a password stored a verifier.
+        if (hashedPassword) {
+          await announceCredentialWritten(deps.onCredentialWritten, {
+            db,
+            userId: newUser.id,
+            operation: 'invite',
+            actorUserId: parseInt(service.userId),
+            firstSet: true,
+            at: new Date(),
+          });
+        }
+
         await deps.onUserInvited?.({ user: newUser, orgId: service.orgId ?? null, db });
 
         return newUser;
@@ -435,6 +534,17 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         const existing = await repo.findByEmail(db, input.email);
         if (existing) {
           throw new UserRouterError('CONFLICT', 'User with this email already exists');
+        }
+
+        // Server-side closure: same question as `invite`.
+        const createOwner = await ownerOrFrozen(resolveOwner, {
+          db,
+          operation: 'create',
+          user: null,
+          email: input.email,
+        });
+        if (createOwner.kind === 'external') {
+          throw new CredentialOwnedElsewhereError(createOwner, 'create');
         }
 
         // Hash password before storing
@@ -459,6 +569,18 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           isActive: input.isActive,
           currentOrgId: input.orgId,
         });
+
+        // Only a create that CARRIED a password stored a verifier.
+        if (hashedPassword) {
+          await announceCredentialWritten(deps.onCredentialWritten, {
+            db,
+            userId: newUser.id,
+            operation: 'create',
+            actorUserId: parseInt(service.userId),
+            firstSet: true,
+            at: new Date(),
+          });
+        }
 
         // Assign role if provided
         if (input.roleId && input.orgId) {
@@ -510,6 +632,22 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         // Hash password if provided
         const finalUpdateData = { ...updateData } as typeof updateData & { password?: string };
         if (password) {
+          // Server-side closure: an admin setting a password IS a local
+          // verifier write. Ask WHERE the credential lives before hashing.
+          const owner = await ownerOrFrozen(resolveOwner, {
+            db,
+            operation: 'update',
+            user: existing,
+            email: existing.email ?? null,
+          });
+          if (owner.kind === 'external') {
+            // Not ours to set: nothing is hashed or stored, the caller is
+            // told where the credential is managed.
+            return credentialRedirect(owner);
+          }
+          if (owner.kind === 'none') {
+            throw new UserRouterError('NOT_FOUND', `User with ID ${id} not found`);
+          }
           finalUpdateData.password = await deps.hashPassword(password, 10);
           console.log('[SDK User Update] Password hashed and added to finalUpdateData');
         }
@@ -520,7 +658,21 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           allKeys: Object.keys(finalUpdateData),
         }));
 
-        return repo.update(db, id, finalUpdateData);
+        const updated = await repo.update(db, id, finalUpdateData);
+
+        // Only an update that actually SET a password wrote a verifier.
+        if (finalUpdateData.password) {
+          await announceCredentialWritten(deps.onCredentialWritten, {
+            db,
+            userId: id,
+            operation: 'update',
+            actorUserId: parseInt(service.userId),
+            firstSet: !existing.password,
+            at: new Date(),
+          });
+        }
+
+        return updated;
       },
     },
 
@@ -623,6 +775,21 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('NOT_FOUND', 'User not found');
         }
 
+        // Server-side closure: route BEFORE the compare, so a user whose
+        // credential lives elsewhere learns nothing about a stale local hash.
+        const owner = await ownerOrFrozen(resolveOwner, {
+          db,
+          operation: 'change-password',
+          user,
+          email: user.email ?? null,
+        });
+        if (owner.kind === 'external') {
+          return { success: false as const, ...credentialRedirect(owner) };
+        }
+        if (owner.kind === 'none') {
+          throw new UserRouterError('NOT_FOUND', 'User not found');
+        }
+
         // Verify current password
         const isValid = user.password
           ? await deps.comparePassword(input.currentPassword, user.password)
@@ -635,6 +802,16 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         // Hash and update new password
         const hashedPassword = await deps.hashPassword(input.newPassword, 10);
         await repo.updatePassword(db, userId, hashedPassword);
+
+        // The compare above succeeded, so a verifier existed: never a first set.
+        await announceCredentialWritten(deps.onCredentialWritten, {
+          db,
+          userId,
+          operation: 'change-password',
+          actorUserId: userId,
+          firstSet: false,
+          at: new Date(),
+        });
 
         return { success: true };
       },

@@ -29,6 +29,12 @@ export interface TokenSet {
 /** Claims returned from /userinfo. */
 export interface ConnectUserinfo {
   sub: string
+  /**
+   * Issuer that asserted this subject. Optional because a plain (unsigned)
+   * /userinfo response does not carry it; when absent the RP falls back to its
+   * configured issuer. Half of the `(issuer, sub)` binding (specs.md §5).
+   */
+  iss?: string
   email?: string
   emailVerified?: boolean
   name?: string
@@ -37,6 +43,24 @@ export interface ConnectUserinfo {
   orgId?: number
   /** Connect membership role at the org level. NOT product RBAC. */
   orgRole?: 'owner' | 'admin' | 'member'
+  /**
+   * `credential_version` observed at the instant credentials were verified
+   * (specs.md §10.2) — NOT the current version. An authentication is never
+   * upgraded to a newer version.
+   */
+  cv?: number
+  /**
+   * Opaque authentication-epoch id (specs.md §10.2). Immutable, and inherited
+   * unchanged by every derived credential.
+   */
+  aeid?: string
+  /**
+   * The OIDC grant the credential was issued under (specs.md §10.5). Without it
+   * a token cannot be correlated to its epoch or to per-grant revocation.
+   */
+  grant_id?: string
+  /** camelCase alias for `grant_id`, tolerated on the wire. */
+  grantId?: string
 }
 
 /** Verified claims from a Connect ID token (RS256 JWT). */

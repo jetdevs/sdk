@@ -1,6 +1,6 @@
 {
   "name": "@jetdevs/connect",
-  "version": "0.2.0-dev",
+  "version": "0.2.1-dev",
   "description": "OIDC Relying-Party client SDK for any Connect-compatible identity provider",
   "type": "module",
   "publishConfig": {

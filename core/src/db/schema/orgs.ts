@@ -100,10 +100,39 @@ export const users = pgTable(
     uuid: uuid("uuid").unique().notNull().defaultRandom(),
     email: varchar("email", { length: 255 }),
     /**
-     * Stable yobo-auth OIDC `sub` for this shadow user. Replaces email matching
-     * for SSO provisioning. NULL until first Yobo Connect login / backfill.
+     * Stable Connect OIDC `sub` for this shadow user. Replaces email matching
+     * for SSO provisioning. NULL until first Connect login / backfill.
      */
     connectSub: varchar("connect_sub", { length: 64 }),
+    /**
+     * Issuer that minted `connect_sub` (p79 §5.5). The identity binding is the
+     * PAIR `(connect_issuer, connect_sub)`, never the subject alone: two
+     * independent IdPs allocate subjects from their own sequences, so a bare
+     * subject lookup can authenticate the wrong person.
+     *
+     * The per-database constraint is `UNIQUE (connect_issuer, connect_sub)`
+     * with `CHECK ((connect_issuer IS NULL) = (connect_sub IS NULL))`.
+     * `UNIQUE(connect_sub)` alone is a DIFFERENT and STRONGER constraint that
+     * p79 explicitly does not want. Indexes are NOT declared here — only the
+     * databases that need the binding carry them (p79 STORY-002 / STORY-004).
+     */
+    connectIssuer: varchar("connect_issuer", { length: 255 }),
+    /**
+     * Which service verifies this user's password: `local` | `connect`
+     * (p79 §14). **cadra-web is the sole authority for this column**; the
+     * Cadra Connect instance ignores it. Authority is per-user state, not a
+     * flag, and it never travels backwards: once `connect`, no code path
+     * re-enables the local verifier.
+     */
+    credentialAuthority: varchar("credential_authority", { length: 16 })
+      .notNull()
+      .default("local"),
+    /**
+     * Monotonic credential version (p79 §10). **Authoritative in the
+     * `cadra_auth` database and ignored in cadra-web**, where it exists only so
+     * the shared schema matches both deployments.
+     */
+    credentialVersion: integer("credential_version").notNull().default(1),
     name: varchar("name", { length: 255 }),
     firstName: varchar("first_name", { length: 255 }),
     lastName: varchar("last_name", { length: 255 }),

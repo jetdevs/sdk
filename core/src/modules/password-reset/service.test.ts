@@ -157,6 +157,215 @@ describe('password reset service', () => {
     });
   });
 
+  describe('canWriteLocalCredential guard (caller-injected)', () => {
+    const liveToken = [{ id: 1, userId: 7, expiresAt: new Date(Date.now() + 60_000) }];
+    const owned = { id: 7, email: 'owned@example.com', password: 'hashed:Old!Pass123', ownedElsewhere: true };
+
+    it('requestReset: a refused mint still answers success, but issues no token and sends no email', async () => {
+      const guard = vi.fn().mockResolvedValue({ allowed: false, reason: 'owned elsewhere' });
+      const { service, db, sendResetEmail } = build(
+        { users: [owned] },
+        { canWriteLocalCredential: guard },
+      );
+
+      const result = await service.requestReset({ email: 'owned@example.com' });
+
+      expect(result).toEqual({ success: true });
+      expect(db.__calls.inserted).toHaveLength(0);
+      expect(db.__calls.deleted).toBe(0);
+      expect(sendResetEmail).not.toHaveBeenCalled();
+      // The guard sees the WHOLE row, not a projection — the app's rule may
+      // live in any column.
+      expect(guard).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'reset-request', user: owned, email: 'owned@example.com' }),
+      );
+    });
+
+    it('resetPassword: a refused write is reported as refused and writes nothing', async () => {
+      const guard = vi.fn().mockResolvedValue({ allowed: false, reason: 'owned elsewhere' });
+      const { service, db } = build(
+        { tokens: liveToken, users: [owned] },
+        { canWriteLocalCredential: guard },
+      );
+
+      const result = await service.resetPassword({ token: 'good', password: 'Str0ng!Pass' });
+
+      expect(result).toEqual({ ok: false, error: 'owned elsewhere', reason: 'refused' });
+      expect(db.__calls.updated).toHaveLength(0);
+      expect(db.__calls.inserted).toHaveLength(0);
+      expect(guard).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'reset', user: owned }),
+      );
+    });
+
+    it('an allowing guard changes nothing about the happy path', async () => {
+      const { service, db } = build(
+        { tokens: liveToken, users: [owned] },
+        { canWriteLocalCredential: async () => ({ allowed: true }) },
+      );
+
+      const result = await service.resetPassword({ token: 'good', password: 'Str0ng!Pass' });
+
+      expect(result).toEqual({ ok: true });
+      expect(db.__calls.updated[0].values.password).toBe('hashed:Str0ng!Pass');
+    });
+
+    it('no guard injected: every write is allowed (pre-existing consumers unchanged)', async () => {
+      const { service, db } = build({ tokens: liveToken, users: [owned] });
+      const result = await service.resetPassword({ token: 'good', password: 'Str0ng!Pass' });
+      expect(result).toEqual({ ok: true });
+      expect(db.__calls.updated[0].values.password).toBe('hashed:Str0ng!Pass');
+    });
+  });
+
+  describe('resolveCredentialOwner — the routing port (STORY-039)', () => {
+    const liveToken = [{ id: 1, userId: 7, expiresAt: new Date(Date.now() + 60_000) }];
+    const owned = { id: 7, email: 'owned@example.com', password: 'hashed:Old!Pass123' };
+    const externalOwner = (forwardResetRequest?: (email: string) => Promise<void>) => ({
+      kind: 'external' as const,
+      issuer: 'https://idp.example.com',
+      providerId: 'idp',
+      accountUrl: 'https://idp.example.com/account',
+      resetUrl: 'https://idp.example.com/forgot',
+      ...(forwardResetRequest && { forwardResetRequest }),
+    });
+    const frozen = { kind: 'frozen' as const, reason: 'migration in progress' };
+    const none = { kind: 'none' as const };
+    const resolving = (owner: unknown) => vi.fn().mockResolvedValue(owner);
+
+    describe('requestReset', () => {
+      it('external with forwardResetRequest: forwards EXACTLY once with the normalised email, mints nothing, sends nothing, silent success', async () => {
+        const forward = vi.fn().mockResolvedValue(undefined);
+        const resolver = resolving(externalOwner(forward));
+        const { service, db, sendResetEmail } = build({ users: [owned] }, { resolveCredentialOwner: resolver });
+
+        await expect(service.requestReset({ email: '  Owned@Example.com ' })).resolves.toEqual({ success: true });
+
+        expect(forward).toHaveBeenCalledTimes(1);
+        expect(forward).toHaveBeenCalledWith('owned@example.com');
+        expect(db.__calls.inserted).toHaveLength(0);
+        expect(db.__calls.deleted).toBe(0);
+        expect(sendResetEmail).not.toHaveBeenCalled();
+        expect(resolver).toHaveBeenCalledWith(expect.objectContaining({ operation: 'reset-request', user: owned, email: 'owned@example.com' }));
+      });
+
+      it('external without forwardResetRequest: silent success, nothing minted or sent', async () => {
+        const { service, db, sendResetEmail } = build({ users: [owned] }, { resolveCredentialOwner: resolving(externalOwner()) });
+        await expect(service.requestReset({ email: owned.email })).resolves.toEqual({ success: true });
+        expect(db.__calls.inserted).toHaveLength(0);
+        expect(sendResetEmail).not.toHaveBeenCalled();
+      });
+
+      it('a failing forward is logged and swallowed: the response shape does not change', async () => {
+        const logger = { error: vi.fn(), warn: vi.fn() };
+        const forward = vi.fn().mockRejectedValue(new Error('owner down'));
+        const { service } = build({ users: [owned] }, { resolveCredentialOwner: resolving(externalOwner(forward)), logger });
+        await expect(service.requestReset({ email: owned.email })).resolves.toEqual({ success: true });
+        expect(forward).toHaveBeenCalledTimes(1);
+        expect(logger.error).toHaveBeenCalledTimes(1);
+      });
+
+      it.each([
+        ['frozen', frozen],
+        ['none', none],
+      ])('%s: silent success, nothing minted, no email', async (_kind, owner) => {
+        const { service, db, sendResetEmail } = build({ users: [owned] }, { resolveCredentialOwner: resolving(owner) });
+        await expect(service.requestReset({ email: owned.email })).resolves.toEqual({ success: true });
+        expect(db.__calls.inserted).toHaveLength(0);
+        expect(db.__calls.deleted).toBe(0);
+        expect(sendResetEmail).not.toHaveBeenCalled();
+      });
+
+      it('local, and no resolver, mint and email identically', async () => {
+        for (const resolver of [resolving({ kind: 'local' }), undefined]) {
+          const { service, db, sendResetEmail } = build({ users: [owned] }, { resolveCredentialOwner: resolver });
+          await expect(service.requestReset({ email: owned.email })).resolves.toEqual({ success: true });
+          expect(db.__calls.deleted).toBe(1);
+          expect(db.__calls.inserted).toHaveLength(1);
+          expect(sendResetEmail).toHaveBeenCalledTimes(1);
+        }
+      });
+    });
+
+    describe('resetPassword (consume)', () => {
+      it('external: refused with the owner resetUrl as redirect; no compare, no hash, nothing written', async () => {
+        const hashPassword = vi.fn(async (pw: string) => `hashed:${pw}`);
+        const comparePassword = vi.fn(async () => false);
+        const { service, db } = build({ tokens: liveToken, users: [owned] }, { resolveCredentialOwner: resolving(externalOwner()), hashPassword, comparePassword });
+
+        const result = await service.resetPassword({ token: 'good', password: 'Str0ng!Pass' });
+
+        expect(result).toMatchObject({ ok: false, reason: 'refused', redirect: 'https://idp.example.com/forgot' });
+        expect(db.__calls.updated).toHaveLength(0);
+        expect(db.__calls.inserted).toHaveLength(0);
+        expect(hashPassword).not.toHaveBeenCalled();
+        expect(comparePassword).not.toHaveBeenCalled();
+      });
+
+      it('frozen: refused with the reason, nothing hashed or written', async () => {
+        const hashPassword = vi.fn(async (pw: string) => `hashed:${pw}`);
+        const { service, db } = build({ tokens: liveToken, users: [owned] }, { resolveCredentialOwner: resolving(frozen), hashPassword });
+        await expect(service.resetPassword({ token: 'good', password: 'Str0ng!Pass' })).resolves.toEqual({ ok: false, error: 'migration in progress', reason: 'refused' });
+        expect(db.__calls.updated).toHaveLength(0);
+        expect(hashPassword).not.toHaveBeenCalled();
+      });
+
+      it('none: the link points at nobody — invalid, nothing hashed or written', async () => {
+        const hashPassword = vi.fn(async (pw: string) => `hashed:${pw}`);
+        const { service, db } = build({ tokens: liveToken, users: [owned] }, { resolveCredentialOwner: resolving(none), hashPassword });
+        await expect(service.resetPassword({ token: 'good', password: 'Str0ng!Pass' })).resolves.toMatchObject({ ok: false, reason: 'invalid' });
+        expect(db.__calls.updated).toHaveLength(0);
+        expect(hashPassword).not.toHaveBeenCalled();
+      });
+
+      it('local, and no resolver, write identically', async () => {
+        for (const resolver of [resolving({ kind: 'local' }), undefined]) {
+          const { service, db } = build({ tokens: liveToken, users: [owned] }, { resolveCredentialOwner: resolver });
+          await expect(service.resetPassword({ token: 'good', password: 'Str0ng!Pass' })).resolves.toEqual({ ok: true });
+          expect(db.__calls.updated[0].values.password).toBe('hashed:Str0ng!Pass');
+        }
+      });
+
+      it('resolveCredentialOwner wins over a refusing guard', async () => {
+        const guard = vi.fn().mockResolvedValue({ allowed: false, reason: 'guard says no' });
+        const { service, db } = build({ tokens: liveToken, users: [owned] }, { resolveCredentialOwner: resolving({ kind: 'local' }), canWriteLocalCredential: guard });
+        await expect(service.resetPassword({ token: 'good', password: 'Str0ng!Pass' })).resolves.toEqual({ ok: true });
+        expect(db.__calls.updated[0].values.password).toBe('hashed:Str0ng!Pass');
+        expect(guard).not.toHaveBeenCalled();
+      });
+    });
+
+    it('guard alone ≡ fromLocalCredentialGuard(guard) on reset-request and reset, allow and refuse', async () => {
+      const { fromLocalCredentialGuard } = await import('../auth/credential-owner');
+      for (const verdict of [{ allowed: true }, { allowed: false, reason: 'owned elsewhere' }]) {
+        const guard = async () => verdict as any;
+        const run = async (deps: Record<string, unknown>) => {
+          const req = build({ users: [owned] }, deps);
+          const requested = await req.service.requestReset({ email: owned.email });
+          const con = build({ tokens: liveToken, users: [owned] }, deps);
+          const consumed = await con.service.resetPassword({ token: 'good', password: 'Str0ng!Pass' });
+          return {
+            requested,
+            requestWrites: { inserted: req.db.__calls.inserted.length, emails: req.sendResetEmail.mock.calls.length },
+            consumed,
+            consumeWrites: con.db.__calls.updated.length,
+          };
+        };
+        const viaGuard = await run({ canWriteLocalCredential: guard });
+        const viaAdapter = await run({ resolveCredentialOwner: fromLocalCredentialGuard(guard) });
+        expect(viaAdapter).toEqual(viaGuard);
+        if (!verdict.allowed) {
+          expect(viaGuard).toEqual({
+            requested: { success: true },
+            requestWrites: { inserted: 0, emails: 0 },
+            consumed: { ok: false, error: 'owned elsewhere', reason: 'refused' },
+            consumeWrites: 0,
+          });
+        }
+      }
+    });
+  });
+
   describe('resetPassword', () => {
     const liveToken = [{ id: 1, userId: 7, expiresAt: new Date(Date.now() + 60_000) }];
 

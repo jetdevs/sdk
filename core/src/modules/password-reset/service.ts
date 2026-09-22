@@ -1,6 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 
+import {
+  askCredentialOwner,
+  frozenCredentialMessage,
+  selectCredentialOwnerResolver,
+} from '../auth/credential-owner';
+import { announceCredentialWritten } from '../auth/credential-written';
 import { validatePassword } from './password-policy';
 import type {
   PasswordResetDb,
@@ -26,8 +32,8 @@ const DEFAULT_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
  *     shows a "request a new one" screen instead of failing after the user has
  *     typed a password.
  *  3. `resetPassword` re-checks the token inside the write, updates the
- *     password, runs `onPasswordChanged`, marks the token used, and writes an
- *     auth log entry — all in one transaction.
+ *     password, runs `onPasswordChanged` and then `onCredentialWritten`, marks
+ *     the token used, and writes an auth log entry — all in one transaction.
  */
 export function createPasswordResetService(
   deps: PasswordResetServiceDeps,
@@ -44,8 +50,10 @@ export function createPasswordResetService(
     tokenTtlMs = DEFAULT_TOKEN_TTL_MS,
     generateToken = () => randomBytes(32).toString('hex'),
     onPasswordChanged,
+    onCredentialWritten,
     logger = console,
   } = deps;
+  const resolveOwner = selectCredentialOwnerResolver(deps);
 
   const { users, passwordResetTokens, authLogs } = tables;
   const expiryHours = Math.max(1, Math.round(tokenTtlMs / (60 * 60 * 1000)));
@@ -53,21 +61,59 @@ export function createPasswordResetService(
   async function requestReset({ email }: RequestResetArgs): Promise<RequestResetResult> {
     const normalized = email.toLowerCase().trim();
 
+    // Match the STORED address case-insensitively, not just the typed one.
+    // Lowercasing the input alone misses a legacy row saved as `Sean@x.com`,
+    // which then silently receives no reset mail (STORY-040).
+    //
+    // INDEX: this is `lower(email)`, so a plain b-tree on `email` no longer
+    // serves it. The SDK ships no `lower(email)` index — the app owns its own
+    // DDL; cadra-web adds one in its migration 0136. Without such an index
+    // this is a sequential scan on `users`.
     const [user] = await runPrivileged(async (db: PasswordResetDb) =>
-      db.select({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        firstName: users.firstName,
-      })
+      db.select()
         .from(users)
-        .where(eq(users.email, normalized))
+        .where(sql`lower(${users.email}) = lower(${normalized})`)
         .limit(1),
     );
 
     // No account: stop here but report success, so the response is identical
     // either way and the endpoint reveals nothing about who has an account.
     if (!user) {
+      return { success: true };
+    }
+
+    // Where does the credential live? Anything but `local` answers the same
+    // silent success — the response shape must not change — and mints
+    // nothing here: a link that could only be refused on consumption is not
+    // worth minting. An external owner may be asked to mint its own.
+    const owner = await runPrivileged(async (db: PasswordResetDb) =>
+      askCredentialOwner(resolveOwner, {
+        db,
+        operation: 'reset-request',
+        user,
+        email: normalized,
+      }),
+    );
+    if (owner.kind === 'external') {
+      if (owner.forwardResetRequest) {
+        try {
+          await owner.forwardResetRequest(normalized);
+        } catch (error) {
+          // Same rule as our own delivery: a failure must not change the
+          // response shape, so it is logged and swallowed.
+          logger.error('[password-reset] failed to forward reset request to the credential owner:', error);
+        }
+      } else {
+        logger.warn(`[password-reset] reset link not minted for user ${user.id}: credential owned by ${owner.issuer}`);
+      }
+      return { success: true };
+    }
+    if (owner.kind === 'frozen') {
+      logger.warn(`[password-reset] reset link refused for user ${user.id}: ${frozenCredentialMessage(owner)}`);
+      return { success: true };
+    }
+    if (owner.kind === 'none') {
+      logger.warn(`[password-reset] reset link not minted for user ${user.id}: no credential owner`);
       return { success: true };
     }
 
@@ -181,11 +227,40 @@ export function createPasswordResetService(
     }
 
     const [currentUser] = await runPrivileged(async (db: PasswordResetDb) =>
-      db.select({ password: users.password })
+      db.select()
         .from(users)
         .where(eq(users.id, resetToken.userId))
         .limit(1),
     );
+
+    // Server-side closure, checked at CONSUMPTION: a link minted while the
+    // password was still local must not write a verifier once it is not.
+    const owner = await runPrivileged(async (db: PasswordResetDb) =>
+      askCredentialOwner(resolveOwner, {
+        db,
+        operation: 'reset',
+        user: currentUser ?? null,
+        email: currentUser?.email ?? null,
+      }),
+    );
+    if (owner.kind === 'external') {
+      return {
+        ok: false,
+        error: `This account's password is managed by ${owner.issuer}`,
+        reason: 'refused',
+        redirect: owner.resetUrl,
+      };
+    }
+    if (owner.kind === 'frozen') {
+      return { ok: false, error: frozenCredentialMessage(owner), reason: 'refused' };
+    }
+    if (owner.kind === 'none') {
+      return {
+        ok: false,
+        error: 'Reset link is invalid or has expired. Please request a new one',
+        reason: 'invalid',
+      };
+    }
 
     if (currentUser?.password) {
       const isSamePassword = await comparePassword(password, currentUser.password);
@@ -207,9 +282,18 @@ export function createPasswordResetService(
         .set({ password: hashedPassword, updatedAt: at })
         .where(eq(users.id, resetToken.userId));
 
+      // Alias first, keeping its pre-existing position, then the general hook.
       if (onPasswordChanged) {
         await onPasswordChanged(tx, { userId: resetToken.userId, at });
       }
+
+      await announceCredentialWritten(onCredentialWritten, {
+        db: tx,
+        userId: resetToken.userId,
+        operation: 'reset',
+        firstSet: !currentUser?.password,
+        at,
+      });
 
       await tx.update(passwordResetTokens)
         .set({ usedAt: at })

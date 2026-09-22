@@ -189,3 +189,67 @@ export type {
   AuthContext,
   AuthHandlerContext,
 } from './router-config';
+
+// =============================================================================
+// LOCAL CREDENTIAL WRITE POLICY (caller-injected guard)
+// =============================================================================
+
+export { askLocalCredentialGuard } from './local-credential-policy';
+
+export type {
+  LocalCredentialWriteArgs,
+  LocalCredentialWriteGuard,
+  LocalCredentialWriteOperation,
+  LocalCredentialWriteVerdict,
+} from './local-credential-policy';
+
+// =============================================================================
+// CREDENTIAL OWNER (routing port: where a credential lives, for every writer
+// and the login path)
+// =============================================================================
+
+export {
+  askCredentialOwner,
+  credentialOwnerOf,
+  credentialRedirect,
+  CredentialOwnedElsewhereError,
+  FROZEN_CREDENTIAL_MESSAGE,
+  fromLocalCredentialGuard,
+  frozenCredentialMessage,
+  isCredentialRedirect,
+  localOnlyOwner,
+  selectCredentialOwnerResolver,
+} from './credential-owner';
+
+export type {
+  CredentialOwner,
+  CredentialOwnerDeps,
+  CredentialOwnerKind,
+  CredentialOwnerOperation,
+  CredentialRedirect,
+  ExternalCredentialOwner,
+  FrozenCredentialOwner,
+  ResolveCredentialOwner,
+  ResolveCredentialOwnerArgs,
+} from './credential-owner';
+
+// =============================================================================
+// CREDENTIAL WRITTEN (announcement port: a successful local verifier write)
+// =============================================================================
+
+export { announceCredentialWritten } from './credential-written';
+
+export type {
+  CredentialWriteOperation,
+  CredentialWrittenArgs,
+  CredentialWrittenDeps,
+  OnCredentialWritten,
+} from './credential-written';
+
+export { verifyLocalCredential } from './verify-local-credential';
+
+export type {
+  VerifyLocalCredentialArgs,
+  VerifyLocalCredentialDeps,
+  VerifyLocalCredentialResult,
+} from './verify-local-credential';

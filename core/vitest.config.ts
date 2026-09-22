@@ -16,6 +16,8 @@ export default defineConfig({
     environmentMatchGlobs: [
       // Only the data-table DOM render tests get happy-dom.
       ['src/ui/data-table/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
+      // p79 STORY-047: the shared auth page UI render tests.
+      ['src/ui/auth-pages/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
     ],
     globals: true,
   },

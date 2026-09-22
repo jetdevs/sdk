@@ -11,6 +11,18 @@
 import { z } from 'zod';
 import type { IAuthRepository } from './repository';
 import { registerSchema, updateProfileSchema } from './schemas';
+import type { LocalCredentialWriteGuard } from './local-credential-policy';
+import {
+  askCredentialOwner,
+  CredentialOwnedElsewhereError,
+  frozenCredentialMessage,
+  selectCredentialOwnerResolver,
+  type ResolveCredentialOwner,
+} from './credential-owner';
+import {
+  announceCredentialWritten,
+  type OnCredentialWritten,
+} from './credential-written';
 
 // =============================================================================
 // TYPES
@@ -55,6 +67,35 @@ export interface AuthRouterDeps {
    * Defaults to checking NEXT_PUBLIC_ENABLE_PUBLIC_REGISTRATION env var
    */
   isRegistrationEnabled?: () => boolean;
+
+  /**
+   * Optional resolver consulted before `register` allocates a user with a
+   * local verifier. Answers WHERE the credential for that email lives:
+   * `local` or `none` → the user is created; `external` → refused with
+   * `CredentialOwnedElsewhereError` (`code: 'OWNED_ELSEWHERE'`, carrying the
+   * owner's `accountUrl`); `frozen` → `AuthRouterError('FORBIDDEN', reason)`.
+   * Nothing is written on a refusal. Absent, `canWriteLocalCredential` is
+   * adapted if given, else every credential is local (today's behaviour).
+   */
+  resolveCredentialOwner?: ResolveCredentialOwner;
+
+  /**
+   * Legacy yes/no guard, kept for one minor. Ignored when
+   * `resolveCredentialOwner` is given; otherwise adapted onto it with the same
+   * outcomes as before: allow → write, refuse →
+   * `AuthRouterError('FORBIDDEN', reason)` and nothing written.
+   */
+  canWriteLocalCredential?: LocalCredentialWriteGuard;
+
+  /**
+   * Optional hook fired ONCE after `register` has successfully stored a local
+   * verifier, with `operation: 'register'` and `firstSet: true`. It is never
+   * fired on a refusal (`external` or `frozen` owner), on a disabled
+   * registration, or on a duplicate email — nothing was written in those
+   * cases. `register` has no transaction, so it fires immediately after the
+   * row is created, on the same `db` handle; errors propagate to the caller.
+   */
+  onCredentialWritten?: OnCredentialWritten;
 }
 
 /**
@@ -139,6 +180,7 @@ export class AuthRouterError extends Error {
 export function createAuthRouterConfig(deps: AuthRouterDeps) {
   const isRegistrationEnabled = deps.isRegistrationEnabled ||
     (() => process.env.NEXT_PUBLIC_ENABLE_PUBLIC_REGISTRATION === 'true');
+  const resolveOwner = selectCredentialOwnerResolver(deps);
 
   return {
     // -------------------------------------------------------------------------
@@ -181,7 +223,7 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
       public: true,
       input: registerSchema,
       repository: deps.Repository,
-      handler: async ({ input, repo }: AuthHandlerContext<z.infer<typeof registerSchema>>) => {
+      handler: async ({ input, repo, db }: AuthHandlerContext<z.infer<typeof registerSchema>>) => {
         // Check if public registration is enabled
         if (!isRegistrationEnabled()) {
           throw new AuthRouterError('FORBIDDEN', 'Public registration is disabled');
@@ -193,12 +235,37 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
           throw new AuthRouterError('CONFLICT', 'User already exists');
         }
 
+        // Server-side closure: ask WHERE this email's credential lives before
+        // allocating a local verifier. `local` and `none` both allocate.
+        const owner = await askCredentialOwner(resolveOwner, {
+          db,
+          operation: 'register',
+          user: null,
+          email: input.email,
+        });
+        if (owner.kind === 'external') {
+          throw new CredentialOwnedElsewhereError(owner, 'register');
+        }
+        if (owner.kind === 'frozen') {
+          throw new AuthRouterError('FORBIDDEN', frozenCredentialMessage(owner));
+        }
+
         const hashedPassword = await deps.hashPassword(input.password, 12);
 
         const newUser = await repo.createUser({
           email: input.email,
           password: hashedPassword,
           name: input.name || input.email.split('@')[0],
+        });
+
+        // The verifier is stored: announce it. No transaction here, so this
+        // runs immediately after the write, on the same handle.
+        await announceCredentialWritten(deps.onCredentialWritten, {
+          db,
+          userId: newUser.id,
+          operation: 'register',
+          firstSet: true,
+          at: new Date(),
         });
 
         return {
