@@ -297,3 +297,21 @@ export type {
   CredentialWriteOptions,
   CredentialWriteRefusalReason,
 } from './credential-write';
+
+// =============================================================================
+// p77 TRIGGER SQL TEMPLATES (M2 writers-closed, M3 one-allocator, M6 bump)
+// =============================================================================
+
+export {
+  AUTHORITY_ROLLBACK_ERROR_PREFIX,
+  AUTHORITY_TRANSITION_ERROR_PREFIX,
+  WRITERS_CLOSED_ERROR_PREFIX,
+  writersClosedTriggerSql,
+  ONE_ALLOCATOR_ERROR_PREFIX,
+  ONE_ALLOCATOR_GUC,
+  oneAllocatorGucSql,
+  oneAllocatorTriggerSql,
+  credentialVersionBumpTriggerSql,
+} from './sql';
+
+export type { WritersClosedOptions } from './sql';
