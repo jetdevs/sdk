@@ -9,6 +9,7 @@ export default defineConfig({
     'server/handoff/index': 'src/server/handoff/index.ts',
     'server/owner/index': 'src/server/owner/index.ts',
     'adapter/index': 'src/adapter/index.ts',
+    'cutover/index': 'src/cutover/index.ts',
     'next-auth/index': 'src/next-auth/index.ts',
     'browser/index': 'src/browser/index.ts',
   },

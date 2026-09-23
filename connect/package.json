@@ -53,6 +53,11 @@
       "types": "./dist/adapter/index.d.ts",
       "import": "./dist/adapter/index.js",
       "default": "./dist/adapter/index.js"
+    },
+    "./cutover": {
+      "types": "./dist/cutover/index.d.ts",
+      "import": "./dist/cutover/index.js",
+      "default": "./dist/cutover/index.js"
     }
   },
   "scripts": {

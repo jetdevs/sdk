@@ -65,6 +65,10 @@ export class FakeConnect {
   registerStatusOverride: number | null = null
   /** The switch's current jti; a request carrying another one is `403 operator_superseded`. null = off (no check). */
   jti: string | null = null
+  /** STORY-005: how to read the jti out of a presented operator token (a real JWT in the estate tests). Default: the raw header IS the jti. */
+  operatorJtiOf: ((raw: string) => string | null) | null = null
+  /** STORY-005: Connect writes `first_activation_at` inside the first successful activation of a window. */
+  onActivated: (() => void) | null = null
   /** Routes answered 503 until removed. */
   withhold = new Set<string>()
   hits: Record<string, number> = {}
@@ -103,7 +107,7 @@ export class FakeConnect {
   }
 
   async start(): Promise<string> {
-    this.server = createServer((req, res) => void this.handle(req, res))
+    this.server = createServer((req, res) => void this.handleRequest(req, res))
     await new Promise<void>((resolve) => this.server!.listen(0, '127.0.0.1', resolve))
     const { port } = this.server!.address() as AddressInfo
     this.issuer = `http://127.0.0.1:${port}`
@@ -116,7 +120,7 @@ export class FakeConnect {
     this.server = null
   }
 
-  private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://x')
     const route = url.pathname.replace(/^\/api\/internal\/connect\//, '')
     const chunks: Buffer[] = []
@@ -140,7 +144,8 @@ export class FakeConnect {
     }
     if (req.headers['x-internal-api-key'] !== this.rpKey) return answer(401, { error: 'unauthorized' })
     if (this.withhold.has(route)) return answer(503, { error: 'withheld' })
-    if (route.startsWith('handoff/') && operator !== null && this.jti !== null && operator !== this.jti) {
+    const presentedJti = operator === null ? null : this.operatorJtiOf ? this.operatorJtiOf(operator) : operator
+    if (route.startsWith('handoff/') && operator !== null && this.jti !== null && presentedJti !== this.jti) {
       return answer(403, { error: 'operator_superseded' })
     }
     const caller = { system: system ?? '?', ref: String(body?.sourceUserRef ?? '') }
@@ -203,6 +208,7 @@ export class FakeConnect {
         this.staged.delete(u.id)
         r.state = 'activated'
         r.established = true
+        this.onActivated?.()
         return answer(200, { outcome: 'activated', credentialVersion: u.credentialVersion })
       }
       case 'handoff/activate-existing': {
@@ -216,6 +222,7 @@ export class FakeConnect {
         if (r.handoffClass === 'retire' && u.password == null) return answer(409, { error: 'canonical_pending' })
         if (r.handoffClass === 'recover' && u.password == null && !u.googleLinked) return answer(200, { outcome: 'no_connect_credential_yet' })
         r.state = 'activated'
+        this.onActivated?.()
         const via = r.handoffClass === 'recover' ? (u.password != null ? 'password' : 'google') : 'retired'
         return answer(200, { outcome: 'activated', via, credentialVersion: u.credentialVersion })
       }

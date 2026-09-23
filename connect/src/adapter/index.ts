@@ -148,6 +148,12 @@ export interface RpState {
   }
   /** Open (`prepared` | `fenced`) handoff rows. */
   openHandoffs: number
+  /**
+   * STORY-005: the local user refs of those open rows — what `off --abort`
+   * releases (§6.3 step 6, "release for every row each RP's state lists").
+   * Optional for a pilot adapter that never opens a handoff.
+   */
+  openHandoffRefs?: string[]
 }
 
 /** One `credential_handoff` row (cadra-web 0125/0131 + p77's `handoff_class`, `prepare_acked_at`, `fail_requested_at`). */
