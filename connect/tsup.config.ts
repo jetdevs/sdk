@@ -5,6 +5,8 @@ export default defineConfig({
     'index': 'src/index.ts',
     'types/index': 'src/types/index.ts',
     'server/index': 'src/server/index.ts',
+    'server/revocation/index': 'src/server/revocation/index.ts',
+    'adapter/index': 'src/adapter/index.ts',
     'next-auth/index': 'src/next-auth/index.ts',
     'browser/index': 'src/browser/index.ts',
   },

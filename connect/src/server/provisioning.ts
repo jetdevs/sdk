@@ -18,12 +18,14 @@ export type OrgPlatformRole = 'owner' | 'admin' | 'member'
 /** Membership lifecycle state in the canonical directory. */
 export type MembershipStatus = 'invited' | 'active' | 'suspended' | 'removed'
 
+import type { RpSystem } from '../adapter/index.js'
+
 /**
- * The relying party a canonical org originated from (C5 keying). A free-form
- * key chosen by each RP to identify itself (e.g. its app slug). Kept as `string`
- * so the SDK is not coupled to any specific set of consuming applications.
+ * The relying party a canonical org originated from (C5 keying). p77 narrows
+ * it to the registered systems (specs.md §5.2): the four password-holding RPs
+ * plus the two Cadra-side clients that provision through the same routes.
  */
-export type SourceSystem = string
+export type SourceSystem = RpSystem | 'cadra' | 'slides'
 
 export interface ConnectProvisioningConfig {
   /** Base URL of the Connect IdP (no trailing slash required). */

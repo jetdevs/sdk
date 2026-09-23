@@ -1,6 +1,6 @@
 {
   "name": "@jetdevs/connect",
-  "version": "0.2.1-dev",
+  "version": "0.3.0-dev",
   "description": "OIDC Relying-Party client SDK for any Connect-compatible identity provider",
   "type": "module",
   "publishConfig": {
@@ -24,6 +24,11 @@
       "import": "./dist/server/index.js",
       "default": "./dist/server/index.js"
     },
+    "./server/revocation": {
+      "types": "./dist/server/revocation/index.d.ts",
+      "import": "./dist/server/revocation/index.js",
+      "default": "./dist/server/revocation/index.js"
+    },
     "./next-auth": {
       "types": "./dist/next-auth/index.d.ts",
       "import": "./dist/next-auth/index.js",
@@ -33,6 +38,11 @@
       "types": "./dist/browser/index.d.ts",
       "import": "./dist/browser/index.js",
       "default": "./dist/browser/index.js"
+    },
+    "./adapter": {
+      "types": "./dist/adapter/index.d.ts",
+      "import": "./dist/adapter/index.js",
+      "default": "./dist/adapter/index.js"
     }
   },
   "scripts": {
