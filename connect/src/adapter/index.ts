@@ -175,13 +175,41 @@ export interface HandoffRow {
   lastOutcome: string | null
 }
 
+/**
+ * `readLocalCredential(userId)` — the RP's own verifier, read for the handoff
+ * driver (STORY-004): the ONLY place the hash leaves the RP is the RP's own
+ * `handoff/prepare` / `handoff/activate` call to Connect (§6.2 `import`).
+ * Never logged; the driver carries the digest everywhere else.
+ */
+export interface LocalCredentialRead {
+  /** The stored bcrypt verifier, or null when `password IS NULL` (or not a bcrypt hash). */
+  verifier: string | null
+  /** sha256 hex of `verifier`; null when `verifier` is null. */
+  digest: string | null
+  /** `users.updated_at` as an ISO string — the revision the fence compares. */
+  revision: string
+  authority: RpCredentialAuthority
+}
+
 /** Access to this app's `credential_handoff` rows, over the RP's privileged client. */
 export interface HandoffTableAccess {
   readHandoff(handoffId: string): Promise<HandoffRow | null>
   /** The one open (`prepared` | `fenced`) row for a user, or null (`credential_handoff_open_user_uq`). */
   readOpenHandoffForUser(userId: number): Promise<HandoffRow | null>
-  /** Open rows that are due (`next_attempt_at <= now()`), oldest first, for the reconciler (§6.4). */
+  /**
+   * Open rows that are due (`next_attempt_at <= now()`), oldest first, for the reconciler (§6.4).
+   * The reconciler's claim: implement it as `SELECT … FOR UPDATE SKIP LOCKED` in its own short
+   * transaction (`RECONCILER_CLAIM_SQL` in `server/handoff/reconciler.ts` is the reference text),
+   * so a row a live driver step holds at that instant is not returned. The per-step exclusion is
+   * the users row lock `FOR UPDATE NOWAIT` inside `fence` / `release` (→ `in_flight`).
+   */
   listDue(limit: number): Promise<HandoffRow[]>
+  /**
+   * §6.2 step (2) — ONE transaction under the users row lock: insert the row `prepared` with the
+   * class Connect answered at `classify` AND move `users.credential_authority` local → prepared.
+   * `prepare_acked_at` starts NULL (Connect has not heard of the row yet). A second open row for
+   * the user is refused by `credential_handoff_open_user_uq` (throw; the driver resumes instead).
+   */
   insert(row: {
     connectIssuer: string
     connectSub: string
@@ -192,6 +220,13 @@ export interface HandoffTableAccess {
     expectedLocalDigest: string | null
     expectedLocalRevision: string | null
   }): Promise<HandoffRow>
+  /**
+   * Move the row to `to` (or, with `to === row.state`, patch it in place) — the M5 transition
+   * trigger enforces the machine, including "`prepared → fenced` refused while `prepare_acked_at`
+   * IS NULL". The driver uses it for `prepare_acked_at`, the fenced re-pin, backoff and the
+   * `fail_requested_*` pair; `failed` and `activated` are reached through `release` / the driver's
+   * activation (flip first, then this transition).
+   */
   transition(
     handoffId: string,
     to: HandoffState,
@@ -224,22 +259,36 @@ export interface RpAdapter {
   inventory(): AsyncIterable<RpUserInventoryRow>
   /** Per-app rule; see §7. */
   isSystemIdentity(row: RpUserInventoryRow): boolean
-  /** credential_authority, credential_version, password IS NULL. */
+  /** credential_authority, credential_version, password IS NULL. Throws when the user does not exist. */
   readAuthority(userId: number): Promise<AuthorityRow>
+  /**
+   * STORY-004: the RP's own verifier + revision for the handoff driver (`import` stages it at
+   * Connect; `adopt`/`retire` pin its digest and revision). null when the user does not exist.
+   */
+  readLocalCredential(userId: number): Promise<LocalCredentialRead | null>
   /** schemaTag, flagEnabled, counts, openHandoffs — the lift gates read it (§6.3 step 6). */
   state(): Promise<RpState>
   /**
-   * §6.5: expires every unfinished operator lease (`UPDATE … WHERE finished_at IS NULL AND lease_until > now()`);
+   * §6.5: expires every unfinished operator lease (`drainLeases` in `server/handoff/lease.ts` — one UPDATE
+   * over every row `finished_at IS NULL AND outcome IS NULL`, persisting `outcome = 'drained'`);
    * returns only after every transaction holding a lease row has ended.
    */
   drain(): Promise<{ expired: number }>
-  /** users row lock, same tx as the handoff row; per-class rule (§6.2); refused while prepare_acked_at IS NULL. */
+  /**
+   * users row lock (`FOR UPDATE NOWAIT` → `in_flight`), same tx as the handoff row; resolves the user's open
+   * handoff itself; per-class rule (§6.2) against `expected` (the driver passes the row's pinned values:
+   * import → `source_digest`; adopt | retire → `expected_local_*`; recover → nothing); refused `not_acked`
+   * while prepare_acked_at IS NULL; a `fenced` row is re-asserted (idempotent). import digest drift is NOT a
+   * refusal: the fence pins the digest it observes and answers it, and the driver re-stages from it.
+   */
   fence(userId: number, expected: { digest?: string; revision?: string }): Promise<FenceResult>
-  /** sets 'connect', password NULL, credential_version := connectCv, in ONE statement. */
+  /** sets 'connect', password NULL, credential_version := connectCv, in ONE statement. Idempotent on a `connect` row. */
   flipToConnect(userId: number, connectCv: number): Promise<void>
   /**
    * resolves the user's open handoff server-side; back to 'local' on Connect's word only, never after activation;
-   * no_handoff = nothing open for this user (D23).
+   * no_handoff = nothing open for this user (D23). ONE transaction under the users row lock: authority
+   * prepared|fenced → local AND the open row → `failed` with `failed_reason = coalesce(fail_requested_reason,
+   * 'released')`. The driver calls it only after Connect's `handoff/fail` answered.
    */
   release(userId: number): Promise<'released' | 'no_handoff'>
   /** app-specific (yobo: onboarding resume access too). */

@@ -29,6 +29,16 @@
       "import": "./dist/server/revocation/index.js",
       "default": "./dist/server/revocation/index.js"
     },
+    "./server/handoff": {
+      "types": "./dist/server/handoff/index.d.ts",
+      "import": "./dist/server/handoff/index.js",
+      "default": "./dist/server/handoff/index.js"
+    },
+    "./server/owner": {
+      "types": "./dist/server/owner/index.d.ts",
+      "import": "./dist/server/owner/index.js",
+      "default": "./dist/server/owner/index.js"
+    },
     "./next-auth": {
       "types": "./dist/next-auth/index.d.ts",
       "import": "./dist/next-auth/index.js",
