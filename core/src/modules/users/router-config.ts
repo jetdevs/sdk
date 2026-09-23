@@ -27,6 +27,10 @@ import {
   type OnCredentialWritten,
 } from '../auth/credential-written';
 import {
+  withCredentialWrite,
+  type CredentialWriteGate,
+} from '../auth/credential-write';
+import {
     assignRoleSchema,
     changePasswordSchema,
     checkUsernameSchema,
@@ -117,8 +121,21 @@ export interface UserRouterDeps {
    * no verifier was written in any of those. None of these procedures runs in
    * a transaction, so it fires immediately after the write, on the same `db`
    * handle; errors propagate to the caller.
+   *
+   * p77: every one of those writes now runs inside `withCredentialWrite`'s
+   * transaction, so the hook fires INSIDE it, on the transaction handle.
    */
   onCredentialWritten?: OnCredentialWritten;
+
+  /**
+   * p77 credential-write seam (D26). Asked AFTER the credential-owner
+   * resolver and BEFORE any hash, by `invite` and `create` of a new user,
+   * `update` with a password and `changePassword`. A throw refuses: nothing is
+   * hashed or written, and a `CredentialWriteRefusedError` reaches tRPC as
+   * `SERVICE_UNAVAILABLE`. Absent, every write is admitted (today's
+   * behaviour). See `withCredentialWrite`.
+   */
+  credentialWriteGate?: CredentialWriteGate;
 }
 
 /**
@@ -463,55 +480,59 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new CredentialOwnedElsewhereError(inviteOwner, 'invite');
         }
 
-        // Hash password before storing
-        const hashedPassword = input.password
-          ? await deps.hashPassword(input.password, 10)
-          : undefined;
-
         // Derive name from firstName/lastName if not provided
         const derivedName = input.name ||
           [input.firstName, input.lastName].filter(Boolean).join(' ').trim() ||
           input.email.split('@')[0];  // Fallback to email username
 
-        // Create new user
-        const newUser = await repo.create(db, {
-          name: derivedName,
-          firstName: input.firstName,
-          lastName: input.lastName,
-          email: input.email,
-          phone: input.phone,
-          username: input.username,
-          password: hashedPassword,
-          isActive: input.isActive,
-          currentOrgId: service.orgId,
-        });
-
-        // Assign role - use provided roleId or find global "Standard User" role
+        // Role - use provided roleId or find global "Standard User" role.
+        // Resolved BEFORE the seam: it is a read, and the seam's clock runs.
         let roleIdToAssign = input.roleId;
         if (!roleIdToAssign) {
           roleIdToAssign = await findDefaultRoleId();
         }
 
-        if (roleIdToAssign && service.orgId) {
-          await repo.assignRole(db, {
-            userId: newUser.id,
-            roleId: roleIdToAssign,
-            orgId: service.orgId,
-            assignedBy: parseInt(service.userId),
-          });
-        }
+        // p77 seam: allocating a user goes through the gate, and the hash,
+        // the insert, the role and the announcement share one bounded tx.
+        const newUser = await withCredentialWrite(deps, { operation: 'invite', db }, async (tx) => {
+          const hashedPassword = input.password
+            ? await deps.hashPassword(input.password, 10)
+            : undefined;
 
-        // Only an invite that CARRIED a password stored a verifier.
-        if (hashedPassword) {
-          await announceCredentialWritten(deps.onCredentialWritten, {
-            db,
-            userId: newUser.id,
-            operation: 'invite',
-            actorUserId: parseInt(service.userId),
-            firstSet: true,
-            at: new Date(),
+          const created = await repo.create(tx, {
+            name: derivedName,
+            firstName: input.firstName,
+            lastName: input.lastName,
+            email: input.email,
+            phone: input.phone,
+            username: input.username,
+            password: hashedPassword,
+            isActive: input.isActive,
+            currentOrgId: service.orgId,
           });
-        }
+
+          if (roleIdToAssign && service.orgId) {
+            await repo.assignRole(tx, {
+              userId: created.id,
+              roleId: roleIdToAssign,
+              orgId: service.orgId,
+              assignedBy: parseInt(service.userId),
+            });
+          }
+
+          // Only an invite that CARRIED a password stored a verifier.
+          if (hashedPassword) {
+            await announceCredentialWritten(deps.onCredentialWritten, {
+              db: tx,
+              userId: created.id,
+              operation: 'invite',
+              actorUserId: parseInt(service.userId),
+              firstSet: true,
+              at: new Date(),
+            });
+          }
+          return created;
+        });
 
         await deps.onUserInvited?.({ user: newUser, orgId: service.orgId ?? null, db });
 
@@ -547,52 +568,54 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new CredentialOwnedElsewhereError(createOwner, 'create');
         }
 
-        // Hash password before storing
-        const hashedPassword = input.password
-          ? await deps.hashPassword(input.password, 10)
-          : undefined;
-
         // Derive name from firstName/lastName if not provided
         const derivedName = input.name ||
           [input.firstName, input.lastName].filter(Boolean).join(' ').trim() ||
           input.email.split('@')[0];  // Fallback to email username
 
-        // Create new user
-        const newUser = await repo.create(db, {
-          name: derivedName,
-          firstName: input.firstName,
-          lastName: input.lastName,
-          email: input.email,
-          phone: input.phone,
-          username: input.username,
-          password: hashedPassword,
-          isActive: input.isActive,
-          currentOrgId: input.orgId,
+        // p77 seam: gate, then hash + insert + announcement + role in one
+        // bounded transaction.
+        return withCredentialWrite(deps, { operation: 'create', db }, async (tx) => {
+          const hashedPassword = input.password
+            ? await deps.hashPassword(input.password, 10)
+            : undefined;
+
+          const newUser = await repo.create(tx, {
+            name: derivedName,
+            firstName: input.firstName,
+            lastName: input.lastName,
+            email: input.email,
+            phone: input.phone,
+            username: input.username,
+            password: hashedPassword,
+            isActive: input.isActive,
+            currentOrgId: input.orgId,
+          });
+
+          // Only a create that CARRIED a password stored a verifier.
+          if (hashedPassword) {
+            await announceCredentialWritten(deps.onCredentialWritten, {
+              db: tx,
+              userId: newUser.id,
+              operation: 'create',
+              actorUserId: parseInt(service.userId),
+              firstSet: true,
+              at: new Date(),
+            });
+          }
+
+          // Assign role if provided
+          if (input.roleId && input.orgId) {
+            await repo.assignRole(tx, {
+              userId: newUser.id,
+              roleId: input.roleId,
+              orgId: input.orgId,
+              assignedBy: parseInt(service.userId),
+            });
+          }
+
+          return newUser;
         });
-
-        // Only a create that CARRIED a password stored a verifier.
-        if (hashedPassword) {
-          await announceCredentialWritten(deps.onCredentialWritten, {
-            db,
-            userId: newUser.id,
-            operation: 'create',
-            actorUserId: parseInt(service.userId),
-            firstSet: true,
-            at: new Date(),
-          });
-        }
-
-        // Assign role if provided
-        if (input.roleId && input.orgId) {
-          await repo.assignRole(db, {
-            userId: newUser.id,
-            roleId: input.roleId,
-            orgId: input.orgId,
-            assignedBy: parseInt(service.userId),
-          });
-        }
-
-        return newUser;
       },
     },
 
@@ -648,31 +671,25 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           if (owner.kind === 'none') {
             throw new UserRouterError('NOT_FOUND', `User with ID ${id} not found`);
           }
-          finalUpdateData.password = await deps.hashPassword(password, 10);
-          console.log('[SDK User Update] Password hashed and added to finalUpdateData');
-        }
 
-        // DEBUG: Log final update data
-        console.log('[SDK User Update] Final update data:', JSON.stringify({
-          hasPassword: !!finalUpdateData.password,
-          allKeys: Object.keys(finalUpdateData),
-        }));
-
-        const updated = await repo.update(db, id, finalUpdateData);
-
-        // Only an update that actually SET a password wrote a verifier.
-        if (finalUpdateData.password) {
-          await announceCredentialWritten(deps.onCredentialWritten, {
-            db,
-            userId: id,
-            operation: 'update',
-            actorUserId: parseInt(service.userId),
-            firstSet: !existing.password,
-            at: new Date(),
+          // p77 seam: gate, then hash + write + announcement in one bounded tx.
+          return withCredentialWrite(deps, { operation: 'update', db }, async (tx) => {
+            finalUpdateData.password = await deps.hashPassword(password, 10);
+            const updated = await repo.update(tx, id, finalUpdateData);
+            await announceCredentialWritten(deps.onCredentialWritten, {
+              db: tx,
+              userId: id,
+              operation: 'update',
+              actorUserId: parseInt(service.userId),
+              firstSet: !existing.password,
+              at: new Date(),
+            });
+            return updated;
           });
         }
 
-        return updated;
+        // No password: not a credential write, so not through the seam.
+        return repo.update(db, id, finalUpdateData);
       },
     },
 
@@ -799,18 +816,20 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('UNAUTHORIZED', 'Current password is incorrect');
         }
 
-        // Hash and update new password
-        const hashedPassword = await deps.hashPassword(input.newPassword, 10);
-        await repo.updatePassword(db, userId, hashedPassword);
+        // p77 seam: gate, then hash + write + announcement in one bounded tx.
+        await withCredentialWrite(deps, { operation: 'change-password', db }, async (tx) => {
+          const hashedPassword = await deps.hashPassword(input.newPassword, 10);
+          await repo.updatePassword(tx, userId, hashedPassword);
 
-        // The compare above succeeded, so a verifier existed: never a first set.
-        await announceCredentialWritten(deps.onCredentialWritten, {
-          db,
-          userId,
-          operation: 'change-password',
-          actorUserId: userId,
-          firstSet: false,
-          at: new Date(),
+          // The compare above succeeded, so a verifier existed: never a first set.
+          await announceCredentialWritten(deps.onCredentialWritten, {
+            db: tx,
+            userId,
+            operation: 'change-password',
+            actorUserId: userId,
+            firstSet: false,
+            at: new Date(),
+          });
         });
 
         return { success: true };

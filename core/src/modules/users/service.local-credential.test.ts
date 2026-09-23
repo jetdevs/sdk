@@ -4,6 +4,7 @@
  * tRPC config) gets the same server-side refusal before anything is hashed.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { transactionalStub } from '../auth/__test-support__/transactional-stub';
 
 import { createUserService, type UserServiceContext } from './service';
 
@@ -40,7 +41,7 @@ const ctx = (overrides: Partial<UserServiceContext> = {}): UserServiceContext =>
 function service(repo: any, guard: any) {
   return createUserService({
     hooks: {
-      withPrivilegedDb: async (fn: any) => fn({}),
+      withPrivilegedDb: async (fn: any) => fn(transactionalStub({})),
       hashPassword,
       comparePassword,
       canWriteLocalCredential: guard,
@@ -135,7 +136,7 @@ describe('createUserService — resolveCredentialOwner', () => {
     compareSpy.mockClear();
     const { repo, writes } = rememberingRepo(existing);
     const svc = createUserService({
-      hooks: { withPrivilegedDb: async (fn: any) => fn({}), hashPassword: hashSpy, comparePassword: compareSpy, resolveCredentialOwner: resolver, ...extraHooks },
+      hooks: { withPrivilegedDb: async (fn: any) => fn(transactionalStub({})), hashPassword: hashSpy, comparePassword: compareSpy, resolveCredentialOwner: resolver, ...extraHooks },
       repository: repo,
     });
     return { svc, writes };
@@ -232,7 +233,7 @@ describe('createUserService — resolveCredentialOwner', () => {
         for (const call of calls) {
           const run = async (hooks: Record<string, unknown>) => {
             const { repo, writes } = rememberingRepo({ [owned.email]: owned });
-            const svc = createUserService({ hooks: { withPrivilegedDb: async (fn: any) => fn({}), hashPassword, comparePassword, ...hooks }, repository: repo });
+            const svc = createUserService({ hooks: { withPrivilegedDb: async (fn: any) => fn(transactionalStub({})), hashPassword, comparePassword, ...hooks }, repository: repo });
             const outcome = await call(svc).then(
               (r: any) => ({ ok: true, r: r && typeof r === 'object' ? { ...r } : r }),
               (e: any) => ({ ok: false, code: e.code, message: e.message }),

@@ -54,6 +54,8 @@ function createFakeDb(rows: { users?: any[]; tokens?: any[] }) {
       },
     }),
     transaction: (fn: any) => fn(db),
+    // p77: the credential-write seam's three SET LOCALs land here.
+    execute: async () => [],
     __calls: calls,
     __selectCalls: () => selectCall,
   };
