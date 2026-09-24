@@ -19,6 +19,7 @@ import { __resetRevocationCacheForTests, applyLogoutToken } from '../ledger.js'
 import { BACKCHANNEL_LOGOUT_EVENT, __resetJwksCacheForTests, verifyLogoutToken } from '../logout-token.js'
 import { closedPort, signJwt, startFakeIdp, type FakeIdp } from './support/fake-idp.js'
 import { openLocalLedgerDb, type LocalLedgerDb } from './support/local-db.js'
+import { WOULD_REFUSE_PREFIX, withEpochEnforcement } from '../../../next-auth/epoch-enforcement.js'
 
 const db: LocalLedgerDb | null = await openLocalLedgerDb()
 let idp: FakeIdp
@@ -452,5 +453,100 @@ describe.skipIf(!db)('the session-token trio (§4.5)', () => {
     await stampConnectEpochOnSignIn(none, null, deps())
     expect(none.connectAccessToken).toBeUndefined()
     expect(derivedLineageFromToken({ ...none, authTime: 1 })).toBeNull()
+  })
+})
+
+/**
+ * p77 FIX-logout-record (found in STORY-028) — an UNBOUND session (no
+ * (issuer, sub) on the token: yobo's password and phone-only OTP sessions)
+ * consults the revocation record too. Real logout tokens, signed by the
+ * loopback IdP and applied by the real receiver half (`applyLogoutToken`),
+ * against the real local Postgres; the gate is the real `withEpochEnforcement`.
+ */
+describe.skipIf(!db)('unbound sessions and the logout record (FIX-logout-record)', () => {
+  beforeEach(async () => {
+    __resetFreshnessCachesForTests()
+    __resetRevocationCacheForTests()
+    __resetJwksCacheForTests()
+    await db!.sql.execute('TRUNCATE connect_logout_tokens, connect_session_revocations, users RESTART IDENTITY')
+    // 3: bound to Connect (the pair set) but its credential still LOCAL — the
+    //    STORY-028 case. 4: a stranger, bound the same way. 5: phone-only, no pair.
+    await db!.sql.execute(
+      `INSERT INTO users (id, connect_issuer, connect_sub, credential_authority, credential_version) VALUES
+        (3, $1, '33', 'local', 2),
+        (4, $1, '44', 'local', 1),
+        (5, NULL, NULL, 'local', 1)`,
+      [idp.issuer],
+    )
+  })
+
+  let jtiSeq = 0
+  async function logout(claims: { sub?: string; sid?: string }): Promise<void> {
+    const tok = await verifyLogoutToken(
+      signJwt(idp.key, { iss: idp.issuer, aud: 'crm', iat: nowS(), jti: `j-fix-${++jtiSeq}`, ...claims, events: { [BACKCHANNEL_LOGOUT_EVENT]: {} } }),
+      { issuer: idp.issuer, clientId: 'crm' },
+    )
+    if (!tok.ok) throw new Error(tok.reason)
+    const applied = await applyLogoutToken(db!.sql, tok.token, { logger: silent() })
+    expect(applied.outcome).toBe('applied')
+  }
+  const passwordSession = (userId: number, localCv: number): SessionEpochToken => ({ userId, authTime: nowS() - 60, localCv })
+
+  it('a subject-wide logout for the lineage ends a password (unbound) session; the refusal carries revokedAfter', async () => {
+    const token = passwordSession(3, 2)
+    expect(await assertSessionTokenFresh(token, deps())).toMatchObject({ ok: true, source: 'mirror' })
+    await logout({ sub: '33' })
+    // maxAgeMs 0: no cached "no revocations yet" answer (the 60 s bound, F2).
+    const v = await assertSessionTokenFresh(token, deps({ maxAgeMs: 0 }))
+    expect(v).toMatchObject({ ok: false, reason: 'revoked' })
+    expect(typeof (v as { facts: { revokedAfter: unknown } }).facts.revokedAfter).toBe('number')
+    // The receiver resolved local_user_id from the pair — the key the local session carries.
+    expect((await db!.sql.execute('SELECT local_user_id, connect_sid FROM connect_session_revocations'))[0]).toEqual({ local_user_id: 3, connect_sid: null })
+    // A sign-in AFTER the logout is not ended by it.
+    __resetRevocationCacheForTests()
+    expect(await assertSessionTokenFresh({ userId: 3, authTime: nowS() + 1, localCv: 2 }, deps({ maxAgeMs: 0 }))).toMatchObject({ ok: true })
+  })
+
+  it('an unrelated logout does not end it: another subject, or a sid-scoped sign-out of this subject (D12)', async () => {
+    await logout({ sub: '44' })
+    await logout({ sub: '33', sid: 'browser-A' })
+    await logout({ sid: 'browser-B' })
+    expect(await assertSessionTokenFresh(passwordSession(3, 2), deps({ maxAgeMs: 0 }))).toMatchObject({ ok: true, source: 'mirror' })
+    expect(await assertSessionTokenFresh(passwordSession(5, 1), deps({ maxAgeMs: 0 }))).toMatchObject({ ok: true })
+    // …while the stranger's own session IS ended.
+    expect(await assertSessionTokenFresh(passwordSession(4, 1), deps({ maxAgeMs: 0 }))).toMatchObject({ ok: false, reason: 'revoked' })
+  })
+
+  it('a revocation older than the session does not match; a local-id row (the RP adapter\'s invalidate) ends a phone-only session', async () => {
+    await db!.sql.execute(
+      `INSERT INTO connect_session_revocations (connect_issuer, connect_sub, local_user_id, jti, revoked_at) VALUES ($1, '33', 3, 'old', now() - interval '10 minutes')`,
+      [idp.issuer],
+    )
+    expect(await assertSessionTokenFresh(passwordSession(3, 2), deps({ maxAgeMs: 0 }))).toMatchObject({ ok: true })
+    await db!.sql.execute(`INSERT INTO connect_session_revocations (connect_issuer, connect_sub, local_user_id, jti) VALUES ('rp:yobo', 'local:5', 5, 'rp:yobo:invalidate:x')`)
+    expect(await assertSessionTokenFresh(passwordSession(5, 1), deps({ maxAgeMs: 0 }))).toMatchObject({ ok: false, reason: 'revoked' })
+  })
+
+  it('an unreadable ledger ADMITS an unbound session (the local half of the split), and is not cached', async () => {
+    await logout({ sub: '33' })
+    const ledgerDown = async (text: string, params?: unknown[]) => {
+      if (text.includes('connect_session_revocations')) throw new Error('ledger down')
+      return db!.sql.execute(text, params as never)
+    }
+    const logger = silent()
+    expect(await assertSessionTokenFresh(passwordSession(3, 2), deps({ execute: ledgerDown as never, logger, maxAgeMs: 0 }))).toMatchObject({ ok: true })
+    expect(logger.error).toHaveBeenCalled()
+    // The store is back: the same session is refused at once.
+    expect(await assertSessionTokenFresh(passwordSession(3, 2), deps({ maxAgeMs: 0 }))).toMatchObject({ ok: false, reason: 'revoked' })
+  })
+
+  it('withEpochEnforcement: enforce refuses the ended password session; warn admits and logs would_refuse revoked (kind local)', async () => {
+    await logout({ sub: '33' })
+    const enforced = await withEpochEnforcement('enforce', deps({ maxAgeMs: 0 }))({ ...passwordSession(3, 2) })
+    expect(enforced).toMatchObject({ userId: 0 })
+    const logger = silent()
+    const warned = await withEpochEnforcement('warn', deps({ maxAgeMs: 0, logger }))({ ...passwordSession(3, 2) })
+    expect(warned.userId).toBe(3)
+    expect(logger.warn).toHaveBeenCalledWith(`${WOULD_REFUSE_PREFIX} revoked`, { userId: 3, kind: 'local' })
   })
 })

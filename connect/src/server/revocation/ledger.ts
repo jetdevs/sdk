@@ -317,13 +317,24 @@ export async function isSessionRevokedForToken(
   execute: SqlExecutor | null | undefined,
   identity: CredentialIdentity,
   nowMs: number = Date.now(),
-  opts: { maxAgeMs?: number; logger?: Pick<Console, 'error'> } = {},
+  opts: {
+    maxAgeMs?: number
+    logger?: Pick<Console, 'error'>
+    /**
+     * What an unreadable store answers. Default: refuse a credential that
+     * carries a Connect binding, admit one that does not. The freshness gate
+     * passes `'admit'` for an UNBOUND credential it asks by its row's pair —
+     * the split is on the credential's binding, not on the identity asked.
+     */
+    onUnreadable?: 'refuse' | 'admit'
+  } = {},
 ): Promise<boolean> {
-  const hasConnectBinding = Boolean(identity.issuer && (identity.sub || identity.sid))
+  const refuseOnUnreadable =
+    opts.onUnreadable != null ? opts.onUnreadable === 'refuse' : Boolean(identity.issuer && (identity.sub || identity.sid))
   const logger = opts.logger ?? console
   const maxAgeMs = Math.min(CACHE_TTL_MS, Math.max(0, opts.maxAgeMs ?? CACHE_TTL_MS))
 
-  if (!execute) return hasConnectBinding
+  if (!execute) return refuseOnUnreadable
 
   const cacheKey = [
     identity.issuer ?? '',
@@ -348,6 +359,6 @@ export async function isSessionRevokedForToken(
     logger.error('[connect-revocation] revocation check failed:', err)
     // Not cached — an unreadable store must be re-asked on the next request,
     // not remembered for a minute.
-    return hasConnectBinding
+    return refuseOnUnreadable
   }
 }

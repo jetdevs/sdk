@@ -29,6 +29,12 @@
  *                 same lookup with the supplied `{ sub, sourceUserRef:
  *                 parentUserId, aeid, grantId }`; its own ledger takes `sid`.
  *
+ * AN UNBOUND CREDENTIAL (no `(issuer, sub)` on it, the row not `connect`: a
+ * password, phone-only OTP or Google session) is judged locally. Reads: the
+ * ledger, subject-wide only (by local user id and the row's own pair; never
+ * `sid`) → the mirror. The ledger read is what lets a Connect logout end a
+ * password session of a row bound to Connect but still `local` (§9.2).
+ *
  * WHAT THE LOOKUP'S ANSWER MEANS (D24). `epoch` is Connect's version
  * comparison on `aeid`; `grant` is whether the browser's provider Grant still
  * exists — a sign-out at Connect destroys it, so `grant: 'gone'` IS the
@@ -395,7 +401,36 @@ export async function assertCredentialFresh(epoch: CredentialEpoch, deps: Freshn
   // estate refuses in `enforce`. `fenced` is mid-handoff and is not yet Connect's.
   if (mirror?.authority === 'connect') bound = true
 
-  if (!bound) return localVerdict(epoch, mirror, mirrorUnreadable, f, logger)
+  if (!bound) {
+    // p77 FIX-logout-record — an UNBOUND credential (a password, phone-only
+    // OTP or Google session: no (issuer, sub) on the token, the row not yet
+    // Connect's) is still ended by the revocation record (§9.2: the ledger is
+    // keyed by the LOCAL user id resolved from (issuer, sub) at receive time,
+    // precisely so a session that never carried a Connect token is ended by
+    // the same logout). Before this, the local branch read only the version
+    // mirror, so a back-channel logout for a row that is Connect-bound but
+    // still `local` left its password session alive (found in STORY-028).
+    //
+    // The question asked is SUBJECT-WIDE only: by local user id, and by the
+    // row's own (issuer, sub) pair when it has one — never by `sid`, since a
+    // local credential belongs to no IdP session, so a single browser's
+    // sign-out at Connect (a sid-scoped row, D12) never ends it. A revocation
+    // older than the credential's authTime does not match (a fresh sign-in
+    // after the logout works). An unreadable store ADMITS, the local half of
+    // the fail-closed split, decided on the CREDENTIAL's binding as above.
+    if (!mirrorUnreadable && execute && epoch.localUserId != null) {
+      const identity = localLedgerIdentity(epoch, mirror)
+      if (await isSessionRevokedForToken(execute, identity, nowMs, { maxAgeMs, logger, onUnreadable: 'admit' })) {
+        try {
+          f.revokedAfter = (await readConnectSessionRevocation(execute, identity)).revokedAfter
+        } catch {
+          // The fact is decoration; the refusal stands.
+        }
+        return refuse('revoked')
+      }
+    }
+    return localVerdict(epoch, mirror, mirrorUnreadable, f, logger)
+  }
 
   // ── Connect-bound ───────────────────────────────────────────────────────
   const lineage: 'oidc' | 'app_local' =
@@ -544,6 +579,22 @@ export async function assertCredentialFresh(epoch: CredentialEpoch, deps: Freshn
   return { ok: true, cv, aeid, grantId, source, facts: f }
 }
 
+/**
+ * The ledger identity of an unbound credential: its local user id and, when
+ * the row itself carries the full pair, that (issuer, sub) — the subject a
+ * logout names. No `sid`: a local credential descends from no IdP session.
+ */
+function localLedgerIdentity(epoch: CredentialEpoch, mirror: MirrorRow | null) {
+  const paired = Boolean(mirror?.issuer && mirror?.sub)
+  return {
+    issuer: paired ? mirror!.issuer : null,
+    sub: paired ? mirror!.sub : null,
+    sid: null,
+    localUserId: epoch.localUserId,
+    issuedAtSeconds: epoch.issuedAtSeconds,
+  }
+}
+
 function localVerdict(
   epoch: CredentialEpoch,
   mirror: MirrorRow | null,
@@ -674,7 +725,8 @@ export async function refreshConnectSessionOnce(
  * A Connect (`oidc`) session with no access token, no `cv` or no `aeid` — one
  * minted before this shipped — is refused (`no_epoch`); an `app_local` session
  * needs only `(issuer, sub)` and a version; a session with no binding is
- * read against the local mirror, version 1 when it carries none.
+ * asked the ledger (subject-wide, by its local user id) and then read against
+ * the local mirror, version 1 when it carries none.
  */
 export async function assertSessionTokenFresh(token: SessionEpochToken, deps: FreshnessDeps): Promise<FreshnessVerdict> {
   const nowMs = deps.nowMs ?? Date.now()
