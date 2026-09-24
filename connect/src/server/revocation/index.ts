@@ -67,6 +67,8 @@ export {
   assertSessionTokenFresh,
   derivedLineageFromToken,
   forgetCredentialAuthority,
+  isConfiguredIssuer,
+  normalizeIssuer,
   observeCredentialVersion,
   readLocalCredentialVersion,
   refreshConnectSessionOnce,

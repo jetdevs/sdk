@@ -95,7 +95,9 @@ describe.skipIf(!db)('assertCredentialFresh (real IdP + real Postgres)', () => {
       idp.state.introspect.set('AT-2', { active: false })
       expect(await assertCredentialFresh(oidc({ accessToken: 'AT-2' }), deps())).toMatchObject({ ok: false, reason: 'inactive' })
       expect(
-        await assertCredentialFresh(oidc({ accessToken: 'AT-3' }), deps({ connect: { issuer: dead, clientId: 'crm', clientSecret: 'crm-secret' } })),
+        // (The credential names the same issuer the RP is configured with — here the dead one — so this is
+        // the transport failure and not the foreign-issuer gate, p77 FIX-issuer-isolation.)
+        await assertCredentialFresh(oidc({ accessToken: 'AT-3', issuer: dead }), deps({ connect: { issuer: dead, clientId: 'crm', clientSecret: 'crm-secret' } })),
       ).toMatchObject({ ok: false, reason: 'unreadable' })
       // A 401 from the issuer (our client credentials refused) is a failure to answer, not a verdict.
       expect(
@@ -210,6 +212,21 @@ describe.skipIf(!db)('assertCredentialFresh (real IdP + real Postgres)', () => {
       expect(await assertCredentialFresh(appLocal(), deps({ lookup: { issuer: idp.issuer, rpKey: 'wrong' } }))).toMatchObject({ ok: false, reason: 'unreadable' })
       // No lookup configured at all: unreadable, never admitted on the mirror alone.
       expect(await assertCredentialFresh(appLocal(), deps({ lookup: null }))).toMatchObject({ ok: false, reason: 'unreadable' })
+    })
+
+    it('p77 FIX-issuer-isolation: a credential naming a foreign (Cadra) issuer → foreign_issuer before any ledger read or lookup, never cached; the configured issuer spelled with a trailing slash is the configured issuer', async () => {
+      idp.state.accountVersion.set('77|7', { found: true, cv: 2, active: true, epoch: 'unknown', grant: 'unknown' })
+      const cadra = 'https://cadra-connect-mini.cafesean.com'
+      expect(await assertCredentialFresh(appLocal({ issuer: cadra }), deps())).toMatchObject({ ok: false, reason: 'foreign_issuer', facts: { version: null } })
+      expect(await assertCredentialFresh({ ...appLocal({ issuer: cadra }), kind: 'derived', lineage: 'app_local', sourceUserRef: 7 }, deps())).toMatchObject({ ok: false, reason: 'foreign_issuer' })
+      expect(await assertCredentialFresh({ kind: 'oidc', localUserId: 1, issuer: cadra, sub: '42', cv: 1, aeid: 'E1', accessToken: 'AT', issuedAtSeconds: nowS() - 30 }, deps())).toMatchObject({ ok: false, reason: 'foreign_issuer' })
+      expect(idp.hits.accountVersion).toBe(0)
+      expect(idp.hits.introspect).toBe(0)
+      expect(await assertCredentialFresh(appLocal({ issuer: `${idp.issuer}/` }), deps())).toMatchObject({ ok: true, cv: 2, source: 'lookup' })
+      expect(idp.hits.accountVersion).toBe(1)
+      // Still refused after the admission primed the caches.
+      expect(await assertCredentialFresh(appLocal({ issuer: cadra }), deps())).toMatchObject({ ok: false, reason: 'foreign_issuer' })
+      expect(idp.hits.accountVersion).toBe(1)
     })
 
     it('the 60 s cache holds the VERSION: a second app_local credential with a lower cv is refused from the entry without a second POST', async () => {

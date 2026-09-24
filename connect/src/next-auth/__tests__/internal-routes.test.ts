@@ -469,6 +469,67 @@ describe('session-freshness (AC7)', () => {
     expect((await h.call(lineage({ issuer: h.idp.issuer, cv: 'x' }), { path: FRESHNESS })).status).toBe(400)
   })
 
+  // p77 FIX-issuer-isolation (STORY-033 AC3, F2): the route used to pass the
+  // body's issuer through as the lineage's while the lookup always asked the
+  // CONFIGURED issuer — so a lineage naming Cadra Connect with a colliding sub
+  // was answered fresh:true by crm, yobo and superhost.
+  const CADRA_ISSUER = 'https://cadra-connect-mini.cafesean.com'
+
+  it('F2: a lineage naming a foreign (Cadra) issuer → fresh false, reason foreign_issuer, no facts, Connect never asked, nothing cached; the matching lineage (any trailing-slash / case spelling of the configured issuer) is answered exactly as before', async () => {
+    if (skip()) return
+    await seedUser(h.db.sql, { id: 5, email: 'p@example.test', connectSub: '505', issuer: h.idp.issuer, authority: 'connect' })
+    h.idp.accountVersion.set('505|5', { found: true, cv: 1, active: true, epoch: 'fresh', grant: 'live' })
+    const t0 = h.clock.t
+    const foreign = await h.call(lineage({ issuer: CADRA_ISSUER }), { path: FRESHNESS })
+    expect(foreign.status).toBe(200)
+    expect(foreign.json).toEqual({ fresh: false, reason: 'foreign_issuer', version: null, active: null, epoch: null, grant: null, revokedAfter: null, checkedAt: t0 })
+    expect(h.idp.accountVersionHits).toBe(0)
+    // Same host, other scheme / port / path → still foreign.
+    for (const other of [h.idp.issuer.replace('http:', 'https:'), `${h.idp.issuer}0`, `${h.idp.issuer}/cadra`]) {
+      expect((await h.call(lineage({ issuer: other }), { path: FRESHNESS })).json).toMatchObject({ fresh: false, reason: 'foreign_issuer' })
+    }
+    expect(h.idp.accountVersionHits).toBe(0)
+    // The matching lineage: unchanged answer, one lookup.
+    const ok = await h.call(lineage({ issuer: h.idp.issuer }), { path: FRESHNESS })
+    expect(ok.json).toEqual({ fresh: true, version: 1, active: true, epoch: 'fresh', grant: 'live', revokedAfter: null, checkedAt: t0 })
+    expect(h.idp.accountVersionHits).toBe(1)
+    // Normalized spellings of the configured issuer are the configured issuer.
+    const spelled = await h.call(lineage({ issuer: ` ${h.idp.issuer.replace('http://', 'HTTP://')}// ` }), { path: FRESHNESS })
+    expect(spelled.json).toMatchObject({ fresh: true, version: 1 })
+    // The foreign answer was never cached: asked again after the admission, still refused, still no lookup.
+    const again = await h.call(lineage({ issuer: CADRA_ISSUER }), { path: FRESHNESS })
+    expect(again.json).toMatchObject({ fresh: false, reason: 'foreign_issuer', version: null })
+    expect(h.idp.accountVersionHits).toBe(1)
+    // An app_local lineage from the foreign issuer is refused the same way.
+    const local = await h.call(lineage({ issuer: CADRA_ISSUER, kind: 'app_local', aeid: undefined, grantId: undefined }), { path: FRESHNESS })
+    expect(local.json).toMatchObject({ fresh: false, reason: 'foreign_issuer' })
+    expect(h.idp.accountVersionHits).toBe(1)
+  })
+
+  it('F2: the parent row must be bound to exactly (iss, sub) before any lookup — another sub, an unbound row or a missing row → binding_mismatch; a half-bound legacy row (NULL issuer, sub) counts as the configured issuer (D9 trust rule)', async () => {
+    if (skip()) return
+    await seedUser(h.db.sql, { id: 5, email: 'p@example.test', connectSub: '505', issuer: h.idp.issuer, authority: 'connect' })
+    await seedUser(h.db.sql, { id: 6, email: 'u@example.test', connectSub: null, issuer: null })
+    await seedUser(h.db.sql, { id: 7, email: 'h@example.test', connectSub: '707', issuer: null })
+    h.idp.accountVersion.set('505|5', { found: true, cv: 1, active: true, epoch: 'fresh', grant: 'live' })
+    h.idp.accountVersion.set('606|5', { found: true, cv: 1, active: true, epoch: 'fresh', grant: 'live' })
+    h.idp.accountVersion.set('707|7', { found: true, cv: 1, active: true, epoch: 'fresh', grant: 'live' })
+    const spliced = await h.call(lineage({ issuer: h.idp.issuer, sub: '606' }), { path: FRESHNESS })
+    expect(spliced.json).toEqual({ fresh: false, reason: 'binding_mismatch', version: null, active: null, epoch: null, grant: null, revokedAfter: null, checkedAt: h.clock.t })
+    expect((await h.call(lineage({ issuer: h.idp.issuer, parentUserId: 6 }), { path: FRESHNESS })).json).toMatchObject({ fresh: false, reason: 'binding_mismatch' })
+    expect((await h.call(lineage({ issuer: h.idp.issuer, parentUserId: 99 }), { path: FRESHNESS })).json).toMatchObject({ fresh: false, reason: 'binding_mismatch' })
+    expect(h.idp.accountVersionHits).toBe(0)
+    const halfBound = await h.call(lineage({ issuer: h.idp.issuer, parentUserId: 7, sub: '707' }), { path: FRESHNESS })
+    expect(halfBound.json).toMatchObject({ fresh: true, version: 1 })
+    expect(h.idp.accountVersionHits).toBe(1)
+  })
+
+  it('F2 (membership-check, same rule): a foreign issuer is answered not-found without consulting the app, even for a sub the app knows', async () => {
+    if (skip()) return
+    expect((await h.call({ issuer: CADRA_ISSUER, sub: '101' }, { path: '/api/v1/internal/connect/membership-check' })).json).toEqual({ found: false, active: false, orgs: [] })
+    expect((await h.call({ issuer: `${h.idp.issuer}/`, sub: '101' }, { path: '/api/v1/internal/connect/membership-check' })).json).toMatchObject({ found: true, active: true })
+  })
+
   it('AC7: the parent process restarted between two requests (the route module re-imported) answers identically — nothing was held in memory', async () => {
     if (skip()) return
     await seedUser(h.db.sql, { id: 5, email: 'p@example.test', connectSub: '505', issuer: h.idp.issuer, authority: 'connect' })

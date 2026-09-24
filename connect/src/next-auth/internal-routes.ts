@@ -84,7 +84,7 @@ import {
 import { reconcile } from '../server/handoff/reconciler.js'
 import { sweepMappings } from '../server/handoff/sweep.js'
 import { createHandoffTransport, type HandoffTransport } from '../server/handoff/transport.js'
-import { assertCredentialFresh, type FreshnessRefusal } from '../server/revocation/freshness.js'
+import { assertCredentialFresh, isConfiguredIssuer, type FreshnessRefusal } from '../server/revocation/freshness.js'
 import { readEstateMaintenance } from '../server/revocation/maintenance.js'
 import { verifyOperatorToken } from '../server/revocation/operator-token.js'
 
@@ -346,8 +346,15 @@ export function createConnectInternalRoutes(deps: ConnectInternalRouteDeps): Con
     const iss = typeof body.issuer === 'string' ? body.issuer.trim() : ''
     const sub = typeof body.sub === 'string' ? body.sub.trim() : ''
     if (!iss || !sub || iss.length > 255 || sub.length > 255) return json(400, { error: 'invalid_body' })
+    // p77 FIX-issuer-isolation — membership is only ever vouched for THIS RP's
+    // configured issuer. A subject of any other identity system is not a
+    // member here, whatever the app's lookup would match; the app is not asked.
+    if (!isConfiguredIssuer(iss, issuer)) {
+      logger.warn('[connect/membership-check] foreign issuer — answered not found')
+      return json(200, { found: false, active: false, orgs: [] } satisfies MembershipAnswer)
+    }
     try {
-      return json(200, await deps.membership({ issuer: iss, sub }))
+      return json(200, await deps.membership({ issuer, sub }))
     } catch (err) {
       logger.error('[connect/membership-check] read failed', err)
       return json(503, { error: 'db_unavailable' })
@@ -383,13 +390,45 @@ export function createConnectInternalRoutes(deps: ConnectInternalRouteDeps): Con
     if (!parent || !iss || !sub || !kind || cv == null || authTime == null) return json(400, { error: 'invalid_body' })
     const maxAgeMs = typeof body.maxAgeMs === 'number' && Number.isFinite(body.maxAgeMs) ? Math.max(0, body.maxAgeMs) : undefined
     const nowMs = now().getTime()
+    // p77 FIX-issuer-isolation (STORY-033 AC3 / F2). The lookup below always
+    // asks the CONFIGURED issuer, so a lineage naming another identity system
+    // (Cadra Connect) used to be answered fresh:true whenever its `sub` happened
+    // to resolve here. Two gates, both before any ledger read, lookup or cache:
+    //   1. the lineage's issuer IS this RP's configured issuer (normalized);
+    //   2. the parent's own user row is bound to exactly (iss, sub).
+    // Either failure is a fact about the request, not the account: answered
+    // with no facts and never cached (the version caches are never touched).
+    const bare = (reason: FreshnessRefusal) =>
+      json(200, { fresh: false, reason, version: null, active: null, epoch: null, grant: null, revokedAfter: null, checkedAt: nowMs })
+    if (!isConfiguredIssuer(iss, issuer)) {
+      logger.warn('[connect/session-freshness] lineage names a foreign issuer — refused', { parentUserId: parent.ref })
+      return bare('foreign_issuer')
+    }
+    let boundPair: { issuer: string; sub: string } | null
+    try {
+      const rows = await deps.sql.execute(`SELECT connect_issuer, connect_sub FROM users WHERE id = $1 LIMIT 1`, [parent.id])
+      const r = rows[0]
+      // D9's trust rule: a half-bound legacy row (NULL issuer, sub) can only
+      // have come from this RP's one configured issuer (the backfill and the
+      // D9 writer stamp it as exactly that), so it counts as that issuer here.
+      boundPair = r
+        ? { issuer: r.connect_issuer == null ? (r.connect_sub == null ? '' : issuer) : String(r.connect_issuer), sub: String(r.connect_sub ?? '') }
+        : null
+    } catch (err) {
+      logger.error('[connect/session-freshness] parent row read failed — refusing', err)
+      return bare('unreadable')
+    }
+    if (!boundPair || !isConfiguredIssuer(boundPair.issuer, issuer) || boundPair.sub.trim() !== sub) {
+      logger.warn('[connect/session-freshness] lineage is not the parent row\'s binding — refused', { parentUserId: parent.ref })
+      return bare('binding_mismatch')
+    }
     const verdict = await assertCredentialFresh(
       {
         kind: 'derived',
         lineage: kind,
         localUserId: parent.id,
         sourceUserRef: parent.ref,
-        issuer: iss,
+        issuer,
         sub,
         sid: typeof body.sid === 'string' ? body.sid : null,
         cv,

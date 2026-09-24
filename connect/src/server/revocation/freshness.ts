@@ -144,6 +144,19 @@ export type FreshnessRefusal =
   | 'grant_unknown'
   /** The version could not be read, and this credential must not be admitted unverified. */
   | 'unreadable'
+  /**
+   * p77 FIX-issuer-isolation — the credential names an issuer that is not this
+   * RP's configured Connect issuer (compared normalized). Its subject lives in
+   * another identity system, so nothing here can vouch for it. Decided before
+   * any read; never cached.
+   */
+  | 'foreign_issuer'
+  /**
+   * p77 FIX-issuer-isolation — a `derived` lineage whose (issuer, sub) is not
+   * the pair the parent's own user row is bound to. Decided before any read;
+   * never cached.
+   */
+  | 'binding_mismatch'
 
 /** The facts a check gathered — what the parent's `session-freshness` answer carries (§9.4). */
 export interface FreshnessFacts {
@@ -232,6 +245,37 @@ export function __resetFreshnessCachesForTests(): void {
  */
 export function forgetCredentialAuthority(userId: number): void {
   authorityCache.delete(userId)
+}
+
+/**
+ * p77 FIX-issuer-isolation — the one comparison form for an issuer: scheme and
+ * host lower-cased, a default port dropped, no trailing slash (a path, if the
+ * issuer has one, is kept). Two issuers are the same iff their normalized
+ * forms are equal. A value that is not an http(s) URL is only trimmed and
+ * stripped of trailing slashes, so it can still never equal a real issuer by
+ * accident. Empty in → empty out.
+ */
+export function normalizeIssuer(raw: string | null | undefined): string {
+  const t = (raw ?? '').trim()
+  if (!t) return ''
+  try {
+    const u = new URL(t)
+    if (u.protocol === 'http:' || u.protocol === 'https:') {
+      const path = u.pathname.replace(/\/+$/, '')
+      // WHATWG URL already lower-cases the scheme and host and drops a default port.
+      return `${u.protocol}//${u.host}${path}`
+    }
+  } catch {
+    // not a URL — fall through
+  }
+  return t.replace(/\/+$/, '')
+}
+
+/** Is `candidate` this RP's configured issuer? False when either side is empty. */
+export function isConfiguredIssuer(candidate: string | null | undefined, configured: string | null | undefined): boolean {
+  const a = normalizeIssuer(candidate)
+  const b = normalizeIssuer(configured)
+  return a !== '' && a === b
 }
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex')
@@ -469,6 +513,17 @@ export async function assertCredentialFresh(epoch: CredentialEpoch, deps: Freshn
   }
 
   if (!issuer || !sub) return refuse('no_binding')
+  // p77 FIX-issuer-isolation — the credential's issuer must BE this RP's
+  // configured Connect issuer. Every read below asks the configured issuer
+  // (introspection, the account-version lookup) whatever the credential says,
+  // so without this a lineage naming another identity system (Cadra Connect)
+  // was answered with the configured issuer's facts for a colliding `sub`.
+  // Decided before the ledger or any cache is touched: never cached.
+  const configuredIssuer = deps.connect?.issuer ?? deps.lookup?.issuer ?? null
+  if (configuredIssuer != null && !isConfiguredIssuer(issuer, configuredIssuer)) {
+    logger.warn('[connect-freshness] credential names a foreign issuer — refusing', { userId: epoch.localUserId })
+    return refuse('foreign_issuer')
+  }
   // An app_local credential carries no aeid by construction (D24) — its
   // absence is never the reason. An oidc lineage without one was minted
   // before the epoch existed.
