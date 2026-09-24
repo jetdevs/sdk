@@ -320,6 +320,10 @@ export function validateTableConfig(
     warnings.push(`Table ${tableName} is public but has RLS enabled - this may be intentional`);
   }
 
+  if (config.policies && config.isolation !== 'org') {
+    warnings.push(`Table ${tableName} sets per-command policies but has isolation '${config.isolation}' - policies only apply to org isolation and will be ignored`);
+  }
+
   return {
     isValid: errors.length === 0,
     errors,
