@@ -8,6 +8,12 @@ export {
   type OrgPlatformRole,
   type MembershipStatus,
   type SourceSystem,
+  type RegisterIdentityArgs,
+  type RegisterIdentityResult,
+  type RegisterIdentityErrorCode,
+  ConnectIdentityRegisterError,
+  isConnectIdentityRegisterError,
+  isIdentityRefConflict,
 } from './provisioning.js'
 
 import { generateCodeVerifier, generateCodeChallenge } from './pkce.js'
