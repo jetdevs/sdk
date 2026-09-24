@@ -37,12 +37,35 @@
  * classification half, re-derived for D10's four classes over four RPs)
  */
 
-import type { HandoffClass, RpSystem } from '../adapter/index.js'
+import { isSourceSystemKey, type HandoffClass, type RpSystem } from '../adapter/index.js'
 
-/** The RPs that hold verifiers, in the election order (D10, §6.3). */
-export const CUTOVER_RP_ORDER: readonly RpSystem[] = ['crm', 'yobo']
-/** RPs read for the person map and never fenced (they hold no verifier). */
-export const PILOT_RPS: readonly RpSystem[] = ['commerce', 'superhost']
+/**
+ * p77 STORY-041 — WHICH RPs the driver hands off and in what order is the
+ * IdP's registry (`connect_source_systems.cutover_order`, read with
+ * `fetchSourceSystems`), never a list in this SDK and never insertion order.
+ *   order   the RPs that hold verifiers, in the election / driver order (D10, §6.3)
+ *   pilots  RPs read for the person map and never fenced (they hold no verifier)
+ */
+export interface CutoverPlan {
+  order: readonly RpSystem[]
+  pilots: readonly RpSystem[]
+}
+
+export class CutoverPlanError extends Error {
+  constructor(message: string) {
+    super(`cutover plan: ${message}`)
+    this.name = 'CutoverPlanError'
+  }
+}
+
+/** Validate a plan (keys well-formed, no system twice). Returns it. */
+export function assertCutoverPlan(plan: CutoverPlan | null | undefined): CutoverPlan {
+  if (!plan || !Array.isArray(plan.order) || !Array.isArray(plan.pilots)) throw new CutoverPlanError('missing — take it from the IdP (fetchSourceSystems) or the arguments')
+  const all = [...plan.order, ...plan.pilots]
+  for (const s of all) if (!isSourceSystemKey(s)) throw new CutoverPlanError(`'${String(s)}' is not a source-system key`)
+  if (new Set(all).size !== all.length) throw new CutoverPlanError('a system appears twice')
+  return plan
+}
 
 export type ManifestClass = HandoffClass | 'linked' | 'quarantine'
 
@@ -97,9 +120,9 @@ export interface ClassifiedPerson {
 }
 
 /** The elected source, or null (D10). */
-export function electCanonicalSource(rows: readonly PersonRpRow[], connect: PersonConnectFacts): RpSystem | null {
+export function electCanonicalSource(rows: readonly PersonRpRow[], connect: PersonConnectFacts, plan: CutoverPlan): RpSystem | null {
   if (connect.passwordPresent || connect.establishedReceipt || connect.stagedRow) return null
-  for (const system of CUTOVER_RP_ORDER) {
+  for (const system of plan.order) {
     const row = rows.find((r) => r.system === system)
     if (row && row.hasVerifier && row.credentialAuthority === 'local' && row.isActive) return system
   }
@@ -117,12 +140,12 @@ function quarantineReasons(row: PersonRpRow, connect: PersonConnectFacts): Quara
 }
 
 /** One row's class given the election. Exported so STORY-014's decision-table test imports the very function. */
-export function classifyRow(row: PersonRpRow, connect: PersonConnectFacts, canonicalSource: RpSystem | null): ClassifiedRow {
+export function classifyRow(row: PersonRpRow, connect: PersonConnectFacts, canonicalSource: RpSystem | null, plan: CutoverPlan): ClassifiedRow {
   const base = { system: row.system, sourceUserRef: row.sourceUserRef, email: row.email, passwordDigest: row.passwordDigest, passwordRevision: row.passwordRevision }
   if (row.credentialAuthority === 'connect') return { ...base, class: 'linked', reasons: ['already_connect'] }
   const q = quarantineReasons(row, connect)
   if (q.length > 0) return { ...base, class: 'quarantine', reasons: q }
-  if (PILOT_RPS.includes(row.system)) return { ...base, class: 'linked', reasons: ['pilot_no_verifier'] }
+  if (plan.pilots.includes(row.system)) return { ...base, class: 'linked', reasons: ['pilot_no_verifier'] }
   const receipt = connect.establishedReceipt || Boolean(connect.stagedRow)
   if (row.hasVerifier) {
     if (canonicalSource === row.system) return { ...base, class: 'import', reasons: ['verifier_present', 'canonical_source'] }
@@ -137,15 +160,18 @@ export function classifyRow(row: PersonRpRow, connect: PersonConnectFacts, canon
 }
 
 /** Classify one person's rows across every RP (the manifest's unit). */
-export function classifyPerson(email: string, rows: readonly PersonRpRow[], connect: PersonConnectFacts): ClassifiedPerson {
-  const canonicalSource = electCanonicalSource(rows, connect)
-  const ordered = [...rows].sort((a, b) => rank(a.system) - rank(b.system))
-  return { email: email.toLowerCase(), canonicalSource, rows: ordered.map((r) => classifyRow(r, connect, canonicalSource)) }
+export function classifyPerson(email: string, rows: readonly PersonRpRow[], connect: PersonConnectFacts, plan: CutoverPlan): ClassifiedPerson {
+  const canonicalSource = electCanonicalSource(rows, connect, plan)
+  const ordered = [...rows].sort((a, b) => rank(plan, a.system) - rank(plan, b.system))
+  return { email: email.toLowerCase(), canonicalSource, rows: ordered.map((r) => classifyRow(r, connect, canonicalSource, plan)) }
 }
 
-function rank(system: RpSystem): number {
-  const i = CUTOVER_RP_ORDER.indexOf(system)
-  return i === -1 ? CUTOVER_RP_ORDER.length + PILOT_RPS.indexOf(system) : i
+/** Driver order first, then the pilots; a system in neither sorts last. */
+export function rank(plan: CutoverPlan, system: RpSystem): number {
+  const i = plan.order.indexOf(system)
+  if (i !== -1) return i
+  const p = plan.pilots.indexOf(system)
+  return plan.order.length + (p === -1 ? plan.pilots.length : p)
 }
 
 export const isHandoffManifestClass = (c: ManifestClass): c is HandoffClass => c === 'import' || c === 'retire' || c === 'adopt' || c === 'recover'

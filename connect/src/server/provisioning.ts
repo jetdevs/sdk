@@ -18,14 +18,14 @@ export type OrgPlatformRole = 'owner' | 'admin' | 'member'
 /** Membership lifecycle state in the canonical directory. */
 export type MembershipStatus = 'invited' | 'active' | 'suspended' | 'removed'
 
-import type { RpSystem } from '../adapter/index.js'
-
 /**
- * The relying party a canonical org originated from (C5 keying). p77 narrows
- * it to the registered systems (specs.md §5.2): the four password-holding RPs
- * plus the two Cadra-side clients that provision through the same routes.
+ * The relying party a canonical org originated from (C5 keying).
+ * A source system: a key of the IdP's `connect_source_systems` registry
+ * (p77 STORY-041), validated at runtime (`isSourceSystemKey`). The historical
+ * union survives as the deprecated `KnownSourceSystem`.
  */
-export type SourceSystem = RpSystem | 'cadra' | 'slides'
+export type SourceSystem = string
+export type { KnownSourceSystem } from '../adapter/index.js'
 
 /** `POST /api/internal/connect/identity/register` (p77 D25) — the RP's local user ref for a Connect subject. */
 export interface RegisterIdentityArgs {

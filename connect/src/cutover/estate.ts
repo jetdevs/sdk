@@ -41,7 +41,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { RpSystem } from '../adapter/index.js'
 import type { ConnectEnv, DeactivateAllowlistEntry, RpStateAnswer } from '../next-auth/internal-routes.js'
-import { CUTOVER_RP_ORDER } from './classify.js'
+import { assertCutoverPlan } from './classify.js'
 import { digestPrefix, dryRunIsClean, FLAG_LINE, planRows, renderReport, type EstateRunReport, type RowOutcome } from './dry-run.js'
 import { actionableRows, assertManifestApproved, isApproved, ManifestNotApprovedError, type EstateManifest } from './manifest.js'
 import { replyError, type RpOpsClient, type RpReply } from './rp-client.js'
@@ -133,6 +133,12 @@ export class EstateCutover {
       return finish(2)
     }
 
+    // p77 STORY-041: the driver order is the one the approval signed (manifest.plan).
+    try {
+      assertCutoverPlan(d.manifest.plan)
+    } catch (err) {
+      return refuse(`manifest has no valid plan (${(err as Error).message}); rebuild it with the IdP's source-system plan`)
+    }
     if (d.manifest.env !== d.env) return refuse(`manifest env ${d.manifest.env} does not match --env ${d.env}`)
     if (d.manifest.connectIssuer.replace(/\/+$/, '') !== d.issuer.replace(/\/+$/, '')) return refuse(`manifest issuer ${d.manifest.connectIssuer} does not match the configured issuer ${d.issuer}`)
     const given = Object.keys(d.rps) as RpSystem[]
@@ -179,7 +185,7 @@ export class EstateCutover {
 
       // ── 3. crm, then yobo, row by row ─────────────────────────────────────
       let stop: string | null = null
-      for (const system of CUTOVER_RP_ORDER) {
+      for (const system of d.manifest.plan.order) {
         const rows = actionableRows(d.manifest, system).filter((r) => !d.only?.length || (r.email && d.only.includes(r.email)))
         if (rows.length === 0) continue
         const client = d.rps[system]
@@ -214,7 +220,7 @@ export class EstateCutover {
         report.states[system] = await this.readState(client)
       }
       let allMoved = report.rows.every((r) => r.outcome === 'connect' || r.outcome === 'already_activated')
-      for (const system of CUTOVER_RP_ORDER) {
+      for (const system of d.manifest.plan.order) {
         const s = report.states[system]
         if (s && !('error' in s) && s.counts.eligibleLocal === 0 && s.counts.prepared === 0 && s.counts.fenced === 0) report.flagLines.push(FLAG_LINE(system))
         else if (s && !('error' in s)) allMoved = false

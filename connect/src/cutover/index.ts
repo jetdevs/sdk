@@ -3,8 +3,8 @@
  *
  * The estate cutover as LIBRARY code (specs.md §5.3): the manifest
  * (build / validate / digest / approve), `classify()` (D10 as amended),
- * the dry-run report, `EstateCutover` (§6.3, sequential crm then yobo
- * inside the window), `EstateMaintenance` (D26: arm with the probes and
+ * the dry-run report, `EstateCutover` (§6.3, sequential in the IdP
+ * registry's `cutover_order` inside the window — p77 STORY-041), `EstateMaintenance` (D26: arm with the probes and
  * the settle, lift with rotate → drain → the pre- or post-activation
  * contract, extend, status, mint), `IssuerBackfill` (§3.4) and
  * `EmailAudit` / `EmailReconcile` (§3.5) — all over `RpOpsClient`s, the
@@ -17,14 +17,16 @@
 export { assertEstateGuards, CutoverRefusedError, CutoverUsageError, dbLabel, ESTATE_USAGE, hostOf, isLoopbackUrl, parseEstateArgs, type EstateArgs } from './args.js'
 
 export {
-  CUTOVER_RP_ORDER,
-  PILOT_RPS,
+  CutoverPlanError,
+  assertCutoverPlan,
+  rank as cutoverRank,
   classifyPerson,
   classifyRow,
   electCanonicalSource,
   isHandoffManifestClass,
   type ClassifiedPerson,
   type ClassifiedRow,
+  type CutoverPlan,
   type ManifestClass,
   type PersonConnectFacts,
   type PersonRpRow,
@@ -47,6 +49,16 @@ export {
   type EstateManifestRow,
   type ManifestApproval,
 } from './manifest.js'
+
+export {
+  SOURCE_SYSTEMS_ROUTE_PATH,
+  SourceSystemsFetchError,
+  fetchSourceSystems,
+  parseSourceSystemsAnswer,
+  type SourceSystemInfo,
+  type SourceSystemKind,
+  type SourceSystemsAnswer,
+} from './source-systems.js'
 
 export { approveWithReview, reviewManifest, type ApprovalReview } from './approve.js'
 

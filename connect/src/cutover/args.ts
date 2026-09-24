@@ -10,7 +10,7 @@
  * Ported-From: cadra-web@b615864c:scripts/p79/cutover-args.ts
  */
 
-import { isRpSystem, type RpSystem } from '../adapter/index.js'
+import { isSourceSystemKey, type RpSystem } from '../adapter/index.js'
 import { CONNECT_ENVS, type ConnectEnv } from '../next-auth/internal-routes.js'
 
 export class CutoverUsageError extends Error {
@@ -106,7 +106,7 @@ export function parseEstateArgs(argv: ReadonlyArray<string>): EstateArgs {
         const eq = v.indexOf('=')
         const system = eq === -1 ? v : v.slice(0, eq)
         const origin = eq === -1 ? '' : v.slice(eq + 1)
-        if (!isRpSystem(system) || !origin) throw new CutoverUsageError(`--rp must be <crm|yobo|commerce|superhost>=<origin>, got "${v}"`)
+        if (!isSourceSystemKey(system) || !origin) throw new CutoverUsageError(`--rp must be <system>=<origin> (a source-system key), got "${v}"`)
         args.rps[system] = origin
         break
       }

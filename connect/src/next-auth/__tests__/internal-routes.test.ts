@@ -582,6 +582,7 @@ describe('§6.5 orphan — a paused op, the drain and the lift, through the REAL
       issuer: h.idp.issuer,
       store: h.idp.store,
       sign: h.idp.sign,
+      plan: { order: ['crm', 'yobo'], pilots: ['commerce', 'superhost'] },
       rps: { crm: createRpOpsClient({ system: 'crm', origin: h.rp.origin, rpKey: RP_KEY }) },
       audience: ['crm', 'yobo', 'commerce', 'superhost'],
       lock: { isHeld: async () => false },

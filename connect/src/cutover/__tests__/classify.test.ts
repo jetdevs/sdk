@@ -5,7 +5,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { assertEstateGuards, CutoverRefusedError, CutoverUsageError, parseEstateArgs } from '../args.js'
-import { classifyPerson, classifyRow, electCanonicalSource, type PersonConnectFacts, type PersonRpRow } from '../classify.js'
+import { classifyPerson, classifyRow, electCanonicalSource, type CutoverPlan, type PersonConnectFacts, type PersonRpRow } from '../classify.js'
+
+// p77 STORY-041: the plan the IdP registry answers (0025 seeds crm=1, yobo=2).
+const PLAN: CutoverPlan = { order: ['crm', 'yobo'], pilots: ['commerce', 'superhost'] }
 import { actionableRows, approveManifest, assertManifestApproved, buildEstateManifest, computeManifestDigest, ManifestNotApprovedError, validateManifest } from '../manifest.js'
 import { approveWithReview } from '../approve.js'
 import type { InventoryRowAnswer } from '../../next-auth/internal-routes.js'
@@ -28,7 +31,7 @@ const facts = (over: Partial<PersonConnectFacts> = {}): PersonConnectFacts => ({
 
 describe('classify — D10 as amended (AC3)', () => {
   it('AC3: hashes in crm and yobo, Connect NULL, no receipt → canonicalSource crm; crm import, yobo retire', () => {
-    const p = classifyPerson('sean@example.test', [hashed('yobo', 7, 'b'.repeat(64)), hashed('crm', 1, 'a'.repeat(64))], facts())
+    const p = classifyPerson('sean@example.test', [hashed('yobo', 7, 'b'.repeat(64)), hashed('crm', 1, 'a'.repeat(64))], facts(), PLAN)
     expect(p.canonicalSource).toBe('crm')
     expect(p.rows.map((r) => [r.system, r.class])).toEqual([
       ['crm', 'import'],
@@ -38,7 +41,7 @@ describe('classify — D10 as amended (AC3)', () => {
   })
 
   it('AC3: Connect holds a password and no receipt → canonicalSource null, both adopt (with or without verifiers)', () => {
-    const p = classifyPerson('sean@example.test', [hashed('crm', 1, 'a'.repeat(64)), row('yobo', 7)], facts({ passwordPresent: true }))
+    const p = classifyPerson('sean@example.test', [hashed('crm', 1, 'a'.repeat(64)), row('yobo', 7)], facts({ passwordPresent: true }), PLAN)
     expect(p.canonicalSource).toBeNull()
     // A verifier next to a Connect-set password is retired without staging (rule 2 at Connect: `adopt`... the manifest calls the
     // verifier-carrying row `retire` by provenance; both are activate-existing and stage nothing).
@@ -46,25 +49,25 @@ describe('classify — D10 as amended (AC3)', () => {
       ['crm', 'retire'],
       ['yobo', 'adopt'],
     ])
-    const both = classifyPerson('sean@example.test', [row('crm', 1), row('yobo', 7)], facts({ passwordPresent: true }))
+    const both = classifyPerson('sean@example.test', [row('crm', 1), row('yobo', 7)], facts({ passwordPresent: true }), PLAN)
     expect(both.rows.map((r) => r.class)).toEqual(['adopt', 'adopt'])
   })
 
   it('AC3: crm already established (a receipt at Connect) → canonicalSource null; a yobo verifier row is retire, a yobo verifier-less row is adopt', () => {
-    const withHash = classifyPerson('sean@example.test', [row('crm', 1, { credentialAuthority: 'connect' }), hashed('yobo', 7, 'b'.repeat(64))], facts({ establishedReceipt: true, passwordPresent: true }))
+    const withHash = classifyPerson('sean@example.test', [row('crm', 1, { credentialAuthority: 'connect' }), hashed('yobo', 7, 'b'.repeat(64))], facts({ establishedReceipt: true, passwordPresent: true }), PLAN)
     expect(withHash.canonicalSource).toBeNull()
     expect(withHash.rows.map((r) => [r.system, r.class])).toEqual([
       ['crm', 'linked'],
       ['yobo', 'retire'],
     ])
     expect(withHash.rows[1]!.reasons).toContain('receipt_exists')
-    const noHash = classifyPerson('sean@example.test', [row('yobo', 7)], facts({ establishedReceipt: true, passwordPresent: true }))
+    const noHash = classifyPerson('sean@example.test', [row('yobo', 7)], facts({ establishedReceipt: true, passwordPresent: true }), PLAN)
     expect(noHash.rows[0]!.class).toBe('adopt')
   })
 
   it('AC3: no hash anywhere and Connect NULL → recover; a verifier-less earlier crm row next to a hash-holding yobo sibling → crm adopt, yobo import (source yobo)', () => {
-    expect(classifyPerson('sean@example.test', [row('crm', 1), row('yobo', 7)], facts()).rows.map((r) => r.class)).toEqual(['recover', 'recover'])
-    const p = classifyPerson('sean@example.test', [row('crm', 1), hashed('yobo', 7, 'b'.repeat(64))], facts())
+    expect(classifyPerson('sean@example.test', [row('crm', 1), row('yobo', 7)], facts(), PLAN).rows.map((r) => r.class)).toEqual(['recover', 'recover'])
+    const p = classifyPerson('sean@example.test', [row('crm', 1), hashed('yobo', 7, 'b'.repeat(64))], facts(), PLAN)
     expect(p.canonicalSource).toBe('yobo')
     expect(p.rows.map((r) => [r.system, r.class])).toEqual([
       ['crm', 'adopt'],
@@ -73,15 +76,15 @@ describe('classify — D10 as amended (AC3)', () => {
   })
 
   it('quarantine and linked come first: email held by another Connect user → connect_email_taken; no org → no_org; a duplicate lower(email) in one RP; an inactive row; a connect row is linked; a pilot row is linked and never elected', () => {
-    expect(classifyRow(hashed('crm', 1, 'a'.repeat(64)), facts({ emailHeldByOther: true }), 'crm')).toMatchObject({ class: 'quarantine', reasons: ['connect_email_taken'] })
-    expect(classifyRow(row('crm', 1, { orgMemberships: 0 }), facts(), null)).toMatchObject({ class: 'quarantine', reasons: ['no_org'] })
-    expect(classifyRow(row('crm', 1, { duplicateEmail: true }), facts(), null)).toMatchObject({ class: 'quarantine', reasons: ['duplicate_email'] })
-    expect(classifyRow(row('crm', 1, { isActive: false }), facts(), null).reasons).toContain('inactive')
-    expect(classifyRow(row('crm', 1, { credentialAuthority: 'connect' }), facts(), null)).toMatchObject({ class: 'linked' })
-    expect(classifyRow(hashed('superhost', 3, 'c'.repeat(64)), facts(), null)).toMatchObject({ class: 'linked', reasons: ['pilot_no_verifier'] })
-    expect(electCanonicalSource([hashed('superhost', 3, 'c'.repeat(64)), hashed('yobo', 7, 'b'.repeat(64))], facts())).toBe('yobo')
-    expect(electCanonicalSource([hashed('crm', 1, 'a'.repeat(64))], facts({ stagedRow: true }))).toBeNull()
-    expect(electCanonicalSource([hashed('crm', 1, 'a'.repeat(64), { isActive: false })], facts())).toBeNull()
+    expect(classifyRow(hashed('crm', 1, 'a'.repeat(64)), facts({ emailHeldByOther: true }), 'crm', PLAN)).toMatchObject({ class: 'quarantine', reasons: ['connect_email_taken'] })
+    expect(classifyRow(row('crm', 1, { orgMemberships: 0 }), facts(), null, PLAN)).toMatchObject({ class: 'quarantine', reasons: ['no_org'] })
+    expect(classifyRow(row('crm', 1, { duplicateEmail: true }), facts(), null, PLAN)).toMatchObject({ class: 'quarantine', reasons: ['duplicate_email'] })
+    expect(classifyRow(row('crm', 1, { isActive: false }), facts(), null, PLAN).reasons).toContain('inactive')
+    expect(classifyRow(row('crm', 1, { credentialAuthority: 'connect' }), facts(), null, PLAN)).toMatchObject({ class: 'linked' })
+    expect(classifyRow(hashed('superhost', 3, 'c'.repeat(64)), facts(), null, PLAN)).toMatchObject({ class: 'linked', reasons: ['pilot_no_verifier'] })
+    expect(electCanonicalSource([hashed('superhost', 3, 'c'.repeat(64)), hashed('yobo', 7, 'b'.repeat(64))], facts(), PLAN)).toBe('yobo')
+    expect(electCanonicalSource([hashed('crm', 1, 'a'.repeat(64))], facts({ stagedRow: true }), PLAN)).toBeNull()
+    expect(electCanonicalSource([hashed('crm', 1, 'a'.repeat(64), { isActive: false })], facts(), PLAN)).toBeNull()
   })
 })
 
@@ -109,6 +112,7 @@ describe('manifest — build, digest, approval', () => {
     const m = buildEstateManifest({
       env: 'local',
       connectIssuer: 'https://idp.test/',
+      plan: PLAN,
       inventories: {
         crm: [inv(1, { passwordDigest: 'a'.repeat(64) }), inv(9, { email: 'p77-probe@probe.invalid', system: true }), inv(3, { email: 'fb@example.test', deactivate: true })],
         yobo: [inv(1, { email: 'u1@example.test', passwordDigest: 'b'.repeat(64) }), inv(2, { email: null })],
@@ -129,7 +133,7 @@ describe('manifest — build, digest, approval', () => {
     expect(m.rows.find((r) => r.system === 'yobo' && r.sourceUserRef === '2')).toMatchObject({ class: 'quarantine', reasons: ['no_email'] })
     expect(actionableRows(m, 'crm').map((r) => r.sourceUserRef)).toEqual(['1'])
     expect(JSON.stringify(m)).not.toMatch(/\$2[aby]\$/)
-    expect(() => buildEstateManifest({ env: 'local', connectIssuer: 'x', inventories: { crm: [inv(1, { passwordDigest: '$2b$10$abc' })] }, connectFacts: () => ({ connectUserId: null, passwordPresent: false, establishedReceipt: false }) })).toThrow(/verifier/)
+    expect(() => buildEstateManifest({ env: 'local', connectIssuer: 'x', plan: PLAN, inventories: { crm: [inv(1, { passwordDigest: '$2b$10$abc' })] }, connectFacts: () => ({ connectUserId: null, passwordPresent: false, establishedReceipt: false }) })).toThrow(/verifier/)
 
     expect(() => assertManifestApproved(m)).toThrow(ManifestNotApprovedError)
     const { manifest: approved, lines } = approveWithReview(m, { approvedBy: 'Sean Liao', approvedAt: '2026-09-23T11:00:00.000Z' })

@@ -12,7 +12,6 @@
 
 import type { RpSystem } from '../adapter/index.js'
 import type { RpStateAnswer } from '../next-auth/internal-routes.js'
-import { CUTOVER_RP_ORDER } from './classify.js'
 import { actionableRows, isApproved, type EstateManifest } from './manifest.js'
 
 export interface RowOutcome {
@@ -65,7 +64,7 @@ export function renderTable(rows: string[][], header: string[]): string[] {
 /** What the driver would do per row, judged on the RP's LIVE state answer. */
 export function planRows(manifest: EstateManifest, rpGiven: readonly RpSystem[]): RowOutcome[] {
   const out: RowOutcome[] = []
-  for (const system of CUTOVER_RP_ORDER) {
+  for (const system of manifest.plan?.order ?? []) {
     for (const r of actionableRows(manifest, system)) {
       const ready = rpGiven.includes(system)
       out.push({

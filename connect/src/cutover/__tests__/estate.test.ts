@@ -48,6 +48,8 @@ async function manifest(over: { yoboClass?: 'import' | 'retire' | 'adopt' | 'rec
   const built = buildEstateManifest({
     env: 'local',
     connectIssuer: e.idp.issuer,
+    // p77 STORY-041: the IdP registry's plan (0025 seeds crm=1, yobo=2).
+    plan: { order: ['crm', 'yobo'], pilots: ['commerce', 'superhost'] },
     inventories,
     connectFacts: () => ({ connectUserId: 101, passwordPresent: e.idp.connect.users.get(101)!.password != null, establishedReceipt: [...e.idp.connect.receipts.values()].some((r) => r.userId === 101 && r.established) }),
     generatedAt: '2026-09-23T10:00:00.000Z',

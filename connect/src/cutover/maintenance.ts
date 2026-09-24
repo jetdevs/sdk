@@ -66,7 +66,7 @@
 
 import type { RpSystem } from '../adapter/index.js'
 import type { ConnectEnv, HandoffOp, RpStateAnswer } from '../next-auth/internal-routes.js'
-import { CUTOVER_RP_ORDER } from './classify.js'
+import type { CutoverPlan } from './classify.js'
 import type { EstateLock } from './estate.js'
 import { replyError, type RpOpsClient } from './rp-client.js'
 import { mintOperatorToken, OFF_SWITCH_ROW, newSwitchJti, type MaintenanceSwitchRow, type MaintenanceSwitchStore, type OperatorTokenSigner } from './switch.js'
@@ -204,6 +204,12 @@ export interface EstateMaintenanceDeps {
   rps: Partial<Record<RpSystem, RpOpsClient>>
   /** The RP set the token is minted for; default = the keys of `rps`. */
   audience?: readonly RpSystem[]
+  /**
+   * p77 STORY-041 — the driver order (the IdP registry's `cutover_order`,
+   * `fetchSourceSystems().plan`): the post-activation lift requires each
+   * driven RP to serve the flag. Never a list in this SDK.
+   */
+  plan: CutoverPlan
   lock: Pick<EstateLock, 'tryAcquire' | 'release'> | { isHeld(env: ConnectEnv): Promise<boolean> }
   probes?: readonly ProbeSurface[]
   probeContext?: { issuerLoginPaths?: string[]; maintenancePath?: string; pausedText?: string }
@@ -401,7 +407,7 @@ export class EstateMaintenance {
         const outside = s.counts.eligibleLocal + s.counts.prepared + s.counts.fenced
         if (outside > 0) return refuse('counts', `${system} reports eligibleLocal ${s.counts.eligibleLocal} prepared ${s.counts.prepared} fenced ${s.counts.fenced}`)
       }
-      for (const system of CUTOVER_RP_ORDER) {
+      for (const system of this.deps.plan.order) {
         const client = this.deps.rps[system]
         if (!client) continue
         const s = await this.readState(client)

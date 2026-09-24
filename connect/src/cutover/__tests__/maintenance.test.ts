@@ -19,6 +19,9 @@ import { classifyProbe, EstateMaintenance, type EstateMaintenanceDeps, type Prob
 import { createRemintingTokenProvider, MintRefusedError, type MaintenanceSwitchRow, type MaintenanceSwitchStore } from '../switch.js'
 import { startEstate, type Estate } from './support/estate-harness.js'
 
+// p77 STORY-041: the driver order is the IdP registry's (0025 seeds crm=1, yobo=2).
+const PLAN = { order: ['crm', 'yobo'], pilots: ['commerce', 'superhost'] } as const
+
 const A = bcryptLike('crm-hash-A')
 
 // =============================================================================
@@ -94,7 +97,7 @@ describe('EstateMaintenance.arm (AC10)', () => {
     return Object.keys(OK).map((name) => ({ name, kind: kindOf(name), run: async (phase) => (phase === 'positive' ? { ...POSITIVE[name]!, ...positiveOver[name] } : { ...OK[name]!, ...pausedOver[name] }) }))
   }
   function maintenance(s: MaintenanceSwitchStore, probes: ProbeSurface[], log: string[] = []): EstateMaintenance {
-    return new EstateMaintenance({ env: 'local', issuer: 'http://127.0.0.1:1', store: s, sign: async () => 'tok', rps: {}, audience: ['crm', 'yobo'], lock: { isHeld: async () => false }, probes, probeContext: { pausedText: 'Sign-in is paused' }, settleMs: 45_000, sleep: async (ms) => void log.push(`sleep ${ms}`), log: (l) => log.push(l) })
+    return new EstateMaintenance({ env: 'local', issuer: 'http://127.0.0.1:1', store: s, sign: async () => 'tok', rps: {}, audience: ['crm', 'yobo'], plan: PLAN, lock: { isHeld: async () => false }, probes, probeContext: { pausedText: 'Sign-in is paused' }, settleMs: 45_000, sleep: async (ms) => void log.push(`sleep ${ms}`), log: (l) => log.push(l) })
   }
 
   const failing: Array<[string, string, ProbeObservation, string]> = [
@@ -176,6 +179,7 @@ function lifter(over: Partial<EstateMaintenanceDeps> = {}, log: string[] = []): 
     issuer: e.idp.issuer,
     store: e.idp.store,
     sign: e.idp.sign,
+    plan: PLAN,
     rps: e.clientsWith(() => null),
     audience: ['crm', 'yobo'],
     lock: { isHeld: async () => false },

@@ -22,7 +22,7 @@ import { createHash } from 'node:crypto'
 import type { RpSystem } from '../adapter/index.js'
 import type { ConnectEnv } from '../next-auth/internal-routes.js'
 import type { InventoryRowAnswer } from '../next-auth/internal-routes.js'
-import { classifyPerson, CUTOVER_RP_ORDER, PILOT_RPS, type ClassifiedRow, type ManifestClass, type PersonConnectFacts, type PersonRpRow } from './classify.js'
+import { assertCutoverPlan, classifyPerson, CutoverPlanError, type ClassifiedRow, type CutoverPlan, type ManifestClass, type PersonConnectFacts, type PersonRpRow } from './classify.js'
 
 export interface ManifestApproval {
   approved: true
@@ -49,6 +49,12 @@ export interface EstateManifest {
   connectIssuer: string
   /** The RPs the inventory came from, in the election order. */
   rps: RpSystem[]
+  /**
+   * p77 STORY-041 — the driver order + pilots the manifest was built with (the
+   * IdP registry's `cutover_order`). SIGNED with the rows: the approval covers
+   * the order the driver will run, and `EstateCutover` reads it from here.
+   */
+  plan: CutoverPlan
   counts: Record<ManifestClass, number> & { system: number; deactivate: number }
   persons: Array<{ email: string; canonicalSource: RpSystem | null; rows: number }>
   rows: EstateManifestRow[]
@@ -58,6 +64,8 @@ export interface EstateManifest {
 export interface BuildEstateManifestInput {
   env: ConnectEnv
   connectIssuer: string
+  /** The IdP registry's driver order + pilots (`fetchSourceSystems().plan`). An inventory of a system in neither is refused. */
+  plan: CutoverPlan
   /** Every RP's inventory (the `inventory` op, all pages). */
   inventories: Partial<Record<RpSystem, readonly InventoryRowAnswer[]>>
   /** What Connect knows per `lower(email)` — from Connect's own `users` and receipts (the driver runs in yobo-auth). */
@@ -89,7 +97,11 @@ export function buildEstateManifest(input: BuildEstateManifestInput): EstateMani
   const onlySet = new Set((input.only ?? []).map((e) => e.toLowerCase()))
   const byPerson = new Map<string, PersonRpRow[]>()
   const systemRows: EstateManifestRow[] = []
-  const rps: RpSystem[] = [...CUTOVER_RP_ORDER, ...PILOT_RPS].filter((s) => input.inventories[s] !== undefined)
+  const plan = assertCutoverPlan(input.plan)
+  for (const s of Object.keys(input.inventories)) {
+    if (!plan.order.includes(s) && !plan.pilots.includes(s)) throw new CutoverPlanError(`inventory for '${s}', which the plan neither drives nor reads as a pilot`)
+  }
+  const rps: RpSystem[] = [...plan.order, ...plan.pilots].filter((s) => input.inventories[s] !== undefined)
 
   for (const system of rps) {
     const rows = input.inventories[system] ?? []
@@ -137,7 +149,7 @@ export function buildEstateManifest(input: BuildEstateManifestInput): EstateMani
   for (const [email, rows] of [...byPerson.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
     const subs = [...new Set(rows.map((r) => r.connectSub).filter((s): s is string => !!s))]
     const facts = email.startsWith('#') ? { connectUserId: null, passwordPresent: false, establishedReceipt: false } : input.connectFacts(email, subs)
-    const person = classifyPerson(email, rows, facts)
+    const person = classifyPerson(email, rows, facts, plan)
     persons.push({ email, canonicalSource: person.canonicalSource, rows: person.rows.length })
     for (const r of person.rows) {
       out.push({ ...r, person: email, canonicalSource: person.canonicalSource, deactivate: deactivated.has(`${r.system}:${r.sourceUserRef}`), systemIdentity: false })
@@ -151,7 +163,7 @@ export function buildEstateManifest(input: BuildEstateManifestInput): EstateMani
     if (r.systemIdentity) counts.system += 1
     if (r.deactivate) counts.deactivate += 1
   }
-  return { version: 2, generatedAt: input.generatedAt ?? new Date().toISOString(), env: input.env, connectIssuer: input.connectIssuer.replace(/\/+$/, ''), rps, counts, persons, rows: out, approval: null }
+  return { version: 2, generatedAt: input.generatedAt ?? new Date().toISOString(), env: input.env, connectIssuer: input.connectIssuer.replace(/\/+$/, ''), rps, plan: { order: [...plan.order], pilots: [...plan.pilots] }, counts, persons, rows: out, approval: null }
 }
 
 // ---------------------------------------------------------------------------
@@ -180,6 +192,11 @@ export function validateManifest(value: unknown): EstateManifest {
   if (!Array.isArray(m.rows)) throw new ManifestInvalidError('no rows')
   if (typeof m.connectIssuer !== 'string' || !m.connectIssuer) throw new ManifestInvalidError('no connectIssuer')
   if (!['local', 'dev', 'prod'].includes(m.env)) throw new ManifestInvalidError(`env ${String(m.env)}`)
+  try {
+    assertCutoverPlan(m.plan)
+  } catch (err) {
+    throw new ManifestInvalidError((err as Error).message)
+  }
   for (const r of m.rows) {
     if (typeof r.sourceUserRef !== 'string' || typeof r.system !== 'string') throw new ManifestInvalidError('a row lacks system/sourceUserRef')
     if (r.passwordDigest && BCRYPT_RE.test(r.passwordDigest)) throw new ManifestInvalidError(`row ${r.system}:${r.sourceUserRef} carries a verifier`)

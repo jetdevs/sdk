@@ -20,14 +20,42 @@
  *      (what `state()` feeds), §6.5 (`drain`), D18, D23, D25.
  */
 
-/** The relying parties that hold a `users` row with a Connect binding. */
-export type RpSystem = 'crm' | 'yobo' | 'commerce' | 'superhost'
+/**
+ * p77 STORY-041 — a source system is a ROW in the IdP's
+ * `connect_source_systems` registry, not a literal in this SDK: a business
+ * joins Connect with a registry row, an OIDC client and an internal key, and
+ * no SDK release. So a system is a `string` validated at runtime by its key
+ * syntax (`isSourceSystemKey`); WHICH systems exist, which are relying
+ * parties and the D10 driver order come from the IdP
+ * (`@jetdevs/connect/cutover` `fetchSourceSystems`, the IdP's read-only
+ * `GET /api/internal/connect/source-systems`) or from the caller's arguments.
+ */
+export const SOURCE_SYSTEM_KEY_RE = /^[a-z][a-z0-9_-]{1,31}$/
 
-export const RP_SYSTEMS: readonly RpSystem[] = ['crm', 'yobo', 'commerce', 'superhost'] as const
-
-export function isRpSystem(value: unknown): value is RpSystem {
-  return typeof value === 'string' && (RP_SYSTEMS as readonly string[]).includes(value)
+/** A source-system key: `^[a-z][a-z0-9_-]{1,31}$` (the registry's CHECK). Syntax only — registration is the IdP's. */
+export function isSourceSystemKey(value: unknown): value is string {
+  return typeof value === 'string' && SOURCE_SYSTEM_KEY_RE.test(value)
 }
+
+/** A relying party that holds a `users` row with a Connect binding: a registry key. */
+export type RpSystem = string
+
+/**
+ * @deprecated p77 STORY-041 — the historical literal union of the four Yobo
+ * relying parties. Systems are IdP registry rows now; use `RpSystem` (a
+ * validated string). Kept so no RP's annotations break.
+ */
+export type KnownRpSystem = 'crm' | 'yobo' | 'commerce' | 'superhost'
+
+/**
+ * @deprecated p77 STORY-041 — the historical literal union of every source
+ * system (`org_source_system`, retired by the IdP's migration 0025). Use
+ * `SourceSystem` (a validated string). Kept so no RP's annotations break.
+ */
+export type KnownSourceSystem = KnownRpSystem | 'cadra' | 'slides'
+
+/** @deprecated p77 STORY-041 — `isSourceSystemKey` (validates the key syntax; there is no list any more). */
+export const isRpSystem: (value: unknown) => value is RpSystem = isSourceSystemKey
 
 /** `users.credential_authority` (specs.md §6.1; @jetdevs/core `CREDENTIAL_AUTHORITY`). */
 export type RpCredentialAuthority = 'local' | 'prepared' | 'fenced' | 'connect'
