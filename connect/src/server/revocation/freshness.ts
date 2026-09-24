@@ -76,6 +76,7 @@ import {
   type RefreshResult,
 } from './introspection.js'
 import { isSessionRevokedForToken, readConnectSessionRevocation } from './ledger.js'
+import { processState } from '../../internal/process-state.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -193,19 +194,20 @@ interface MirrorRow {
   sub: string | null
 }
 
-const authorityCache = new Map<number, { row: MirrorRow; at: number }>()
-const introspectionCache = new Map<string, { result: IntrospectionResult; at: number }>()
+// One copy per process, whichever entry imported this module (internal/process-state.ts).
+const authorityCache = processState('freshness.authorityCache', () => new Map<number, { row: MirrorRow; at: number }>())
+const introspectionCache = processState('freshness.introspectionCache', () => new Map<string, { result: IntrospectionResult; at: number }>())
 /** The introspection still running for a token, which concurrent callers share (one POST per token per burst). */
-const introspectInFlight = new Map<string, Promise<IntrospectionResult>>()
-const lookupCache = new Map<string, { answer: AccountVersionAnswer; at: number }>()
+const introspectInFlight = processState('freshness.introspectInFlight', () => new Map<string, Promise<IntrospectionResult>>())
+const lookupCache = processState('freshness.lookupCache', () => new Map<string, { answer: AccountVersionAnswer; at: number }>())
 const INTROSPECTION_CACHE_MAX = 2_000
 const LOOKUP_CACHE_MAX = 10_000
 /** Largest version any read has revealed per (issuer, sub). Monotonic. */
-const subjectHighWater = new Map<string, number>()
+const subjectHighWater = processState('freshness.subjectHighWater', () => new Map<string, number>())
 /** One refresh exchange per refresh token, remembered until the access token it minted would expire. */
-const refreshMemo = new Map<string, { result: RefreshResult; at: number; ttlMs: number }>()
+const refreshMemo = processState('freshness.refreshMemo', () => new Map<string, { result: RefreshResult; at: number; ttlMs: number }>())
 /** The exchange still running for a refresh token, which every concurrent caller awaits. */
-const refreshInFlight = new Map<string, Promise<RefreshResult>>()
+const refreshInFlight = processState('freshness.refreshInFlight', () => new Map<string, Promise<RefreshResult>>())
 
 /** Test seam — this is process-local state and a test must be able to reset it. */
 export function __resetFreshnessCachesForTests(): void {

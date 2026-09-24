@@ -35,6 +35,7 @@
  */
 
 import { createPublicKey, constants as cryptoConstants, verify as cryptoVerify } from 'node:crypto'
+import { processState } from '../../internal/process-state.js'
 
 /** The single event a back-channel logout token must carry (BCL 1.0 §2.4). */
 export const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout'
@@ -170,7 +171,7 @@ interface JwksCacheEntry {
  * an optimisation: correctness comes from the miss path. Shared with the
  * operator-token verifier (D23, specs.md §6.5 step 1).
  */
-const jwksCache = new Map<string, JwksCacheEntry>()
+const jwksCache = processState('logoutToken.jwksCache', () => new Map<string, JwksCacheEntry>())
 export const JWKS_TTL_SECONDS = 300
 
 /** Test seam — the cache is process-local state and a test must be able to reset it. */

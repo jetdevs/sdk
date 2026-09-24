@@ -102,8 +102,12 @@ export {
 } from './maintenance.js'
 
 export {
+  NeonHttpDriverRefusedError,
+  sqlClientFromNeon,
   sqlClientFromPg,
   sqlClientFromPostgresJs,
+  type NeonClientLike,
+  type NeonPoolLike,
   type PgClientLike,
   type PgPoolLike,
   type PostgresJsLike,

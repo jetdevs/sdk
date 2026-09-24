@@ -124,6 +124,7 @@ export function buildEstateManifest(input: BuildEstateManifestInput): EstateMani
         connectSub: r.connectSub,
         orgMemberships: r.orgMemberships.length,
         duplicateEmail: email ? (emailCounts.get(email) ?? 0) > 1 : false,
+        deactivate: r.deactivate,
       }
       if (r.system) {
         systemRows.push({ ...row, class: 'linked', reasons: ['system_identity'], person: email ?? `#${system}:${r.id}`, canonicalSource: null, deactivate: r.deactivate, systemIdentity: true })

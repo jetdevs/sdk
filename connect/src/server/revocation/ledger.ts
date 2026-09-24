@@ -43,6 +43,7 @@
 import type { RpSqlClient, SqlExecutor } from '../../adapter/index.js'
 import type { VerifiedLogoutToken } from './logout-token.js'
 import { observeCredentialVersion } from './freshness.js'
+import { processState } from '../../internal/process-state.js'
 
 export type LogoutApplication =
   /** The token was accepted and the revocation is recorded. */
@@ -272,13 +273,14 @@ interface CacheEntry {
   at: number
 }
 
-const revokedCache = new Map<string, CacheEntry>()
-let anyRevocationsCache: CacheEntry | null = null
+// One copy per process, whichever entry imported this module (internal/process-state.ts).
+const revokedCache = processState('ledger.revokedCache', () => new Map<string, CacheEntry>())
+const anyRevocations = processState('ledger.anyRevocations', (): { entry: CacheEntry | null } => ({ entry: null }))
 
 /** Test seam — this is process-local state and a test must be able to reset it. */
 export function __resetRevocationCacheForTests(): void {
   revokedCache.clear()
-  anyRevocationsCache = null
+  anyRevocations.entry = null
 }
 
 /**
@@ -290,10 +292,11 @@ export function __resetRevocationCacheForTests(): void {
  * all while the table is empty.
  */
 async function anyRevocationsExist(execute: SqlExecutor, nowMs: number, maxAgeMs: number): Promise<boolean> {
-  if (anyRevocationsCache && nowMs - anyRevocationsCache.at < maxAgeMs) return anyRevocationsCache.value
+  const cached = anyRevocations.entry
+  if (cached && nowMs - cached.at < maxAgeMs) return cached.value
   const hit = await execute(`SELECT 1 AS one FROM connect_session_revocations LIMIT 1`)
   const value = Boolean(hit[0])
-  anyRevocationsCache = { value, at: nowMs }
+  anyRevocations.entry = { value, at: nowMs }
   return value
 }
 

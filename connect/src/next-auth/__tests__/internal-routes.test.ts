@@ -476,6 +476,14 @@ describe('session-freshness (AC7)', () => {
     const before = await h.call(lineage({ issuer: h.idp.issuer, cv: 1 }), { path: FRESHNESS })
     expect(before.json).toMatchObject({ fresh: false, reason: 'stale', version: 2 })
     vi.resetModules()
+    // A re-import is no longer a restart: the SDK's caches live in ONE process-wide registry on
+    // globalThis (internal/process-state.ts), which survives module re-evaluation by design. A new
+    // process starts with that registry empty — the resets below are that.
+    const freshRevocation = (await import('../../server/revocation/index.js')) as typeof import('../../server/revocation/index.js')
+    freshRevocation.__resetFreshnessCachesForTests()
+    freshRevocation.__resetRevocationCacheForTests()
+    freshRevocation.__resetMaintenanceCacheForTests()
+    freshRevocation.__resetJwksCacheForTests()
     const fresh = (await import('../internal-routes.js')) as typeof import('../internal-routes.js')
     const routes2 = fresh.createConnectInternalRoutes({
       system: 'crm',

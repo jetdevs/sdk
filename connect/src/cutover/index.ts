@@ -22,15 +22,18 @@ export {
   rank as cutoverRank,
   classifyPerson,
   classifyRow,
+  decideHandoffClass,
   electCanonicalSource,
   isHandoffManifestClass,
   type ClassifiedPerson,
   type ClassifiedRow,
   type CutoverPlan,
+  type HandoffClassFacts,
   type ManifestClass,
   type PersonConnectFacts,
   type PersonRpRow,
   type QuarantineReason,
+  type RpRowRef,
 } from './classify.js'
 
 export {

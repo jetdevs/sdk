@@ -23,6 +23,8 @@
  * live check. The failure fallback window is the fixed 15 s regardless.
  */
 
+import { processState } from '../../internal/process-state.js'
+
 /** The wire shape of STORY-040's route, camelCase. */
 export interface EstateMaintenanceState {
   active: boolean
@@ -71,7 +73,7 @@ interface GoodRead {
 }
 
 /** Last good read per issuer. Process-local. */
-const lastGood = new Map<string, GoodRead>()
+const lastGood = processState('maintenance.lastGood', () => new Map<string, GoodRead>())
 
 /** Test seam. */
 export function __resetMaintenanceCacheForTests(): void {

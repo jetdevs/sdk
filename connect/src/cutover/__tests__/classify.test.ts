@@ -37,16 +37,16 @@ describe('classify — D10 as amended (AC3)', () => {
       ['crm', 'import'],
       ['yobo', 'retire'],
     ])
-    expect(p.rows[1]!.reasons).toEqual(['verifier_present', 'source_crm'])
+    // crm's activation leaves an established receipt that is not yobo's own → rule 1.
+    expect(p.rows[1]!.reasons).toEqual(['verifier_present', 'receipt_exists'])
   })
 
-  it('AC3: Connect holds a password and no receipt → canonicalSource null, both adopt (with or without verifiers)', () => {
+  it('AC3 / P77-20: Connect holds a password and no receipt → canonicalSource null, both adopt (with or without verifiers)', () => {
     const p = classifyPerson('sean@example.test', [hashed('crm', 1, 'a'.repeat(64)), row('yobo', 7)], facts({ passwordPresent: true }), PLAN)
     expect(p.canonicalSource).toBeNull()
-    // A verifier next to a Connect-set password is retired without staging (rule 2 at Connect: `adopt`... the manifest calls the
-    // verifier-carrying row `retire` by provenance; both are activate-existing and stage nothing).
+    // Connect's rule 2: a password with no receipt was set by the person → adopt, verifier or not (never `retire`).
     expect(p.rows.map((r) => [r.system, r.class])).toEqual([
-      ['crm', 'retire'],
+      ['crm', 'adopt'],
       ['yobo', 'adopt'],
     ])
     const both = classifyPerson('sean@example.test', [row('crm', 1), row('yobo', 7)], facts({ passwordPresent: true }), PLAN)
@@ -65,23 +65,23 @@ describe('classify — D10 as amended (AC3)', () => {
     expect(noHash.rows[0]!.class).toBe('adopt')
   })
 
-  it('AC3: no hash anywhere and Connect NULL → recover; a verifier-less earlier crm row next to a hash-holding yobo sibling → crm adopt, yobo import (source yobo)', () => {
+  it('AC3 / P77-20: no hash anywhere and Connect NULL → recover; a verifier-less earlier crm row next to a hash-holding yobo sibling → crm recover (the driver reaches crm first), yobo import (source yobo)', () => {
     expect(classifyPerson('sean@example.test', [row('crm', 1), row('yobo', 7)], facts(), PLAN).rows.map((r) => r.class)).toEqual(['recover', 'recover'])
     const p = classifyPerson('sean@example.test', [row('crm', 1), hashed('yobo', 7, 'b'.repeat(64))], facts(), PLAN)
     expect(p.canonicalSource).toBe('yobo')
     expect(p.rows.map((r) => [r.system, r.class])).toEqual([
-      ['crm', 'adopt'],
+      ['crm', 'recover'],
       ['yobo', 'import'],
     ])
   })
 
   it('quarantine and linked come first: email held by another Connect user → connect_email_taken; no org → no_org; a duplicate lower(email) in one RP; an inactive row; a connect row is linked; a pilot row is linked and never elected', () => {
-    expect(classifyRow(hashed('crm', 1, 'a'.repeat(64)), facts({ emailHeldByOther: true }), 'crm', PLAN)).toMatchObject({ class: 'quarantine', reasons: ['connect_email_taken'] })
-    expect(classifyRow(row('crm', 1, { orgMemberships: 0 }), facts(), null, PLAN)).toMatchObject({ class: 'quarantine', reasons: ['no_org'] })
-    expect(classifyRow(row('crm', 1, { duplicateEmail: true }), facts(), null, PLAN)).toMatchObject({ class: 'quarantine', reasons: ['duplicate_email'] })
-    expect(classifyRow(row('crm', 1, { isActive: false }), facts(), null, PLAN).reasons).toContain('inactive')
-    expect(classifyRow(row('crm', 1, { credentialAuthority: 'connect' }), facts(), null, PLAN)).toMatchObject({ class: 'linked' })
-    expect(classifyRow(hashed('superhost', 3, 'c'.repeat(64)), facts(), null, PLAN)).toMatchObject({ class: 'linked', reasons: ['pilot_no_verifier'] })
+    expect(classifyRow(hashed('crm', 1, 'a'.repeat(64)), facts({ emailHeldByOther: true }), PLAN)).toMatchObject({ class: 'quarantine', reasons: ['connect_email_taken'] })
+    expect(classifyRow(row('crm', 1, { orgMemberships: 0 }), facts(), PLAN)).toMatchObject({ class: 'quarantine', reasons: ['no_org'] })
+    expect(classifyRow(row('crm', 1, { duplicateEmail: true }), facts(), PLAN)).toMatchObject({ class: 'quarantine', reasons: ['duplicate_email'] })
+    expect(classifyRow(row('crm', 1, { isActive: false }), facts(), PLAN).reasons).toContain('inactive')
+    expect(classifyRow(row('crm', 1, { credentialAuthority: 'connect' }), facts(), PLAN)).toMatchObject({ class: 'linked' })
+    expect(classifyRow(hashed('superhost', 3, 'c'.repeat(64)), facts(), PLAN)).toMatchObject({ class: 'linked', reasons: ['pilot_no_verifier'] })
     expect(electCanonicalSource([hashed('superhost', 3, 'c'.repeat(64)), hashed('yobo', 7, 'b'.repeat(64))], facts(), PLAN)).toBe('yobo')
     expect(electCanonicalSource([hashed('crm', 1, 'a'.repeat(64))], facts({ stagedRow: true }), PLAN)).toBeNull()
     expect(electCanonicalSource([hashed('crm', 1, 'a'.repeat(64), { isActive: false })], facts(), PLAN)).toBeNull()
@@ -128,8 +128,9 @@ describe('manifest — build, digest, approval', () => {
       ['yobo', 'retire'],
     ])
     expect(m.rows.find((r) => r.systemIdentity)).toMatchObject({ system: 'crm', sourceUserRef: '9', class: 'linked' })
-    expect(m.rows.find((r) => r.deactivate)).toMatchObject({ system: 'crm', sourceUserRef: '3' })
-    expect(m.counts).toMatchObject({ import: 1, retire: 1, recover: 1, quarantine: 1, system: 1, deactivate: 1 })
+    // A D18 deactivate row is never driven, so it is `linked` and never enters the class replay (as in yobo-auth's builder).
+    expect(m.rows.find((r) => r.deactivate)).toMatchObject({ system: 'crm', sourceUserRef: '3', class: 'linked', reasons: ['deactivate_allowlist'] })
+    expect(m.counts).toMatchObject({ import: 1, retire: 1, recover: 0, linked: 2, quarantine: 1, system: 1, deactivate: 1 })
     expect(m.rows.find((r) => r.system === 'yobo' && r.sourceUserRef === '2')).toMatchObject({ class: 'quarantine', reasons: ['no_email'] })
     expect(actionableRows(m, 'crm').map((r) => r.sourceUserRef)).toEqual(['1'])
     expect(JSON.stringify(m)).not.toMatch(/\$2[aby]\$/)
