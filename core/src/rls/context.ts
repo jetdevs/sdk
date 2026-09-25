@@ -4,6 +4,8 @@
  * Functions for setting and clearing RLS context in database connections.
  */
 
+import { is, sql } from 'drizzle-orm';
+import { PgTransaction } from 'drizzle-orm/pg-core';
 import type { DbClient } from '../db';
 
 // =============================================================================
@@ -20,12 +22,17 @@ export const RLS_USER_VAR = 'rls.current_user_id';
 /**
  * Set RLS context variables on a database connection.
  *
- * IMPORTANT: Call this before any queries that need RLS filtering.
+ * The values are TRANSACTION-local (`set_config(..., true)`, same scope as
+ * `SET LOCAL`). Called outside a transaction they die with the statement's
+ * implicit transaction, before the next query runs — so pass a `tx`, or use
+ * `withRlsContext`, which opens the transaction for you.
  *
  * @example
  * ```ts
- * await setRlsContext(db, { orgId: 1, userId: 123 });
- * const customers = await db.query.customers.findMany();
+ * await db.transaction(async (tx) => {
+ *   await setRlsContext(tx, { orgId: 1, userId: 123 });
+ *   return tx.query.customers.findMany();
+ * });
  * ```
  */
 export async function setRlsContext(
@@ -35,11 +42,11 @@ export async function setRlsContext(
   const { orgId, userId } = context;
 
   // Set org context (required for most RLS policies)
-  await (db as any).execute(`SET LOCAL ${RLS_ORG_VAR} = '${orgId}'`);
+  await (db as any).execute(sql`SELECT set_config(${RLS_ORG_VAR}, ${String(orgId)}, true)`);
 
   // Set user context if provided
   if (userId !== undefined) {
-    await (db as any).execute(`SET LOCAL ${RLS_USER_VAR} = '${userId}'`);
+    await (db as any).execute(sql`SELECT set_config(${RLS_USER_VAR}, ${String(userId)}, true)`);
   }
 }
 
@@ -56,12 +63,16 @@ export async function clearRlsContext(db: DbClient): Promise<void> {
 /**
  * Execute a function with RLS context set.
  *
- * Automatically sets and clears context around the callback.
+ * Opens one transaction, sets the context inside it, and runs `fn` with the
+ * transaction client, so every query in `fn` sees the context and it reverts
+ * at COMMIT/ROLLBACK. When `db` is already a transaction it is reused (no
+ * nested transaction); the context then lasts until that outer transaction
+ * ends.
  *
  * @example
  * ```ts
- * const customers = await withRlsContext(db, { orgId: 1 }, async (db) => {
- *   return db.query.customers.findMany();
+ * const customers = await withRlsContext(db, { orgId: 1 }, async (tx) => {
+ *   return tx.query.customers.findMany();
  * });
  * ```
  */
@@ -70,12 +81,15 @@ export async function withRlsContext<T>(
   context: { orgId: number; userId?: number },
   fn: (db: DbClient) => Promise<T>
 ): Promise<T> {
-  try {
-    await setRlsContext(db, context);
-    return await fn(db);
-  } finally {
-    await clearRlsContext(db);
+  const run = async (tx: DbClient): Promise<T> => {
+    await setRlsContext(tx, context);
+    return fn(tx);
+  };
+
+  if (is(db, PgTransaction)) {
+    return run(db);
   }
+  return (db as any).transaction((tx: DbClient) => run(tx));
 }
 
 /**
