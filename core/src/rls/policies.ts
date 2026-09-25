@@ -86,6 +86,50 @@ export function generatePublicPolicies(tableName: string): PolicyTemplate[] {
 export function generateOrgPolicies(tableName: string, config: RlsTableConfig): PolicyTemplate[] {
   const condition = generatePolicyCondition(config);
 
+  const internalPolicy: PolicyTemplate = {
+    name: `${tableName}_internal_policy`,
+    cmd: 'ALL',
+    role: 'internal_api_user',
+    using: undefined,
+  };
+
+  // Per-command split (p85 S0 / CAD-190): one policy per command for app_user.
+  // Only the clauses Postgres accepts for each command are set:
+  //   SELECT/DELETE -> USING only, INSERT -> WITH CHECK only, UPDATE -> both.
+  if (config.policies) {
+    const expr = (key: keyof NonNullable<RlsTableConfig['policies']>): string =>
+      (config.policies?.[key] ?? condition).trim();
+
+    return [
+      {
+        name: `${tableName}_select`,
+        cmd: 'SELECT',
+        role: 'app_user',
+        using: expr('select'),
+      },
+      {
+        name: `${tableName}_insert`,
+        cmd: 'INSERT',
+        role: 'app_user',
+        withCheck: expr('insert'),
+      },
+      {
+        name: `${tableName}_update`,
+        cmd: 'UPDATE',
+        role: 'app_user',
+        using: expr('update'),
+        withCheck: expr('update'),
+      },
+      {
+        name: `${tableName}_delete`,
+        cmd: 'DELETE',
+        role: 'app_user',
+        using: expr('delete'),
+      },
+      internalPolicy,
+    ];
+  }
+
   return [
     {
       name: `${tableName}_org_policy`,
@@ -94,12 +138,7 @@ export function generateOrgPolicies(tableName: string, config: RlsTableConfig): 
       using: condition,
       withCheck: condition,
     },
-    {
-      name: `${tableName}_internal_policy`,
-      cmd: 'ALL',
-      role: 'internal_api_user',
-      using: undefined,
-    }
+    internalPolicy,
   ];
 }
 

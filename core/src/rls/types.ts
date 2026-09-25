@@ -23,6 +23,24 @@ export type RlsIsolation = 'public' | 'org' | 'workspace' | 'user';
 export type RlsPolicy = 'select' | 'insert' | 'update' | 'delete';
 
 /**
+ * Per-command policy expressions for org-isolated tables.
+ *
+ * Each value is a bare SQL boolean expression (no surrounding USING/WITH CHECK).
+ * A missing key falls back to the table's default condition
+ * (`generatePolicyCondition`, i.e. `customPolicy` or the org_id check).
+ */
+export interface RlsCommandPolicies {
+  /** USING expression for the `FOR SELECT` policy */
+  select?: string;
+  /** WITH CHECK expression for the `FOR INSERT` policy */
+  insert?: string;
+  /** USING + WITH CHECK expression for the `FOR UPDATE` policy */
+  update?: string;
+  /** USING expression for the `FOR DELETE` policy */
+  delete?: string;
+}
+
+/**
  * Configuration for a single table's RLS policy.
  */
 export interface RlsTableConfig {
@@ -38,6 +56,17 @@ export interface RlsTableConfig {
   inheritedFrom?: string;
   /** Custom RLS policy SQL if needed */
   customPolicy?: string;
+  /**
+   * Per-command policies (isolation 'org' only). When set, the generator emits
+   * separate `${table}_select` / `_insert` / `_update` / `_delete` policies for
+   * app_user instead of the single `${table}_org_policy` FOR ALL policy, so a
+   * table can be readable more widely than it is writable (e.g. global rows
+   * with org_id NULL readable by every org but writable only by a superuser).
+   * Overrides `customPolicy` for org isolation; any missing key falls back to
+   * `generatePolicyCondition(config)` (customPolicy or the org_id check).
+   * The `${table}_internal_policy` for internal_api_user is emitted unchanged.
+   */
+  policies?: RlsCommandPolicies;
   /** Description of the table's isolation requirements */
   description: string;
   /** Whether RLS is currently enabled (for migration tracking) */
