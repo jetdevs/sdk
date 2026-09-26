@@ -16,6 +16,15 @@ import * as React from 'react';
 import { useMemo, useState } from 'react';
 import { cn } from '../../lib';
 import { getAlignCellClass } from './column-meta';
+import {
+    collectHeaderLabels,
+    FilterIcon,
+    MobileRowList,
+    MobileSheet,
+    MobileSheetField,
+    useIsMobileList,
+    type MobileListOption,
+} from './mobile';
 
 // =============================================================================
 // UI COMPONENT TYPES - Types for injected UI components
@@ -188,6 +197,22 @@ export interface BaseListTableProps<TData> {
    * implemented. Default `'list'`.
    */
   rowLayout?: 'list';
+
+  // ---------------------------------------------------------------------------
+  // Phone layout (p90). Below `md` rows render as compact divider-separated
+  // lines (title + one status line + ⋯) and the toolbar collapses to search +
+  // one filters button. Desktop markup is unchanged. `false` opts out.
+  // ---------------------------------------------------------------------------
+
+  /** Phone rendering config, or `false` to keep the table on phones. */
+  mobile?: MobileListOption;
+
+  /**
+   * Primary call-to-action (e.g. "New agent"). Rendered at the end of the
+   * toolbar's right group on desktop, and kept visible in the toolbar row on
+   * phones (pass an icon + short label). Unset → desktop markup unchanged.
+   */
+  primaryAction?: React.ReactNode;
 }
 
 // =============================================================================
@@ -358,13 +383,20 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     columnVisibilityControl,
     layout = 'single-row',
     SelectComponent,
+    primaryAction,
+    mobile,
   }: ListToolbarProps & {
     SelectComponent?: BaseListTableProps<unknown>['SelectComponent'];
+    primaryAction?: React.ReactNode;
+    /** Set on phones: renders the compact toolbar instead. */
+    mobile?: { rightContent: 'sheet' | 'inline' | 'hidden' };
   }) {
     const showClear = !!(search?.value || (statusFilter && statusFilter.value && statusFilter.value !== 'all'));
+    const [sheetOpen, setSheetOpen] = useState(false);
+    const closeSheet = React.useCallback(() => setSheetOpen(false), []);
 
     // Render status filter - use custom SelectComponent if provided, otherwise use native select
-    const renderStatusFilter = () => {
+    const renderStatusFilter = (widthClass = 'w-[140px]') => {
       if (!statusFilter) return null;
 
       if (SelectComponent) {
@@ -374,7 +406,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
             onValueChange={statusFilter.onChange}
             options={statusFilter.options}
             placeholder="Status"
-            className="w-[140px]"
+            className={widthClass}
           />
         );
       }
@@ -384,7 +416,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
         <select
           value={statusFilter.value}
           onChange={(e) => statusFilter.onChange(e.target.value)}
-          className="h-9 w-[140px] rounded-md border border-input bg-background px-3 text-sm"
+          className={`h-9 ${widthClass} rounded-md border border-input bg-background px-3 text-sm`}
         >
           {statusFilter.options.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -394,6 +426,65 @@ export function createBaseListTable(ui: DataTableUIComponents) {
         </select>
       );
     };
+
+    // Phones (p90): one row — full-width search + one filters button (+ the
+    // primary CTA). Columns / view toggles / refresh / result count are not
+    // shown; filters live in a bottom sheet. No wrapper box.
+    if (mobile) {
+      const sheetRight = mobile.rightContent === 'sheet' ? rightContent : null;
+      const inlineRight = mobile.rightContent === 'inline' ? rightContent : null;
+      const hasSheet = Boolean(statusFilter || sheetRight);
+      const filtersActive = !!(statusFilter && statusFilter.value && statusFilter.value !== 'all');
+      return (
+        <div data-slot="list-toolbar-mobile" className="sticky top-0.5 z-10 flex items-center gap-2 pb-3 mb-1">
+          {search ? (
+            <div className="relative min-w-0 flex-1">
+              <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search.value}
+                onChange={(e) => search.onChange(e.target.value)}
+                placeholder={search.placeholder || 'Search...'}
+                className="pl-8 w-full bg-background border"
+              />
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          {hasSheet && (
+            <Button variant="outline" size="icon" className="relative h-9 w-9 shrink-0 p-0" onClick={() => setSheetOpen(true)}>
+              <FilterIcon className="h-4 w-4" />
+              <span className="sr-only">Filters</span>
+              {filtersActive && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary" />}
+            </Button>
+          )}
+          {inlineRight && <div className="flex shrink-0 items-center gap-2">{inlineRight}</div>}
+          {primaryAction && <div className="shrink-0">{primaryAction}</div>}
+          {hasSheet && (
+            <MobileSheet open={sheetOpen} onClose={closeSheet} title="Filters">
+              {statusFilter && <MobileSheetField label="Status">{renderStatusFilter('w-full')}</MobileSheetField>}
+              {sheetRight && <div className="flex flex-wrap items-center gap-2">{sheetRight}</div>}
+              <div className="flex items-center justify-end gap-2 pt-2">
+                {showClear && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      search?.onChange('');
+                      statusFilter?.onChange('all');
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+                <Button size="sm" onClick={closeSheet}>
+                  Done
+                </Button>
+              </div>
+            </MobileSheet>
+          )}
+        </div>
+      );
+    }
 
     if (layout === 'two-row') {
       return (
@@ -428,7 +519,12 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                 </Button>
               )}
             </div>
-            {rightContent && <div className="flex flex-wrap items-center gap-2">{rightContent}</div>}
+            {(rightContent || primaryAction) && (
+              <div className="flex flex-wrap items-center gap-2">
+                {rightContent}
+                {primaryAction}
+              </div>
+            )}
           </div>
 
           {/* Row 2: Actions */}
@@ -488,6 +584,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
             </Button>
           )}
           {rightContent}
+          {primaryAction}
         </div>
       </div>
     );
@@ -546,7 +643,20 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     getRowId,
     // rowLayout is 'list'-only for p6; accepted for API parity, no branch needed.
     rowLayout: _rowLayout = 'list',
+    mobile,
+    primaryAction,
   }: BaseListTableProps<TData>) {
+    // Phone layout (p90). Always false on the server and ≥ md, so desktop
+    // takes exactly the pre-p90 path below.
+    const isMobile = useIsMobileList(mobile !== false);
+    const mobileConfig = mobile || {};
+    // renderRow consumers own their row layout — only the toolbar goes compact.
+    const cardMode = isMobile && !renderRow;
+    const headerLabels = useMemo(
+      () => collectHeaderLabels(columns as Array<{ id?: string; header?: unknown; accessorKey?: unknown }>),
+      [columns],
+    );
+
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
       if (!defaultVisibleColumns) return {};
@@ -589,7 +699,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
         el.removeEventListener('scroll', updateScrollState);
         window.removeEventListener('resize', updateScrollState);
       };
-    }, [data]);
+    }, [data, cardMode]);
 
     // Auto-wrap plain-string headers into sortable buttons. Memoized on the
     // columns identity so TanStack doesn't re-detect columns every render.
@@ -681,6 +791,25 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     const lastColumnIndex = headerGroup ? headerGroup.headers.length - 1 : -1;
     const shouldUseStickyActions = enableStickyActions && lastColumnIndex >= 0;
 
+    const emptyContent = emptyState ? (
+      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+        {emptyState.icon}
+        <div className="font-medium text-foreground">{emptyState.title}</div>
+        {emptyState.subtitle && <div className="text-sm">{emptyState.subtitle}</div>}
+      </div>
+    ) : (
+      <div className="text-sm text-muted-foreground">No items found.</div>
+    );
+
+    // Nothing to page through: no rows at all on the first page. Hides the
+    // "Showing 0 to 0 of 0 · Page 1 of 0" pager under an empty state.
+    const hidePagination =
+      !!pagination &&
+      !isLoading &&
+      (pagination.totalCount === 0 || (data.length === 0 && pagination.pageIndex === 0));
+    const pageCount =
+      pagination?.totalCount !== undefined ? Math.ceil(pagination.totalCount / pagination.pageSize) : undefined;
+
     return (
       <div className="space-y-3">
         <ListToolbar
@@ -692,9 +821,31 @@ export function createBaseListTable(ui: DataTableUIComponents) {
           columnVisibilityControl={columnVisibilityDropdown}
           layout={toolbarLayout}
           SelectComponent={SelectComponent}
+          primaryAction={primaryAction}
+          mobile={isMobile ? { rightContent: mobileConfig.rightContent ?? 'sheet' } : undefined}
         />
 
-        {!hideTable && <div className="rounded-md border relative">
+        {!hideTable && cardMode && (
+          isLoading ? (
+            <div data-slot="mobile-list-loading" className="divide-y divide-border">
+              {[...Array(Math.min(pagination?.pageSize || 5, 8))].map((_, i) => (
+                <div key={i} className="py-4">
+                  <div className="h-3 w-2/3 bg-muted animate-pulse rounded" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <MobileRowList
+              table={table}
+              config={mobileConfig}
+              headerLabels={headerLabels}
+              getRowProps={getRowProps}
+              empty={emptyContent}
+            />
+          )
+        )}
+
+        {!hideTable && !cardMode && <div className="rounded-md border relative">
           {/* Left scroll indicator */}
           {shouldUseStickyActions && scrollState.canScrollLeft && (
             <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent pointer-events-none z-10" />
@@ -853,8 +1004,39 @@ export function createBaseListTable(ui: DataTableUIComponents) {
           </div>
         </div>}
 
-        {/* Pagination Controls */}
-        {pagination && (
+        {/* Pagination Controls — phones: prev · Page x of y · next only. */}
+        {pagination && !hidePagination && isMobile && (
+          <div data-slot="mobile-pagination" className="flex items-center justify-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => pagination.onPageChange?.(pagination.pageIndex - 1)}
+              disabled={pagination.pageIndex === 0 || !pagination.onPageChange}
+              className="h-9 w-9 p-0"
+            >
+              <ChevronLeftIcon className="h-4 w-4" />
+              <span className="sr-only">Previous page</span>
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {pagination.pageIndex + 1}
+              {pageCount !== undefined && ` of ${pageCount}`}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => pagination.onPageChange?.(pagination.pageIndex + 1)}
+              disabled={
+                !pagination.onPageChange ||
+                (pageCount !== undefined && pagination.pageIndex >= pageCount - 1)
+              }
+              className="h-9 w-9 p-0"
+            >
+              <ChevronRightIcon className="h-4 w-4" />
+              <span className="sr-only">Next page</span>
+            </Button>
+          </div>
+        )}
+        {pagination && !hidePagination && !isMobile && (
           <div className="flex flex-col gap-3 px-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm text-muted-foreground">

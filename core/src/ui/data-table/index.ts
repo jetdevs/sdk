@@ -50,6 +50,11 @@ export {
 } from './column-meta';
 export type { ColumnAlign } from './column-meta';
 
+// Phone layout (p90) — the media query + config types, for apps that want to
+// mirror the list's breakpoint (e.g. hide a page subtitle on phones).
+export { MOBILE_LIST_QUERY, useIsMobileList } from './mobile';
+export type { MobileListConfig, MobileListOption } from './mobile';
+
 // Type exports - UI component interfaces
 export type { DataTableUIComponents } from './BaseListTable';
 export type { ColumnHeaderUIComponents } from './DataTableColumnHeader';
