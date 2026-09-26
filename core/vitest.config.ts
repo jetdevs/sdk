@@ -18,6 +18,8 @@ export default defineConfig({
       ['src/ui/data-table/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
       // p79 STORY-047: the shared auth page UI render tests.
       ['src/ui/auth-pages/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
+      // p90 batch 3d: the shared app header + brand mark.
+      ['src/ui/app-header/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
     ],
     globals: true,
   },
