@@ -62,9 +62,9 @@ describe('CadraMark / BrandMark', () => {
 });
 
 describe('BrandLockup', () => {
-  it('draws the Cadra mark + "Cadra" + "OS" in text-primary', () => {
+  it('draws the Cadra wordmark only — "Cadra" + "OS" in text-primary, no icon (the icon is the favicon)', () => {
     const { container } = render(<BrandLockup {...cadraBrand} />);
-    expect(screen.getByTestId('cadra-mark')).toBeTruthy();
+    expect(screen.queryByTestId('cadra-mark')).toBeNull();
     expect(container.textContent).toBe('CadraOS');
     expect(container.innerHTML).toContain('<span class="text-primary">OS</span>');
   });
@@ -81,7 +81,7 @@ describe('BrandLockup', () => {
   });
 
   it('applies markClassName to the mark', () => {
-    render(<BrandLockup {...cadraBrand} markClassName="h-7 w-7" />);
+    render(<BrandLockup {...cadraBrand} mark={<CadraMark />} markClassName="h-7 w-7" />);
     const cls = screen.getByTestId('cadra-mark').getAttribute('class')!;
     expect(cls).toContain('h-7');
     expect(cls).not.toContain('h-8');
@@ -175,9 +175,8 @@ describe('AppHeader', () => {
       ]),
     );
     expect(header.querySelector('[data-slot="menu"]')!.className).toContain('md:hidden');
-    // Mark: 28px phone, 32px desktop.
-    const mark = screen.getByTestId('cadra-mark').getAttribute('class')!.split(/\s+/);
-    expect(mark).toEqual(expect.arrayContaining(['h-7', 'w-7', 'md:h-8', 'md:w-8']));
+    // Cadra header = wordmark only; no mark rendered.
+    expect(screen.queryByTestId('cadra-mark')).toBeNull();
   });
 
   it('reads height and gutter from theme variables, never hard-coded sizes (#16)', () => {
