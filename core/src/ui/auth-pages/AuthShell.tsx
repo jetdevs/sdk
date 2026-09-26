@@ -19,25 +19,11 @@
 
 import * as React from 'react';
 import { cn } from '../../lib';
+import { AppHeader } from '../app-header/AppHeader';
+import { Wordmark } from '../app-header/brand';
 
-/** The wordmark cadra-web's header shows: `Cadra` + `OS` in the primary colour. */
-export function Wordmark({
-  text,
-  accent,
-  className,
-}: {
-  text: string;
-  /** The suffix drawn in `text-primary`, e.g. "OS". */
-  accent?: string;
-  className?: string;
-}) {
-  return (
-    <span className={cn('text-lg font-bold tracking-tight', className)}>
-      {text}
-      {accent ? <span className="text-primary">{accent}</span> : null}
-    </span>
-  );
-}
+/** The wordmark lives with the brand lockup now; re-exported for existing imports. */
+export { Wordmark };
 
 export interface AuthTopBarProps {
   /** The brand mark: a `Wordmark`, an `<img>`, or nothing. */
@@ -51,17 +37,21 @@ export interface AuthTopBarProps {
   children?: React.ReactNode;
 }
 
-/** The sticky 64px top bar every auth page sits under. */
+/**
+ * The sticky 64px top bar every auth page sits under. p90 batch 3d: this IS
+ * the shared `AppHeader` (one header on the platform); it only pins the 64px
+ * height on phones too, so the auth pages look exactly as they did.
+ */
 export function AuthTopBar({ brand, href = '/', linkComponent, children, ...rest }: AuthTopBarProps) {
-  const LinkComponent = (linkComponent ?? 'a') as React.ElementType;
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
-      <LinkComponent href={href} className="flex items-center gap-2" aria-label={rest['aria-label'] ?? 'Home'}>
-        {brand}
-      </LinkComponent>
-      <div className="flex-1" />
-      {children}
-    </header>
+    <AppHeader
+      logo={brand}
+      logoHref={href}
+      logoLabel={rest['aria-label'] ?? 'Home'}
+      linkComponent={linkComponent}
+      right={children}
+      className="h-16 gap-4 px-4"
+    />
   );
 }
 
