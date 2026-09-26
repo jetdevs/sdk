@@ -38,9 +38,10 @@ export interface AuthTopBarProps {
 }
 
 /**
- * The sticky 64px top bar every auth page sits under. p90 batch 3d: this IS
- * the shared `AppHeader` (one header on the platform); it only pins the 64px
- * height on phones too, so the auth pages look exactly as they did.
+ * The sticky top bar every auth page sits under. p90 batch 3d: this IS the
+ * shared `AppHeader` (one header on the platform), so it has the header's
+ * height — 48px on phones, 64px from md up, or whatever the theme sets via
+ * `--app-header-height-sm` / `--app-header-height`.
  */
 export function AuthTopBar({ brand, href = '/', linkComponent, children, ...rest }: AuthTopBarProps) {
   return (
@@ -65,12 +66,22 @@ export interface AuthShellProps {
 /**
  * Full-height page background with the content centred under the top bar.
  * Put an `AuthCard` (or any card) inside.
+ *
+ * The centring area is the viewport minus the header, read from the same theme
+ * variables `AppHeader` uses (`--app-header-height-sm` on phones,
+ * `--app-header-height` from md; defaults 3rem / 4rem), so the card stays
+ * centred without a page scroll whatever height the theme gives the header.
  */
 export function AuthShell({ topBar, children, className }: AuthShellProps) {
   return (
     <div className={cn('min-h-dvh bg-background', className)}>
       {topBar}
-      <div className="flex justify-center items-center min-h-[calc(100dvh-64px)] p-4">{children}</div>
+      <div
+        data-slot="auth-shell-body"
+        className="flex justify-center items-center min-h-[calc(100dvh_-_var(--app-header-height-sm,3rem))] md:min-h-[calc(100dvh_-_var(--app-header-height,4rem))] p-4"
+      >
+        {children}
+      </div>
     </div>
   );
 }

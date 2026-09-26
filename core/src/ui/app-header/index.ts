@@ -8,11 +8,14 @@
  *   <AppHeader brand={cadraBrand} logoHref="/dashboard" linkComponent={Link}
  *              right={<><Credits /><Language /><UserMenu /></>} />
  *
+ * Theme: height/gutter come from `--app-header-height-sm`, `--app-header-height`,
+ * `--app-header-px-sm`, `--app-header-px` (defaults 3rem/4rem/0.75rem/1.5rem).
+ *
  * Consumers must let Tailwind scan this directory (source under `link:`,
  * `dist/ui/app-header` when installed) or the classes are purged.
  */
 
-export { AppHeader, isExternalHref, type AppHeaderProps } from './AppHeader';
+export { APP_HEADER_CSS_VARS, AppHeader, isExternalHref, type AppHeaderProps } from './AppHeader';
 export {
   BrandLockup,
   BrandMark,
