@@ -144,6 +144,14 @@ export interface BaseListTableProps<TData> {
   enableStickyActions?: boolean;
   /** Hide the table body (useful for grid view where only the toolbar is needed) */
   hideTable?: boolean;
+  /**
+   * Don't render the built-in toolbar (search, status filter, result count,
+   * refresh, column visibility, `rightContent`, `primaryAction`) at all — on
+   * desktop or phones. For consumers that own their own search/filter chrome.
+   * Opt-in; unset → toolbar renders exactly as before. Pagination unaffected.
+   * Mirrors `DataTableWithToolbar`'s `hideToolbar`.
+   */
+  hideToolbar?: boolean;
   /** Custom select component for status filter (apps can pass their own styled Select) */
   SelectComponent?: React.ComponentType<{
     value: string;
@@ -636,6 +644,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     toolbarLayout = 'single-row',
     enableStickyActions = true,
     hideTable = false,
+    hideToolbar = false,
     SelectComponent,
     renderRow,
     renderExpanded,
@@ -812,18 +821,20 @@ export function createBaseListTable(ui: DataTableUIComponents) {
 
     return (
       <div className="space-y-3">
-        <ListToolbar
-          search={search}
-          statusFilter={statusFilter}
-          onRefresh={onRefresh}
-          rightContent={rightContent}
-          resultLabel={resultLabel}
-          columnVisibilityControl={columnVisibilityDropdown}
-          layout={toolbarLayout}
-          SelectComponent={SelectComponent}
-          primaryAction={primaryAction}
-          mobile={isMobile ? { rightContent: mobileConfig.rightContent ?? 'sheet' } : undefined}
-        />
+        {!hideToolbar && (
+          <ListToolbar
+            search={search}
+            statusFilter={statusFilter}
+            onRefresh={onRefresh}
+            rightContent={rightContent}
+            resultLabel={resultLabel}
+            columnVisibilityControl={columnVisibilityDropdown}
+            layout={toolbarLayout}
+            SelectComponent={SelectComponent}
+            primaryAction={primaryAction}
+            mobile={isMobile ? { rightContent: mobileConfig.rightContent ?? 'sheet' } : undefined}
+          />
+        )}
 
         {!hideTable && cardMode && (
           isLoading ? (

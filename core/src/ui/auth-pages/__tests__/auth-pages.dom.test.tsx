@@ -177,3 +177,27 @@ describe('the pieces', () => {
     expect(screen.getByRole('link', { name: 'x' }).getAttribute('data-router')).toBe('1');
   });
 });
+
+describe('AuthShell offsets by the header height the theme sets', () => {
+  it('centres under the AppHeader height vars (48px phones / 64px md defaults), not a fixed 64px', () => {
+    const { container } = render(
+      <AuthShell topBar={<AuthTopBar brand={<Wordmark text="Cadra" accent="OS" />} />}>
+        <p>card</p>
+      </AuthShell>,
+    );
+    const body = container.querySelector('[data-slot="auth-shell-body"]')!;
+    const cls = body.className.split(/\s+/);
+    expect(cls).toEqual(
+      expect.arrayContaining([
+        'min-h-[calc(100dvh_-_var(--app-header-height-sm,3rem))]',
+        'md:min-h-[calc(100dvh_-_var(--app-header-height,4rem))]',
+      ]),
+    );
+    expect(body.className).not.toMatch(/64px|48px/);
+    // Same vars the header itself is sized by — one theme knob moves both.
+    const header = container.querySelector('header')!.className;
+    expect(header).toContain('h-[var(--app-header-height-sm,3rem)]');
+    expect(header).toContain('md:h-[var(--app-header-height,4rem)]');
+    expect(body.textContent).toBe('card');
+  });
+});

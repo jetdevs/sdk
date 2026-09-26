@@ -7,7 +7,7 @@ import * as React from 'react';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { AppHeader, BrandLockup, BrandMark, CadraMark, Wordmark, cadraBrand, isExternalHref, type BrandConfig } from '../index';
+import { APP_HEADER_CSS_VARS, AppHeader, BrandLockup, BrandMark, CadraMark, Wordmark, cadraBrand, isExternalHref, type BrandConfig } from '../index';
 import { AuthTopBar, Wordmark as AuthWordmark } from '../../auth-pages';
 
 afterEach(() => cleanup());
@@ -160,11 +160,34 @@ describe('AppHeader', () => {
     render(<AppHeader brand={cadraBrand} menu={<button>Menu</button>} />);
     const header = screen.getByTestId('app-header');
     const cls = header.className.split(/\s+/);
-    expect(cls).toEqual(expect.arrayContaining(['h-12', 'px-3', 'gap-2', 'md:h-16', 'md:px-6', 'md:gap-4', 'sticky', 'top-0', 'border-b', 'bg-background']));
+    expect(cls).toEqual(
+      expect.arrayContaining([
+        'h-[var(--app-header-height-sm,3rem)]',
+        'px-[var(--app-header-px-sm,0.75rem)]',
+        'gap-2',
+        'md:h-[var(--app-header-height,4rem)]',
+        'md:px-[var(--app-header-px,1.5rem)]',
+        'md:gap-4',
+        'sticky',
+        'top-0',
+        'border-b',
+        'bg-background',
+      ]),
+    );
     expect(header.querySelector('[data-slot="menu"]')!.className).toContain('md:hidden');
     // Mark: 28px phone, 32px desktop.
     const mark = screen.getByTestId('cadra-mark').getAttribute('class')!.split(/\s+/);
     expect(mark).toEqual(expect.arrayContaining(['h-7', 'w-7', 'md:h-8', 'md:w-8']));
+  });
+
+  it('reads height and gutter from theme variables, never hard-coded sizes (#16)', () => {
+    render(<AppHeader brand={cadraBrand} />);
+    const cls = screen.getByTestId('app-header').className.split(/\s+/);
+    // No fixed Tailwind size/gutter steps — the theme owns them.
+    for (const fixed of ['h-12', 'h-16', 'md:h-16', 'px-3', 'md:px-6']) expect(cls).not.toContain(fixed);
+    // Every var the class string reads is a documented, exported name.
+    const used = new Set(Array.from(cls.join(' ').matchAll(/var\((--[\w-]+)/g), (m) => m[1]));
+    expect([...used].sort()).toEqual(Object.values(APP_HEADER_CSS_VARS).sort());
   });
 
   it('keeps image marks at auto width at both sizes', () => {
@@ -195,9 +218,17 @@ describe('AuthTopBar is the AppHeader', () => {
     );
     const header = screen.getByTestId('app-header');
     const cls = header.className.split(/\s+/);
-    expect(cls).toEqual(expect.arrayContaining(['h-12', 'md:h-16', 'px-4', 'gap-4', 'md:px-6']));
+    expect(cls).toEqual(
+      expect.arrayContaining([
+        'h-[var(--app-header-height-sm,3rem)]',
+        'md:h-[var(--app-header-height,4rem)]',
+        'px-4',
+        'gap-4',
+        'md:px-[var(--app-header-px,1.5rem)]',
+      ]),
+    );
     expect(cls).not.toContain('h-16');
-    expect(cls).not.toContain('px-3');
+    expect(cls).not.toContain('px-[var(--app-header-px-sm,0.75rem)]');
     expect(screen.getByRole('link', { name: 'Go home' }).getAttribute('href')).toBe('/');
     expect(within(header.querySelector('[data-slot="right"]') as HTMLElement).getByText('Help')).toBeTruthy();
   });
