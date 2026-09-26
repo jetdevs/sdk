@@ -1,11 +1,13 @@
 /**
  * THE app header and brand mark (p90 batch 3d) — one header for every app on
- * the platform (cadra-web, Cadra/Yobo Connect), brand passed as data.
+ * the platform, brand passed as data. Core ships no product brand: each app
+ * defines its own `BrandConfig` in its own config.
  *
- *   import { AppHeader, BrandLockup, BrandMark, CadraMark, cadraBrand,
- *            Wordmark } from '@jetdevs/core/ui/app-header';
+ *   // appBrand: BrandConfig, defined in the app's own config
+ *   import { AppHeader, BrandLockup, BrandMark, Wordmark,
+ *            type BrandConfig } from '@jetdevs/core/ui/app-header';
  *
- *   <AppHeader brand={cadraBrand} logoHref="/dashboard" linkComponent={Link}
+ *   <AppHeader brand={appBrand} logoHref="/dashboard" linkComponent={Link}
  *              right={<><Credits /><Language /><UserMenu /></>} />
  *
  * Theme: height/gutter come from `--app-header-height-sm`, `--app-header-height`,
@@ -19,9 +21,7 @@ export { APP_HEADER_CSS_VARS, AppHeader, isExternalHref, type AppHeaderProps } f
 export {
   BrandLockup,
   BrandMark,
-  CadraMark,
   Wordmark,
-  cadraBrand,
   type BrandConfig,
   type BrandLockupProps,
   type BrandMarkProps,

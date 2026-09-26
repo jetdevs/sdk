@@ -7,12 +7,20 @@ import * as React from 'react';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { APP_HEADER_CSS_VARS, AppHeader, BrandLockup, BrandMark, CadraMark, Wordmark, cadraBrand, isExternalHref, type BrandConfig } from '../index';
+import * as appHeader from '../index';
+import { APP_HEADER_CSS_VARS, AppHeader, BrandLockup, BrandMark, Wordmark, isExternalHref, type BrandConfig } from '../index';
 import { AuthTopBar, Wordmark as AuthWordmark } from '../../auth-pages';
 
 afterEach(() => cleanup());
 
-const yoboBrand: BrandConfig = { name: 'Yobo', markSrc: '/yobo-logo-black.png', markSrcDark: '/yobo-logo.png' };
+// Test-only brands. Core ships no product brand; each app defines its own.
+const textBrand: BrandConfig = { name: 'Acme HQ', text: 'Acme', accent: 'HQ' };
+const imageBrand: BrandConfig = { name: 'Logo Co', markSrc: '/logo-light.png', markSrcDark: '/logo-dark.png' };
+
+/** A stand-in app mark component, the way an app passes its own SVG. */
+function TestMark({ className }: { className?: string }) {
+  return <svg className={className} data-testid="test-mark" />;
+}
 
 /** A stand-in for next/link, to prove the app's router link is used. */
 const FakeLink = React.forwardRef<HTMLAnchorElement, React.AnchorHTMLAttributes<HTMLAnchorElement>>(
@@ -21,29 +29,19 @@ const FakeLink = React.forwardRef<HTMLAnchorElement, React.AnchorHTMLAttributes<
   },
 );
 
-describe('CadraMark / BrandMark', () => {
-  it('gives each CadraMark its own gradient id', () => {
-    const { container } = render(
-      <>
-        <CadraMark />
-        <CadraMark />
-      </>,
+describe('core ships no product brand', () => {
+  it('exports no brand constant or logo component — apps define their own', () => {
+    const names = Object.keys(appHeader);
+    expect(names.filter((n) => /cadra|yobo/i.test(n))).toEqual([]);
+    expect(names.sort()).toEqual(
+      ['APP_HEADER_CSS_VARS', 'AppHeader', 'BrandLockup', 'BrandMark', 'Wordmark', 'isExternalHref'].sort(),
     );
-    const ids = Array.from(container.querySelectorAll('linearGradient')).map((g) => g.id);
-    expect(ids).toHaveLength(2);
-    expect(ids[0]).not.toBe(ids[1]);
   });
+});
 
-  it('is decorative without a title and an img with one', () => {
-    const { container } = render(<CadraMark />);
-    expect(container.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true');
-    cleanup();
-    render(<CadraMark title="CadraOS" />);
-    expect(screen.getByRole('img', { name: 'CadraOS' })).toBeTruthy();
-  });
-
+describe('BrandMark', () => {
   it('renders a light + dark image pair for an image brand', () => {
-    render(<BrandMark markSrc="/a.png" markSrcDark="/b.png" alt="Yobo" />);
+    render(<BrandMark markSrc="/a.png" markSrcDark="/b.png" alt="Logo Co" />);
     const light = screen.getByTestId('brand-mark-img');
     const dark = screen.getByTestId('brand-mark-img-dark');
     expect(light.getAttribute('src')).toBe('/a.png');
@@ -62,17 +60,17 @@ describe('CadraMark / BrandMark', () => {
 });
 
 describe('BrandLockup', () => {
-  it('draws the Cadra wordmark only — "Cadra" + "OS" in text-primary, no icon (the icon is the favicon)', () => {
-    const { container } = render(<BrandLockup {...cadraBrand} />);
-    expect(screen.queryByTestId('cadra-mark')).toBeNull();
-    expect(container.textContent).toBe('CadraOS');
-    expect(container.innerHTML).toContain('<span class="text-primary">OS</span>');
+  it('draws a wordmark-only brand — text + accent in text-primary, no mark', () => {
+    const { container } = render(<BrandLockup {...textBrand} />);
+    expect(container.querySelector('svg, img')).toBeNull();
+    expect(container.textContent).toBe('AcmeHQ');
+    expect(container.innerHTML).toContain('<span class="text-primary">HQ</span>');
   });
 
-  it('uses a logo image alone, alt = brand name, for a brand with no wordmark (Yobo)', () => {
-    render(<BrandLockup {...yoboBrand} />);
-    const imgs = screen.getAllByAltText('Yobo');
-    expect(imgs.map((i) => i.getAttribute('src'))).toEqual(['/yobo-logo-black.png', '/yobo-logo.png']);
+  it('uses a logo image alone, alt = brand name, for a brand with no wordmark', () => {
+    render(<BrandLockup {...imageBrand} />);
+    const imgs = screen.getAllByAltText('Logo Co');
+    expect(imgs.map((i) => i.getAttribute('src'))).toEqual(['/logo-light.png', '/logo-dark.png']);
   });
 
   it('labels a mark-only node brand for screen readers', () => {
@@ -81,8 +79,8 @@ describe('BrandLockup', () => {
   });
 
   it('applies markClassName to the mark', () => {
-    render(<BrandLockup {...cadraBrand} mark={<CadraMark />} markClassName="h-7 w-7" />);
-    const cls = screen.getByTestId('cadra-mark').getAttribute('class')!;
+    render(<BrandLockup {...textBrand} mark={<TestMark />} markClassName="h-7 w-7" />);
+    const cls = screen.getByTestId('test-mark').getAttribute('class')!;
     expect(cls).toContain('h-7');
     expect(cls).not.toContain('h-8');
   });
@@ -94,43 +92,43 @@ describe('BrandLockup', () => {
 
 describe('AppHeader', () => {
   it('renders the brand lockup linking to logoHref through the app router link', () => {
-    render(<AppHeader brand={cadraBrand} logoHref="/dashboard" linkComponent={FakeLink} />);
-    const link = screen.getByRole('link', { name: `${cadraBrand.name} home` });
+    render(<AppHeader brand={textBrand} logoHref="/dashboard" linkComponent={FakeLink} />);
+    const link = screen.getByRole('link', { name: `${textBrand.name} home` });
     expect(link.getAttribute('href')).toBe('/dashboard');
     expect(link.hasAttribute('data-router-link')).toBe(true);
     expect(within(link).getByTestId('brand-lockup')).toBeTruthy();
   });
 
   it('defaults the link to brand.href, then "/"', () => {
-    render(<AppHeader brand={{ ...cadraBrand, href: '/apps' }} />);
+    render(<AppHeader brand={{ ...textBrand, href: '/apps' }} />);
     expect(screen.getByRole('link').getAttribute('href')).toBe('/apps');
     cleanup();
-    render(<AppHeader brand={cadraBrand} />);
+    render(<AppHeader brand={textBrand} />);
     expect(screen.getByRole('link').getAttribute('href')).toBe('/');
   });
 
   it('never routes an absolute URL through the router link', () => {
-    render(<AppHeader brand={cadraBrand} logoHref="https://cadraos.com" linkComponent={FakeLink} logoLabel="CadraOS home" />);
-    const link = screen.getByRole('link', { name: 'CadraOS home' });
-    expect(link.getAttribute('href')).toBe('https://cadraos.com');
+    render(<AppHeader brand={textBrand} logoHref="https://acme.example" linkComponent={FakeLink} logoLabel="Acme home" />);
+    const link = screen.getByRole('link', { name: 'Acme home' });
+    expect(link.getAttribute('href')).toBe('https://acme.example');
     expect(link.hasAttribute('data-router-link')).toBe(false);
     expect(isExternalHref('http://x.y')).toBe(true);
     expect(isExternalHref('/dashboard')).toBe(false);
   });
 
   it('lets `logo` replace the lockup, and `logo={null}` show no brand at all', () => {
-    render(<AppHeader brand={cadraBrand} logo={<img src="/org.png" alt="Org" />} />);
+    render(<AppHeader brand={textBrand} logo={<img src="/org.png" alt="Org" />} />);
     expect(screen.getByAltText('Org')).toBeTruthy();
     expect(screen.queryByTestId('brand-lockup')).toBeNull();
     cleanup();
-    render(<AppHeader brand={cadraBrand} logo={null} />);
+    render(<AppHeader brand={textBrand} logo={null} />);
     expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('renders menu, nav and right slots in order: menu, brand, nav, spacer, right', () => {
     render(
       <AppHeader
-        brand={cadraBrand}
+        brand={textBrand}
         menu={<button>Menu</button>}
         nav={<a href="/apps">Back to your apps</a>}
         right={
@@ -149,7 +147,7 @@ describe('AppHeader', () => {
   });
 
   it('omits empty slots', () => {
-    render(<AppHeader brand={cadraBrand} />);
+    render(<AppHeader brand={textBrand} />);
     const header = screen.getByTestId('app-header');
     expect(header.querySelector('[data-slot="menu"]')).toBeNull();
     expect(header.querySelector('[data-slot="nav"]')).toBeNull();
@@ -157,7 +155,7 @@ describe('AppHeader', () => {
   });
 
   it('is 48px on phones and 64px from md up, with the menu trigger phone-only', () => {
-    render(<AppHeader brand={cadraBrand} menu={<button>Menu</button>} />);
+    render(<AppHeader brand={textBrand} menu={<button>Menu</button>} />);
     const header = screen.getByTestId('app-header');
     const cls = header.className.split(/\s+/);
     expect(cls).toEqual(
@@ -175,12 +173,12 @@ describe('AppHeader', () => {
       ]),
     );
     expect(header.querySelector('[data-slot="menu"]')!.className).toContain('md:hidden');
-    // Cadra header = wordmark only; no mark rendered.
-    expect(screen.queryByTestId('cadra-mark')).toBeNull();
+    // Wordmark-only brand: no mark rendered.
+    expect(header.querySelector('[data-slot="brand"] svg, [data-slot="brand"] img')).toBeNull();
   });
 
   it('reads height and gutter from theme variables, never hard-coded sizes (#16)', () => {
-    render(<AppHeader brand={cadraBrand} />);
+    render(<AppHeader brand={textBrand} />);
     const cls = screen.getByTestId('app-header').className.split(/\s+/);
     // No fixed Tailwind size/gutter steps — the theme owns them.
     for (const fixed of ['h-12', 'h-16', 'md:h-16', 'px-3', 'md:px-6']) expect(cls).not.toContain(fixed);
@@ -190,7 +188,7 @@ describe('AppHeader', () => {
   });
 
   it('keeps image marks at auto width at both sizes', () => {
-    render(<AppHeader brand={yoboBrand} />);
+    render(<AppHeader brand={imageBrand} />);
     const img = screen.getByTestId('brand-mark-img').className.split(/\s+/);
     expect(img).toEqual(expect.arrayContaining(['h-7', 'md:h-8', 'w-auto']));
     expect(img).not.toContain('w-7');
@@ -198,7 +196,7 @@ describe('AppHeader', () => {
 
   it('uses theme tokens only — no palette colours or hex in the chrome', () => {
     const { container } = render(
-      <AppHeader brand={yoboBrand} menu={<button>Menu</button>} nav={<span>Back office</span>} right={<span>x</span>} />,
+      <AppHeader brand={imageBrand} menu={<button>Menu</button>} nav={<span>Back office</span>} right={<span>x</span>} />,
     );
     const classes = Array.from(container.querySelectorAll('[class]'))
       .map((el) => el.getAttribute('class'))
@@ -211,7 +209,7 @@ describe('AppHeader', () => {
 describe('AuthTopBar is the AppHeader', () => {
   it('renders the shared header, 48px on phones like the app, with children on the right', () => {
     render(
-      <AuthTopBar brand={<Wordmark text="Cadra" accent="OS" />} href="/" aria-label="Go home">
+      <AuthTopBar brand={<Wordmark text="Acme" accent="HQ" />} href="/" aria-label="Go home">
         <button>Help</button>
       </AuthTopBar>,
     );
