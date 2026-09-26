@@ -66,7 +66,7 @@ export function AppHeader({
   brand,
   logo,
   logoHref,
-  logoLabel = 'Home',
+  logoLabel,
   linkComponent,
   menu,
   nav,
@@ -95,7 +95,7 @@ export function AppHeader({
         </div>
       ) : null}
       {brandNode != null && brandNode !== false ? (
-        <LinkComponent href={href} className="flex shrink-0 items-center gap-2" aria-label={logoLabel} data-slot="brand">
+        <LinkComponent href={href} className="flex shrink-0 items-center gap-2" aria-label={logoLabel ?? (brand?.name ? `${brand.name} home` : 'Home')} data-slot="brand">
           {brandNode}
         </LinkComponent>
       ) : null}

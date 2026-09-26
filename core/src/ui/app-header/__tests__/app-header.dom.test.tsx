@@ -95,7 +95,7 @@ describe('BrandLockup', () => {
 describe('AppHeader', () => {
   it('renders the brand lockup linking to logoHref through the app router link', () => {
     render(<AppHeader brand={cadraBrand} logoHref="/dashboard" linkComponent={FakeLink} />);
-    const link = screen.getByRole('link', { name: 'Home' });
+    const link = screen.getByRole('link', { name: `${cadraBrand.name} home` });
     expect(link.getAttribute('href')).toBe('/dashboard');
     expect(link.hasAttribute('data-router-link')).toBe(true);
     expect(within(link).getByTestId('brand-lockup')).toBeTruthy();
@@ -187,7 +187,7 @@ describe('AppHeader', () => {
 });
 
 describe('AuthTopBar is the AppHeader', () => {
-  it('renders the shared header, still 64px on phones, with children on the right', () => {
+  it('renders the shared header, 48px on phones like the app, with children on the right', () => {
     render(
       <AuthTopBar brand={<Wordmark text="Cadra" accent="OS" />} href="/" aria-label="Go home">
         <button>Help</button>
@@ -195,8 +195,8 @@ describe('AuthTopBar is the AppHeader', () => {
     );
     const header = screen.getByTestId('app-header');
     const cls = header.className.split(/\s+/);
-    expect(cls).toEqual(expect.arrayContaining(['h-16', 'px-4', 'gap-4', 'md:px-6']));
-    expect(cls).not.toContain('h-12');
+    expect(cls).toEqual(expect.arrayContaining(['h-12', 'md:h-16', 'px-4', 'gap-4', 'md:px-6']));
+    expect(cls).not.toContain('h-16');
     expect(cls).not.toContain('px-3');
     expect(screen.getByRole('link', { name: 'Go home' }).getAttribute('href')).toBe('/');
     expect(within(header.querySelector('[data-slot="right"]') as HTMLElement).getByText('Help')).toBeTruthy();

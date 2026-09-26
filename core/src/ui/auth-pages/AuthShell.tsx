@@ -47,10 +47,10 @@ export function AuthTopBar({ brand, href = '/', linkComponent, children, ...rest
     <AppHeader
       logo={brand}
       logoHref={href}
-      logoLabel={rest['aria-label'] ?? 'Home'}
+      logoLabel={rest['aria-label']}
       linkComponent={linkComponent}
       right={children}
-      className="h-16 gap-4 px-4"
+      className="gap-4 px-4"
     />
   );
 }
