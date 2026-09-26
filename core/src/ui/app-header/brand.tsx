@@ -74,10 +74,15 @@ export function CadraMark({ className, title }: { className?: string; title?: st
   );
 }
 
-/** Cadra's brand, ready to pass to `BrandLockup` / `AppHeader`. */
+/**
+ * Cadra's brand, ready to pass to `BrandLockup` / `AppHeader`.
+ *
+ * Wordmark only (Sean 2026-09-26: "remove the icon from the logo in the header.
+ * Just use the icon in the favicon"). `CadraMark` stays exported for the
+ * favicon / app icons and anywhere a square mark is needed on its own.
+ */
 export const cadraBrand: BrandConfig = {
   name: 'CadraOS',
-  mark: <CadraMark />,
   text: 'Cadra',
   accent: 'OS',
 };
