@@ -18,6 +18,14 @@ import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { PaginationConfig } from './BaseListTable';
 import { getAlignCellClass } from './column-meta';
+import {
+    FilterIcon,
+    MobileRowList,
+    MobileSheet,
+    MobileSheetField,
+    useIsMobileList,
+    type MobileListOption,
+} from './mobile';
 
 // =============================================================================
 // SVG ICONS - Built-in to avoid lucide-react dependency in this component
@@ -284,6 +292,13 @@ export interface DataTableWithToolbarConfig<TData> {
   defaultPageSize?: number;
   /** Initial column visibility state (e.g., { columnId: false } to hide a column by default) */
   initialColumnVisibility?: VisibilityState;
+  /**
+   * Phone layout (p90): below `md`, rows render as compact divider-separated
+   * lines (title + one status line + ⋯) and the toolbar collapses to search +
+   * one filters button. `false` keeps the table on phones. Overridable per
+   * render via the `mobile` prop.
+   */
+  mobile?: MobileListOption;
 }
 
 /**
@@ -423,6 +438,9 @@ export interface DataTableWithToolbarProps<TData> {
    * Renders a small spinner in the toolbar without swapping in the skeleton.
    */
   isFetching?: boolean;
+
+  /** Phone layout override (see `DataTableWithToolbarConfig.mobile`). */
+  mobile?: MobileListOption;
 }
 
 /**
@@ -498,6 +516,7 @@ export function createDataTableWithToolbar<TData>(
     pageSizeOptions = [10, 20, 30, 40, 50],
     defaultPageSize = 10,
     initialColumnVisibility = {},
+    mobile: configMobile,
   } = config;
 
   const {
@@ -579,7 +598,17 @@ export function createDataTableWithToolbar<TData>(
     onExportData,
     resultLabel,
     isFetching,
+    mobile: propMobile,
   }: DataTableWithToolbarProps<TData>) {
+    // Phone layout (p90). Always false on the server and ≥ md, so desktop
+    // takes exactly the pre-p90 path below.
+    const mobile = propMobile !== undefined ? propMobile : configMobile;
+    const isMobile = useIsMobileList(mobile !== false);
+    const mobileConfig = mobile || {};
+    // renderRow consumers own their row layout — only the toolbar goes compact.
+    const cardMode = isMobile && !renderRow;
+    const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+    const closeFilterSheet = React.useCallback(() => setFilterSheetOpen(false), []);
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
@@ -841,11 +870,123 @@ export function createDataTableWithToolbar<TData>(
       return <TableSkeleton columnCount={columns.length} />;
     }
 
+    // Nothing to page through: no rows on the first page ("Page 1 of 0").
+    const hidePagination =
+      table.getRowModel().rows.length === 0 && table.getState().pagination.pageIndex === 0;
+
+    const renderSearchInput = (className: string) =>
+      serverSearch ? (
+        <Input
+          placeholder={serverSearch.placeholder ?? `Search ${entityName}...`}
+          value={searchInput}
+          onChange={(event) => setSearchInput(String(event.target.value))}
+          className={className}
+        />
+      ) : (
+        <Input
+          placeholder={`Search ${entityName}...`}
+          value={globalFilter ?? ''}
+          onChange={(event) => setGlobalFilter(String(event.target.value))}
+          className={className}
+        />
+      );
+
+    // Phones (p90): one row — full-width search + one filters button. Export,
+    // view/density, column toggles, refresh and the result count are not shown;
+    // filters live in a bottom sheet. No wrapper box.
+    const hasMobileFilters = Boolean(serverFilters?.length || filterColumns.length);
+    const mobileToolbar = (
+      <div data-slot="list-toolbar-mobile" className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          {renderSearchInput('pl-8 w-full')}
+        </div>
+        {isFetching && (
+          <span
+            aria-label="Loading"
+            className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+          />
+        )}
+        {hasMobileFilters && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="relative h-9 w-9 shrink-0 p-0"
+            onClick={() => setFilterSheetOpen(true)}
+          >
+            <FilterIcon className="h-4 w-4" />
+            <span className="sr-only">Filters</span>
+            {(columnFilters.length > 0 || serverFilters?.some((f) => f.value !== 'all')) && (
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary" />
+            )}
+          </Button>
+        )}
+        {hasMobileFilters && (
+          <MobileSheet open={filterSheetOpen} onClose={closeFilterSheet} title="Filters">
+            {serverFilters?.map((filterConfig) => (
+              <MobileSheetField key={filterConfig.id} label={filterConfig.label}>
+                <Select value={filterConfig.value} onValueChange={filterConfig.onChange}>
+                  <SelectTrigger className="w-full">
+                    {filterConfig.renderValue ? (
+                      <SelectValue>{filterConfig.renderValue(filterConfig.value)}</SelectValue>
+                    ) : (
+                      <SelectValue placeholder={filterConfig.label} />
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filterConfig.options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </MobileSheetField>
+            ))}
+            {filterColumns.map((filterConfig) => (
+              <MobileSheetField key={filterConfig.columnId} label={filterConfig.label}>
+                <Select
+                  value={(table.getColumn(filterConfig.columnId)?.getFilterValue() as string) ?? 'all'}
+                  onValueChange={(value) =>
+                    table.getColumn(filterConfig.columnId)?.setFilterValue(
+                      value === 'all' ? undefined : value === 'true' ? true : value === 'false' ? false : value
+                    )
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={filterConfig.label} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filterConfig.options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </MobileSheetField>
+            ))}
+            <div className="flex items-center justify-end gap-2 pt-2">
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  Clear
+                </Button>
+              )}
+              <Button size="sm" onClick={closeFilterSheet}>
+                Done
+              </Button>
+            </div>
+          </MobileSheet>
+        )}
+      </div>
+    );
+
     return (
       <div className="space-y-4">
         {/* Toolbar — suppressed when `hideToolbar` (consumer owns its own
             search/count chrome). GATED: byte-identical render when unset. */}
-        {!hideToolbar && (
+        {!hideToolbar && isMobile && mobileToolbar}
+        {!hideToolbar && !isMobile && (
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             {/* Search — server-driven (debounced) when `search` is supplied,
@@ -1037,7 +1178,13 @@ export function createDataTableWithToolbar<TData>(
 
         {/* Bulk Actions Bar */}
         {hasSelection && bulkActions.length > 0 && (
-          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
+          <div
+            className={
+              isMobile
+                ? 'flex flex-wrap items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg border'
+                : 'flex items-center justify-between p-3 bg-muted/50 rounded-lg border'
+            }
+          >
             <div className="flex items-center space-x-2">
               <Badge variant="secondary">
                 {selectedRows.length} selected
@@ -1077,7 +1224,13 @@ export function createDataTableWithToolbar<TData>(
             consumer-styled cards instead of the bordered table. Each renderRow
             output owns its own rounded/border/bg/padding; `space-y` is the gap.
             Pagination / sort / expand state still come from the table instance. */}
-        {renderRow && rowLayout === 'cards' ? (
+        {cardMode ? (
+          <MobileRowList
+            table={table}
+            config={mobileConfig}
+            empty={<div className="text-sm text-muted-foreground">No {entityName} found.</div>}
+          />
+        ) : renderRow && rowLayout === 'cards' ? (
           <div className="space-y-2">
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row, index) => {
@@ -1211,7 +1364,33 @@ export function createDataTableWithToolbar<TData>(
         </div>
         )}
 
-        {/* Pagination */}
+        {/* Pagination — phones: prev · Page x of y · next only. */}
+        {!hidePagination && isMobile && (
+          <div data-slot="mobile-pagination" className="flex items-center justify-center gap-3 py-2">
+            <Button
+              variant="outline"
+              className="h-9 w-9 p-0"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <span className="sr-only">Go to previous page</span>
+              <ChevronLeftIcon className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            </span>
+            <Button
+              variant="outline"
+              className="h-9 w-9 p-0"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              <span className="sr-only">Go to next page</span>
+              <ChevronRightIcon className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        {!hidePagination && !isMobile && (
         <div className="flex items-center justify-between space-x-2 py-4">
           <div className="flex items-center space-x-2">
             <p className="text-sm font-medium">Rows per page</p>
@@ -1278,6 +1457,7 @@ export function createDataTableWithToolbar<TData>(
             </div>
           </div>
         </div>
+        )}
 
         {/* External Dialog (e.g., for bulk delete confirmation) */}
         {renderDialog && renderDialog({
