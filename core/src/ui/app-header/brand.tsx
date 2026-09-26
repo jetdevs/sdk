@@ -6,86 +6,37 @@
  * components.").
  *
  * Brand-agnostic: a brand is data (`BrandConfig`) — a mark node or image, an
- * optional text wordmark, a name. Cadra's SVG mark ships as `CadraMark` and
- * `cadraBrand`; Yobo (cadra-auth's other instance) passes its own images.
+ * optional text wordmark, a name. Core ships NO product brand, logo or brand
+ * colour (Sean 2026-09-26: "many apps use core sdk. no single logo should be
+ * configured in core sdk"): each app defines its own `BrandConfig` (and any
+ * mark component) in its own config and passes it in.
  *
- * Colours: chrome uses theme tokens only (`text-primary` for the accent,
- * inherited `currentColor` for the wordmark). The hex values inside
- * `CadraMark` ARE the logo art (cadraos.com favicon.svg), not chrome.
+ * Colours: theme tokens only (`text-primary` for the accent, inherited
+ * `currentColor` for the wordmark).
  */
 
 import * as React from 'react';
 import { cn } from '../../lib';
 
 export interface BrandConfig {
-  /** Accessible brand name, e.g. "CadraOS" or "Yobo". Used as the image alt / screen-reader label. */
+  /** Accessible brand name, e.g. "Acme". Used as the image alt / screen-reader label. */
   name: string;
-  /** The mark as a node, e.g. `<CadraMark />`. Wins over `markSrc`. */
+  /** The mark as a node, e.g. an app's own SVG component. Wins over `markSrc`. */
   mark?: React.ReactNode;
   /**
-   * The mark as an image URL. With no `text`, this is a full logo (Yobo's
-   * PNG, a tenant/org logo) and is drawn at logo width.
+   * The mark as an image URL. With no `text`, this is a full logo (a PNG
+   * logo, a tenant/org logo) and is drawn at logo width.
    */
   markSrc?: string;
   /** Dark-mode image. Defaults to `markSrc`. */
   markSrcDark?: string;
-  /** Text wordmark beside the mark, e.g. "Cadra". */
+  /** Text wordmark beside the mark, e.g. "Acme". */
   text?: string;
-  /** Suffix drawn in `text-primary`, e.g. "OS". */
+  /** Suffix drawn in `text-primary`, e.g. "HQ". */
   accent?: string;
   /** Default link target when the header is given no `logoHref`. */
   href?: string;
 }
-
-/**
- * Cadra's mark — the same art as cadraos.com's favicon.svg: a dark rounded
- * tile with a teal→sky gradient "C". The tile carries its own background, so
- * it reads on light and dark themes. Gradient id is per instance (useId).
- */
-export function CadraMark({ className, title }: { className?: string; title?: string }) {
-  const gradientId = `cadra-mark-${React.useId().replace(/:/g, '')}`;
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 64 64"
-      className={cn('h-8 w-8 shrink-0', className)}
-      role={title ? 'img' : undefined}
-      aria-hidden={title ? undefined : true}
-      aria-label={title}
-      data-testid="cadra-mark"
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#2dd4bf" />
-          <stop offset="1" stopColor="#0ea5e9" />
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="14" fill="#0a0d12" />
-      <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="none" stroke="#2dd4bf" strokeOpacity="0.25" />
-      <path
-        d="M44 21.5a16 16 0 1 0 0 21"
-        fill="none"
-        stroke={`url(#${gradientId})`}
-        strokeWidth="7"
-        strokeLinecap="round"
-      />
-      <circle cx="46" cy="32" r="4.2" fill={`url(#${gradientId})`} />
-    </svg>
-  );
-}
-
-/**
- * Cadra's brand, ready to pass to `BrandLockup` / `AppHeader`.
- *
- * Wordmark only (Sean 2026-09-26: "remove the icon from the logo in the header.
- * Just use the icon in the favicon"). `CadraMark` stays exported for the
- * favicon / app icons and anywhere a square mark is needed on its own.
- */
-export const cadraBrand: BrandConfig = {
-  name: 'CadraOS',
-  text: 'Cadra',
-  accent: 'OS',
-};
 
 export interface BrandMarkProps extends Pick<BrandConfig, 'mark' | 'markSrc' | 'markSrcDark'> {
   /** Alt text for an image mark. Omit (decorative) when a visible wordmark sits beside it. */
@@ -95,7 +46,7 @@ export interface BrandMarkProps extends Pick<BrandConfig, 'mark' | 'markSrc' | '
 }
 
 /**
- * A brand's mark: its node (e.g. `CadraMark`), or its image with an optional
+ * A brand's mark: its node (e.g. an app's SVG component), or its image with an optional
  * dark-mode variant. Renders nothing when the brand has neither.
  */
 export function BrandMark({ mark, markSrc, markSrcDark, alt = '', className }: BrandMarkProps) {
@@ -118,14 +69,14 @@ export function BrandMark({ mark, markSrc, markSrcDark, alt = '', className }: B
   );
 }
 
-/** The text wordmark: `Cadra` + `OS` with the suffix in the theme's primary colour. */
+/** The text wordmark: `text` + `accent` with the suffix in the theme's primary colour. */
 export function Wordmark({
   text,
   accent,
   className,
 }: {
   text: string;
-  /** The suffix drawn in `text-primary`, e.g. "OS". */
+  /** The suffix drawn in `text-primary`, e.g. "HQ". */
   accent?: string;
   className?: string;
 }) {
