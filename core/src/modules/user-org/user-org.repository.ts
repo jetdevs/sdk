@@ -596,6 +596,17 @@ export function createUserOrgRepository(
     ): Promise<AssignableRole[]> {
       const { category = 'user' } = options;
 
+      // Role category is OPTIONAL schema. Core's own `roles` table has no
+      // `roleCategory` column and no consumer DB carries `role_category`
+      // (cadra-web added it in 0016 and dropped it in 0018). Filtering on the
+      // missing column built `and  = $2` — invalid SQL that broke the Users
+      // dialog role picker. Only filter when the table passed in defines it.
+      const roleCategoryColumn = (roles as { roleCategory?: unknown }).roleCategory;
+      if (!roleCategoryColumn && category === 'service') {
+        // No category column → no service roles can exist.
+        return [];
+      }
+
       return withTelemetry(
         'user-org-repo.getAvailableRolesForOrg',
         async () => {
@@ -605,8 +616,8 @@ export function createUserOrgRepository(
             .where(
               and(
                 eq(roles.isActive, true),
-                // Filter by role category (default: 'user')
-                eq(roles.roleCategory, category),
+                // Filter by role category (default: 'user') when the column exists
+                roleCategoryColumn ? eq(roleCategoryColumn as any, category) : undefined,
                 or(
                   eq(roles.orgId, orgId),
                   and(
