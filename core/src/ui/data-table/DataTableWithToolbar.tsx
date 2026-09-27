@@ -26,6 +26,11 @@ import {
     useIsMobileList,
     type MobileListOption,
 } from './mobile';
+import {
+    createStandardListToolbar,
+    type StandardToolbarConfig,
+    type StandardToolbarFilter,
+} from './standard-toolbar';
 
 // =============================================================================
 // SVG ICONS - Built-in to avoid lucide-react dependency in this component
@@ -376,6 +381,19 @@ export interface DataTableWithToolbarProps<TData> {
    */
   hideToolbar?: boolean;
 
+  /**
+   * The standard list toolbar (p90): search with the filter menu INSIDE it,
+   * status chips, list/grid toggle. When set it REPLACES the built-in toolbar
+   * and also drops export, the View (columns/density) menu, refresh, the result
+   * count and the "Rows per page" select. Every field is optional:
+   *   - `search` defaults to the table's own search (server `search` if set,
+   *     else the client-side global filter);
+   *   - `filters` defaults to `serverFilters` + the config's `filterColumns`,
+   *     moved into the search box's filter menu.
+   * Opt-in; unset → the table renders exactly as before.
+   */
+  standardToolbar?: Partial<StandardToolbarConfig>;
+
   // ---------------------------------------------------------------------------
   // Server-side mode (OPT-IN, backwards-compatible).
   //
@@ -544,6 +562,16 @@ export function createDataTableWithToolbar<TData>(
     toast,
   } = ui;
 
+  const StandardListToolbar = createStandardListToolbar({
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuCheckboxItem,
+    SearchIcon,
+  });
+
   // =========================================================================
   // SKELETON COMPONENT
   // =========================================================================
@@ -599,6 +627,7 @@ export function createDataTableWithToolbar<TData>(
     resultLabel,
     isFetching,
     mobile: propMobile,
+    standardToolbar,
   }: DataTableWithToolbarProps<TData>) {
     // Phone layout (p90). Always false on the server and ≥ md, so desktop
     // takes exactly the pre-p90 path below.
@@ -981,12 +1010,45 @@ export function createDataTableWithToolbar<TData>(
       </div>
     );
 
+    // Standard toolbar (opt-in): the table's own search + filters, configured.
+    const standardToolbarNode = standardToolbar ? (
+      <StandardListToolbar
+        {...standardToolbar}
+        search={
+          standardToolbar.search ??
+          (serverSearch
+            ? { value: searchInput, onChange: setSearchInput, placeholder: serverSearch.placeholder ?? `Search ${entityName}...` }
+            : { value: globalFilter ?? '', onChange: setGlobalFilter, placeholder: `Search ${entityName}...` })
+        }
+        filters={
+          standardToolbar.filters ?? [
+            ...(serverFilters ?? []).map(
+              (f): StandardToolbarFilter => ({ id: f.id, label: f.label, value: f.value, options: f.options, onChange: f.onChange }),
+            ),
+            ...filterColumns.map(
+              (f): StandardToolbarFilter => ({
+                id: f.columnId,
+                label: f.label,
+                value: String(table.getColumn(f.columnId)?.getFilterValue() ?? 'all'),
+                options: f.options,
+                onChange: (value) =>
+                  table
+                    .getColumn(f.columnId)
+                    ?.setFilterValue(value === 'all' ? undefined : value === 'true' ? true : value === 'false' ? false : value),
+              }),
+            ),
+          ]
+        }
+      />
+    ) : null;
+
     return (
       <div className="space-y-4">
+        {!hideToolbar && standardToolbarNode}
         {/* Toolbar — suppressed when `hideToolbar` (consumer owns its own
             search/count chrome). GATED: byte-identical render when unset. */}
-        {!hideToolbar && isMobile && mobileToolbar}
-        {!hideToolbar && !isMobile && (
+        {!hideToolbar && !standardToolbar && isMobile && mobileToolbar}
+        {!hideToolbar && !standardToolbar && !isMobile && (
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             {/* Search — server-driven (debounced) when `search` is supplied,
@@ -1392,7 +1454,7 @@ export function createDataTableWithToolbar<TData>(
         )}
         {!hidePagination && !isMobile && (
         <div className="flex items-center justify-between space-x-2 py-4">
-          <div className="flex items-center space-x-2">
+          <div className={standardToolbar ? 'hidden' : 'flex items-center space-x-2'}>
             <p className="text-sm font-medium">Rows per page</p>
             <Select
               value={`${table.getState().pagination.pageSize}`}
