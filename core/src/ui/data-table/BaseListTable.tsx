@@ -25,6 +25,7 @@ import {
     useIsMobileList,
     type MobileListOption,
 } from './mobile';
+import { createStandardListToolbar, type StandardToolbarConfig } from './standard-toolbar';
 
 // =============================================================================
 // UI COMPONENT TYPES - Types for injected UI components
@@ -221,6 +222,18 @@ export interface BaseListTableProps<TData> {
    * phones (pass an icon + short label). Unset → desktop markup unchanged.
    */
   primaryAction?: React.ReactNode;
+
+  /**
+   * The standard list toolbar (p90): search with the filter menu INSIDE it,
+   * status chips (only with 2+ statuses), list/grid toggle (desktop, only when
+   * `view` is passed). When set it REPLACES the built-in toolbar, and the list
+   * also drops the column picker, refresh button, result count and the
+   * page-size select — so `search` / `statusFilter` / `onRefresh` /
+   * `resultLabel` / `rightContent` / `primaryAction` are ignored.
+   * `standardToolbar.search` falls back to the top-level `search`.
+   * Opt-in; unset → the list renders exactly as before.
+   */
+  standardToolbar?: StandardToolbarConfig;
 }
 
 // =============================================================================
@@ -291,6 +304,16 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     SortDescIcon,
     SortNeutralIcon,
   } = ui;
+
+  const StandardListToolbar = createStandardListToolbar({
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuCheckboxItem,
+    SearchIcon,
+  });
 
   // =============================================================================
   // AUTO-SORTABLE HEADER WRAPPER
@@ -654,6 +677,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     rowLayout: _rowLayout = 'list',
     mobile,
     primaryAction,
+    standardToolbar,
   }: BaseListTableProps<TData>) {
     // Phone layout (p90). Always false on the server and ≥ md, so desktop
     // takes exactly the pre-p90 path below.
@@ -821,7 +845,11 @@ export function createBaseListTable(ui: DataTableUIComponents) {
 
     return (
       <div className="space-y-3">
-        {!hideToolbar && (
+        {!hideToolbar && standardToolbar && (
+          <StandardListToolbar {...standardToolbar} search={standardToolbar.search ?? search} />
+        )}
+
+        {!hideToolbar && !standardToolbar && (
           <ListToolbar
             search={search}
             statusFilter={statusFilter}
@@ -1061,7 +1089,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                   <>Page {pagination.pageIndex + 1}</>
                 )}
               </p>
-              {pagination.onPageSizeChange && (
+              {pagination.onPageSizeChange && !standardToolbar && (
                 <select
                   value={String(pagination.pageSize)}
                   onChange={(e) => pagination.onPageSizeChange!(Number(e.target.value))}
