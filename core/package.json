@@ -144,6 +144,11 @@
       "import": "./dist/ui/app-header/index.js",
       "require": "./dist/ui/app-header/index.js"
     },
+    "./ui/select": {
+      "types": "./dist/ui/select/index.d.ts",
+      "import": "./dist/ui/select/index.js",
+      "require": "./dist/ui/select/index.js"
+    },
     "./hooks": {
       "types": "./dist/hooks/index.d.ts",
       "import": "./dist/hooks/index.js",
