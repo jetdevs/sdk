@@ -83,6 +83,7 @@ export {
   createDataTablePagination,
   createDataTableWithToolbar,
   createStandardListToolbar,
+  getToolbarColumns,
   StatusText,
 } from './data-table';
 
@@ -108,6 +109,7 @@ export type {
   StandardToolbarConfig,
   StandardToolbarFilter,
   StandardToolbarChips,
+  StandardToolbarColumn,
   StatusTone,
 } from './data-table';
 

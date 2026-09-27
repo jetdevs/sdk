@@ -4,12 +4,15 @@
  * The standard list toolbar — ONE fixed shape for every list page.
  *
  *   [ chips: All · <status> · <status> ]                       (only with 2+ choices)
- *   [ 🔍 Search <things>…                        ⚲ ]   [≣ ▦]   (⚲ only with filters,
- *                                                               ≣▦ only with a grid view, desktop)
+ *   [ 🔍 Search <things>…                        ⚲ ]   [⫼ Columns] [≣ ▦]
+ *     ⚲ only with filters · ⫼ only with hideable columns (icon-only on phones)
+ *     · ≣▦ only with a grid view, desktop
  *
- * What is deliberately NOT here (and cannot be added per page): a column picker,
- * a refresh button, separate filter selects, an item count, a page-size select.
- * Extra filters (source, space, type…) go INSIDE the search box's filter menu.
+ * What is deliberately NOT here (and cannot be added per page): a refresh
+ * button, separate filter selects, an item count. Extra filters (source,
+ * space, type…) go INSIDE the search box's filter menu. The page-size select
+ * stays in the table footer. Columns are HIDDEN, never deleted: the Columns
+ * menu brings back any column the page hides by default.
  *
  * Opt-in: `BaseListTable` / `DataTableWithToolbar` render this only when the
  * consumer passes `standardToolbar`; without it their toolbars are unchanged.
@@ -21,7 +24,8 @@
 
 import * as React from 'react';
 import { cn } from '../../lib';
-import { FilterIcon } from './mobile';
+import type { Column, Table } from '@tanstack/react-table';
+import { FilterIcon, getColumnLabel } from './mobile';
 import type { StatusOption } from './BaseListTable';
 
 // =============================================================================
@@ -54,6 +58,14 @@ export interface StandardToolbarChips {
 
 export type StandardToolbarView = 'list' | 'grid';
 
+/** One entry in the Columns menu. The list tables build these from their column visibility. */
+export interface StandardToolbarColumn {
+  id: string;
+  label: string;
+  visible: boolean;
+  onToggle: (visible: boolean) => void;
+}
+
 export interface StandardToolbarConfig {
   search?: {
     value: string;
@@ -73,7 +85,16 @@ export interface StandardToolbarConfig {
     listLabel?: string;
     gridLabel?: string;
   };
-  /** Prefix for data-testids (`<id>-search`, `<id>-filter`, `<id>-chips`). */
+  /**
+   * The Columns menu (show / hide columns). `BaseListTable` and
+   * `DataTableWithToolbar` fill this from the table's hideable columns unless
+   * `enableColumnVisibility` is false; pass `false` to turn it off for one page.
+   * Hidden when there is nothing to toggle.
+   */
+  columns?: StandardToolbarColumn[] | false;
+  /** Button text / accessible name of the Columns menu. Default "Columns". */
+  columnsLabel?: string;
+  /** Prefix for data-testids (`<id>-search`, `<id>-filter`, `<id>-chips`, `<id>-columns`). */
   testId?: string;
 }
 
@@ -113,6 +134,30 @@ export function hasActiveFilter(filters: StandardToolbarFilter[] | undefined): b
   return !!filters?.some((f) => f.value !== (f.emptyValue ?? 'all'));
 }
 
+/**
+ * The Columns-menu entries for a TanStack table: every column that can hide and
+ * is a real field (has an accessor or a `meta.label`) — so selection / actions
+ * columns never show up. Labels: `meta.label` → string header → humanized id.
+ */
+export function getToolbarColumns<TData>(
+  table: Table<TData>,
+  headerLabels?: Record<string, string>,
+): StandardToolbarColumn[] {
+  return table
+    .getAllLeafColumns()
+    .filter(
+      (column: Column<TData, unknown>) =>
+        column.getCanHide() &&
+        (typeof column.accessorFn !== 'undefined' || !!column.columnDef.meta?.label),
+    )
+    .map((column) => ({
+      id: column.id,
+      label: getColumnLabel(column, headerLabels),
+      visible: column.getIsVisible(),
+      onToggle: (visible: boolean) => column.toggleVisibility(visible),
+    }));
+}
+
 // =============================================================================
 // ICONS — inline so core needs no icon library
 // =============================================================================
@@ -138,6 +183,12 @@ const GridIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const ColumnsIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 3v18" /><path d="M15 3v18" />
+  </svg>
+);
+
 // =============================================================================
 // FACTORY
 // =============================================================================
@@ -153,7 +204,16 @@ export function createStandardListToolbar(ui: StandardToolbarUIComponents) {
   } = ui;
   const SearchIcon = ui.SearchIcon ?? DefaultSearchIcon;
 
-  function StandardListToolbar({ search, filters, filterLabel = 'Filters', chips, view, testId }: StandardToolbarConfig) {
+  function StandardListToolbar({
+    search,
+    filters,
+    filterLabel = 'Filters',
+    chips,
+    view,
+    columns,
+    columnsLabel = 'Columns',
+    testId,
+  }: StandardToolbarConfig) {
     const hasFilters = !!filters && filters.some((f) => f.options.length > 0);
     const filterOn = hasActiveFilter(filters);
     const showChips = shouldShowChips(chips);
@@ -240,8 +300,36 @@ export function createStandardListToolbar(ui: StandardToolbarUIComponents) {
       </div>
     ) : null;
 
+    const columnsMenu = columns && columns.length > 0 ? (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              'inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-lg text-sm text-muted-foreground transition-colors md:w-auto md:px-2.5',
+              'hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            )}
+            aria-label={columnsLabel}
+            data-testid={id('columns')}
+          >
+            <ColumnsIcon className="h-4 w-4" />
+            <span className="hidden md:inline">{columnsLabel}</span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="max-h-80 w-52 overflow-y-auto">
+          <DropdownMenuLabel>{columnsLabel}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {columns.map((col) => (
+            <DropdownMenuCheckboxItem key={col.id} checked={col.visible} onCheckedChange={(v) => col.onToggle(!!v)}>
+              {col.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ) : null;
+
     const viewToggle = view ? (
-      <div className="hidden shrink-0 rounded-md bg-muted p-0.5 md:ml-auto md:flex" data-testid="list-view-toggle">
+      <div className="hidden shrink-0 rounded-md bg-muted p-0.5 md:flex" data-testid="list-view-toggle">
         {(
           [
             ['list', view.listLabel ?? 'List view', ListIcon],
@@ -265,15 +353,20 @@ export function createStandardListToolbar(ui: StandardToolbarUIComponents) {
       </div>
     ) : null;
 
-    if (!chipRow && !searchBox && !viewToggle) return null;
+    if (!chipRow && !searchBox && !viewToggle && !columnsMenu) return null;
 
     return (
       <div className="space-y-3" data-slot="standard-list-toolbar" data-testid="list-toolbar">
         {chipRow}
-        {(searchBox || viewToggle) && (
+        {(searchBox || viewToggle || columnsMenu) && (
           <div className="flex items-center gap-3">
             {searchBox}
-            {viewToggle}
+            {(columnsMenu || viewToggle) && (
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                {columnsMenu}
+                {viewToggle}
+              </div>
+            )}
           </div>
         )}
       </div>
