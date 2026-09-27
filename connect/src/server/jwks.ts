@@ -1,8 +1,9 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 import type { ConnectIdTokenClaims, OidcDiscovery } from '../types/index.js'
+import { processState } from '../internal/process-state.js'
 
 // Module-level cache: one RemoteJWKSet per jwks_uri (reuses the jose internal key cache)
-const jwksSets = new Map<string, ReturnType<typeof createRemoteJWKSet>>()
+const jwksSets = processState('jwks.remoteSets', () => new Map<string, ReturnType<typeof createRemoteJWKSet>>())
 
 function getJwksSet(jwksUri: string): ReturnType<typeof createRemoteJWKSet> {
   if (!jwksSets.has(jwksUri)) {

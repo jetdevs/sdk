@@ -50,3 +50,17 @@ export type {
   TokenInvalidReason,
   ValidateTokenResult,
 } from './types';
+
+// p77: the gate `PasswordResetServiceDeps.credentialWriteGate` takes, and the
+// route face of its refusal (503 { error } + Retry-After: 60).
+export {
+  CredentialWriteRefusedError,
+  credentialWriteRefusedResponse,
+  isCredentialWriteRefused,
+} from '../auth/credential-write';
+
+export type {
+  CredentialWriteGate,
+  CredentialWriteGateContext,
+  CredentialWriteRefusalReason,
+} from '../auth/credential-write';

@@ -10,6 +10,7 @@
 import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
 import type { ResolveCredentialOwner } from '../auth/credential-owner';
 import type { OnCredentialWritten } from '../auth/credential-written';
+import type { CredentialWriteGate } from '../auth/credential-write';
 
 /** Minimal drizzle-like client the service needs. Kept loose so any driver fits. */
 export type PasswordResetDb = any;
@@ -112,6 +113,18 @@ export interface PasswordResetServiceDeps {
    * hook.
    */
   onCredentialWritten?: OnCredentialWritten;
+  /**
+   * p77 credential-write seam (D26). Asked by `resetPassword` AFTER the
+   * credential-owner resolver and the same-password check, BEFORE the hash,
+   * with `{ operation: 'reset-consume', db: null }`. A throw refuses: nothing
+   * is hashed, nothing written, the token stays unused, and the throw — a
+   * `CredentialWriteRefusedError` — propagates out of `resetPassword` for the
+   * app's route to answer with `credentialWriteRefusedResponse` (503
+   * `{ error: 'maintenance' }`, `Retry-After: 60`). The admitted write runs in
+   * `runPrivilegedTransaction` under the seam's three timeouts and 10 s commit
+   * deadline. Absent, every reset is admitted.
+   */
+  credentialWriteGate?: CredentialWriteGate;
   logger?: Pick<Console, 'error' | 'warn'>;
 }
 

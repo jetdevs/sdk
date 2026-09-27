@@ -13,6 +13,7 @@
  * tests in `repository.stored-email-case.test.ts` render REAL drizzle SQL.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { transactionalStub } from '../auth/__test-support__/transactional-stub';
 
 import { createAuthRouterConfig } from '../auth/router-config';
 import type { CredentialOwner } from '../auth/credential-owner';
@@ -66,7 +67,7 @@ function userCtx(overrides: Partial<{ input: any; userId: string; orgId: number 
     input: overrides.input,
     service: { db: {}, orgId: overrides.orgId ?? 1, userId: overrides.userId ?? '7' },
     actor: {},
-    db: { handle: 'the-db' },
+    db: transactionalStub({ handle: 'the-db' }),
     repo: new Repo({}),
     ctx: {},
   } as any;
@@ -88,7 +89,8 @@ describe('users router — onCredentialWritten fires once per successful write',
     expect(onCredentialWritten).toHaveBeenCalledTimes(1);
     expect(onCredentialWritten).toHaveBeenCalledWith(
       expect.objectContaining({
-        db: { handle: 'the-db' },
+        // p77: the write and the hook share the seam's transaction.
+        db: { handle: 'the-db:tx' },
         userId: 7,
         operation: 'change-password',
         actorUserId: 7,
@@ -223,12 +225,12 @@ describe('auth router — onCredentialWritten on register', () => {
     const { Repo, writes } = stubRepo({});
     const cfg: any = createAuthRouterConfig(deps({ Repository: Repo, onCredentialWritten }));
 
-    await cfg.register.handler({ input, repo: new (Repo as any)({}), db: { handle: 'the-db' } } as any);
+    await cfg.register.handler({ input, repo: new (Repo as any)({}), db: transactionalStub({ handle: 'the-db' }) } as any);
 
     expect(writes).toHaveLength(1);
     expect(onCredentialWritten).toHaveBeenCalledTimes(1);
     expect(onCredentialWritten).toHaveBeenCalledWith(
-      expect.objectContaining({ db: { handle: 'the-db' }, userId: 99, operation: 'register', firstSet: true }),
+      expect.objectContaining({ db: { handle: 'the-db:tx' }, userId: 99, operation: 'register', firstSet: true }),
     );
     // No session exists at registration, so there is no actor to name.
     expect(onCredentialWritten.mock.calls[0][0].actorUserId).toBeUndefined();
@@ -242,7 +244,7 @@ describe('auth router — onCredentialWritten on register', () => {
     );
 
     await cfg.register
-      .handler({ input, repo: new (Repo as any)({}), db: {} } as any)
+      .handler({ input, repo: new (Repo as any)({}), db: transactionalStub({}) } as any)
       .catch(() => undefined);
 
     if (owner.kind === 'none') {
@@ -260,7 +262,7 @@ describe('auth router — onCredentialWritten on register', () => {
     const cfg: any = createAuthRouterConfig(deps({ Repository: Repo, onCredentialWritten }));
 
     await expect(
-      cfg.register.handler({ input, repo: new (Repo as any)({}), db: {} } as any),
+      cfg.register.handler({ input, repo: new (Repo as any)({}), db: transactionalStub({}) } as any),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
     expect(onCredentialWritten).not.toHaveBeenCalled();
   });

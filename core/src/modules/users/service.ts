@@ -29,6 +29,10 @@ import {
   announceCredentialWritten,
   type OnCredentialWritten,
 } from '../auth/credential-written';
+import {
+  withCredentialWrite,
+  type CredentialWriteGate,
+} from '../auth/credential-write';
 import type {
     UserPermissionsData,
     UserRecord,
@@ -321,8 +325,20 @@ export interface UserServiceHooks {
    * that same callback and receives the privileged handle the write used — an
    * app recording an RLS-protected audit row needs exactly that handle.
    * Errors propagate. Same contract as `UserRouterDeps.onCredentialWritten`.
+   *
+   * p77: those writes now run inside `withCredentialWrite`'s transaction,
+   * opened on the privileged handle, so the hook receives that transaction.
    */
   onCredentialWritten?: OnCredentialWritten;
+
+  /**
+   * p77 credential-write seam (D26). Asked AFTER the credential-owner
+   * resolver and BEFORE any hash, by `invite` of a new user, `update` with a
+   * password and `changePassword`, with the privileged handle. A throw
+   * refuses: nothing hashed or written. Absent, every write is admitted. Same
+   * contract as `UserRouterDeps.credentialWriteGate`.
+   */
+  credentialWriteGate?: CredentialWriteGate;
 }
 
 /**
@@ -810,35 +826,37 @@ export function createUserService(deps: UserServiceDeps): IUserService {
           throw new CredentialOwnedElsewhereError(inviteOwner, 'invite');
         }
 
-        // Hash password if provided
-        let hashedPassword: string | null = null;
-        if (params.password) {
-          hashedPassword = await hooks.hashPassword(params.password, 12);
-        }
+        // p77 seam, on the privileged handle: gate, then hash + insert +
+        // announcement in one bounded transaction.
+        const createdUser = await hooks.withPrivilegedDb(async (db) =>
+          withCredentialWrite(hooks, { operation: 'invite', db }, async (tx) => {
+            const hashedPassword = params.password
+              ? await hooks.hashPassword(params.password, 12)
+              : null;
 
-        const createdUser = await hooks.withPrivilegedDb(async (db) => {
-          const repo = getRepo(db);
-          const created = await repo.create(db, {
-            ...params,
-            password: hashedPassword,
-            currentOrgId: sessionOrgId,
-          });
-
-          // Only an invite that CARRIED a password stored a verifier. Fired on
-          // the privileged handle the write used, inside the same callback.
-          if (hashedPassword) {
-            await announceCredentialWritten(hooks.onCredentialWritten, {
-              db,
-              userId: created.id,
-              operation: 'invite',
-              actorUserId: ctx.userId,
-              firstSet: true,
-              at: new Date(),
+            const repo = getRepo(tx);
+            const created = await repo.create(tx, {
+              ...params,
+              password: hashedPassword,
+              currentOrgId: sessionOrgId,
             });
-          }
 
-          return created;
-        });
+            // Only an invite that CARRIED a password stored a verifier. Fired
+            // on the transaction the write used.
+            if (hashedPassword) {
+              await announceCredentialWritten(hooks.onCredentialWritten, {
+                db: tx,
+                userId: created.id,
+                operation: 'invite',
+                actorUserId: ctx.userId,
+                firstSet: true,
+                at: new Date(),
+              });
+            }
+
+            return created;
+          }),
+        );
 
         userId = createdUser.id;
       }
@@ -953,7 +971,6 @@ export function createUserService(deps: UserServiceDeps): IUserService {
 
       // Hash password if provided — only then is a local verifier written,
       // so only then is the owner asked.
-      let hashedPassword: string | undefined;
       if (password) {
         const owner = await ownerOrFrozen(resolveOwner, {
           db: ctx.db,
@@ -969,29 +986,33 @@ export function createUserService(deps: UserServiceDeps): IUserService {
         if (owner.kind === 'none') {
           throw new UserServiceError('NOT_FOUND', 'User not found');
         }
-        hashedPassword = await hooks.hashPassword(password, 12);
       }
 
       const updatedUser = await hooks.withPrivilegedDb(async (db) => {
-        const repo = getRepo(db);
-        const result = await repo.update(db, id, {
-          ...updateData,
-          ...(hashedPassword && { password: hashedPassword }),
-        });
+        if (!password) {
+          // No password: not a credential write, so not through the seam.
+          return getRepo(db).update(db, id, updateData);
+        }
 
-        // Only an update that actually SET a password wrote a verifier.
-        if (hashedPassword) {
+        // p77 seam: gate, then hash + write + announcement in one bounded tx.
+        return withCredentialWrite(hooks, { operation: 'update', db }, async (tx) => {
+          const hashedPassword = await hooks.hashPassword(password, 12);
+          const result = await getRepo(tx).update(tx, id, {
+            ...updateData,
+            password: hashedPassword,
+          });
+
           await announceCredentialWritten(hooks.onCredentialWritten, {
-            db,
+            db: tx,
             userId: id,
             operation: 'update',
             actorUserId: ctx.userId,
             firstSet: !existingUser.password,
             at: new Date(),
           });
-        }
 
-        return result;
+          return result;
+        });
       });
 
       // Broadcast permission update if activation status changed
@@ -1303,28 +1324,29 @@ export function createUserService(deps: UserServiceDeps): IUserService {
         );
       }
 
-      const hashedPassword = await hooks.hashPassword(newPassword, 12);
+      // p77 seam: gate, then hash + write + announcement in one bounded tx.
+      const updatedUser = await hooks.withPrivilegedDb(async (db) =>
+        withCredentialWrite(hooks, { operation: 'change-password', db }, async (tx) => {
+          const hashedPassword = await hooks.hashPassword(newPassword, 12);
+          const result = await getRepo(tx).updatePassword(tx, userId, hashedPassword);
 
-      const updatedUser = await hooks.withPrivilegedDb(async (db) => {
-        const repo = getRepo(db);
-        const result = await repo.updatePassword(db, userId, hashedPassword);
+          // `result` is the repository's confirmation; announce only once the
+          // row came back, so a no-op update never produces a record. The
+          // compare above succeeded, so a verifier existed: never a first set.
+          if (result) {
+            await announceCredentialWritten(hooks.onCredentialWritten, {
+              db: tx,
+              userId,
+              operation: 'change-password',
+              actorUserId: userId,
+              firstSet: false,
+              at: new Date(),
+            });
+          }
 
-        // `result` is the repository's confirmation; announce only once the
-        // row came back, so a no-op update never produces a record. The
-        // compare above succeeded, so a verifier existed: never a first set.
-        if (result) {
-          await announceCredentialWritten(hooks.onCredentialWritten, {
-            db,
-            userId,
-            operation: 'change-password',
-            actorUserId: userId,
-            firstSet: false,
-            at: new Date(),
-          });
-        }
-
-        return result;
-      });
+          return result;
+        }),
+      );
 
       if (!updatedUser) {
         throw new UserServiceError(

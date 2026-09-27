@@ -9,6 +9,7 @@
  * written, and with no guard injected behaviour is exactly what it was.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { transactionalStub } from '../auth/__test-support__/transactional-stub';
 
 import { createAuthRouterConfig } from '../auth/router-config';
 import { createUserRouterConfig, type UserRouterDeps } from './router-config';
@@ -49,7 +50,7 @@ function userCtx(overrides: Partial<{ input: any; userId: string; orgId: number 
     input: overrides.input,
     service: { db: {}, orgId: overrides.orgId ?? 1, userId: overrides.userId ?? '7' },
     actor: {},
-    db: {},
+    db: transactionalStub({}),
     repo: new Repo({}),
     ctx: {},
   } as any;
@@ -144,7 +145,7 @@ describe('auth router — canWriteLocalCredential', () => {
     canWriteLocalCredential: guard,
   });
   const publicCtx = (input: any, Repo: any) =>
-    ({ input, service: { db: {}, orgId: 0, userId: '' }, actor: {}, db: {}, repo: new Repo({}), ctx: {} }) as any;
+    ({ input, service: { db: {}, orgId: 0, userId: '' }, actor: {}, db: transactionalStub({}), repo: new Repo({}), ctx: {} }) as any;
 
   it('register refuses with the guard reason and creates no user', async () => {
     refuse.mockClear();
@@ -354,7 +355,7 @@ describe('auth router — resolveCredentialOwner (register)', () => {
     ...extra,
   });
   const publicCtx = (input: any, Repo: any) =>
-    ({ input, service: { db: {}, orgId: 0, userId: '' }, actor: {}, db: {}, repo: new Repo({}), ctx: {} }) as any;
+    ({ input, service: { db: {}, orgId: 0, userId: '' }, actor: {}, db: transactionalStub({}), repo: new Repo({}), ctx: {} }) as any;
   const input = { email: 'new@example.com', password: 'N3w!Passw0rd', name: 'New' };
 
   it('external: OWNED_ELSEWHERE with accountUrl, no hash, no user', async () => {

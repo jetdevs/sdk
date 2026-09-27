@@ -253,3 +253,65 @@ export type {
   VerifyLocalCredentialDeps,
   VerifyLocalCredentialResult,
 } from './verify-local-credential';
+
+// =============================================================================
+// p77 — CREDENTIAL AUTHORITY, SCHEMA PIN, CREDENTIAL-WRITE SEAM
+// =============================================================================
+
+export {
+  AUTHORITY_TRANSITIONS,
+  CREDENTIAL_AUTHORITY,
+  canTransition,
+  isCredentialAuthority,
+  isTerminalAuthority,
+} from './credential-authority';
+
+export type { CredentialAuthority } from './credential-authority';
+
+export {
+  assertUsersSchemaCarriesConnectColumns,
+  CONNECT_USERS_COLUMNS,
+} from './schema-pin';
+
+export type {
+  ConnectUsersColumn,
+  SchemaPinOptions,
+  SchemaPinResult,
+} from './schema-pin';
+
+export {
+  CREDENTIAL_WRITE_DEADLINE_MS,
+  CREDENTIAL_WRITE_RETRY_AFTER_SECONDS,
+  CREDENTIAL_WRITE_SET_LOCALS,
+  CredentialWriteRefusedError,
+  credentialWriteRefusedResponse,
+  isCredentialWriteRefused,
+  withCredentialWrite,
+} from './credential-write';
+
+export type {
+  CredentialWriteDeps,
+  CredentialWriteGate,
+  CredentialWriteGateContext,
+  CredentialWriteGateOperation,
+  CredentialWriteOptions,
+  CredentialWriteRefusalReason,
+} from './credential-write';
+
+// =============================================================================
+// p77 TRIGGER SQL TEMPLATES (M2 writers-closed, M3 one-allocator, M6 bump)
+// =============================================================================
+
+export {
+  AUTHORITY_ROLLBACK_ERROR_PREFIX,
+  AUTHORITY_TRANSITION_ERROR_PREFIX,
+  WRITERS_CLOSED_ERROR_PREFIX,
+  writersClosedTriggerSql,
+  ONE_ALLOCATOR_ERROR_PREFIX,
+  ONE_ALLOCATOR_GUC,
+  oneAllocatorGucSql,
+  oneAllocatorTriggerSql,
+  credentialVersionBumpTriggerSql,
+} from './sql';
+
+export type { WritersClosedOptions } from './sql';

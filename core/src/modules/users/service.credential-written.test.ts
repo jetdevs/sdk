@@ -9,6 +9,7 @@
  * Classification: MOCK. Repository and db handle are stubs.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { transactionalStub } from '../auth/__test-support__/transactional-stub';
 
 import type { CredentialOwner } from '../auth/credential-owner';
 import { createUserService, type UserServiceContext } from './service';
@@ -38,8 +39,11 @@ function stubRepo(existing: Record<string, any> = {}) {
 const hashPassword = async (p: string) => `hashed:${p}`;
 const comparePassword = async (p: string, h: string) => h === `hashed:${p}`;
 
-/** The handle `withPrivilegedDb` hands its callback; the hook must receive it. */
-const PRIVILEGED = { handle: 'privileged' };
+/**
+ * The handle `withPrivilegedDb` hands its callback. p77: the seam opens its
+ * transaction ON it, and the hook receives that transaction (`PRIVILEGED.tx`).
+ */
+const PRIVILEGED = transactionalStub({ handle: 'privileged' });
 
 const ctx = (overrides: Partial<UserServiceContext> = {}): UserServiceContext => ({
   db: { handle: 'rls' } as any,
@@ -91,7 +95,7 @@ describe('createUserService — onCredentialWritten', () => {
     expect(onCredentialWritten).toHaveBeenCalledTimes(1);
     expect(onCredentialWritten).toHaveBeenCalledWith(
       expect.objectContaining({
-        db: PRIVILEGED,
+        db: PRIVILEGED.tx,
         userId: 7,
         operation: 'change-password',
         actorUserId: 7,
@@ -108,7 +112,7 @@ describe('createUserService — onCredentialWritten', () => {
     await svc.update({ id: 7, password: 'N3w!Passw0rd' } as any, ctx({ userId: 42 }));
     expect(onCredentialWritten).toHaveBeenCalledTimes(1);
     expect(onCredentialWritten).toHaveBeenCalledWith(
-      expect.objectContaining({ db: PRIVILEGED, userId: 7, operation: 'update', actorUserId: 42, firstSet: false }),
+      expect.objectContaining({ db: PRIVILEGED.tx, userId: 7, operation: 'update', actorUserId: 42, firstSet: false }),
     );
 
     onCredentialWritten.mockClear();
@@ -133,7 +137,7 @@ describe('createUserService — onCredentialWritten', () => {
     );
     expect(onCredentialWritten).toHaveBeenCalledTimes(1);
     expect(onCredentialWritten).toHaveBeenCalledWith(
-      expect.objectContaining({ db: PRIVILEGED, userId: 99, operation: 'invite', actorUserId: 7, firstSet: true }),
+      expect.objectContaining({ db: PRIVILEGED.tx, userId: 99, operation: 'invite', actorUserId: 7, firstSet: true }),
     );
 
     onCredentialWritten.mockClear();

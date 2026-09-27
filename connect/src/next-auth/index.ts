@@ -251,3 +251,80 @@ export function ConnectProvider(
     },
   }
 }
+
+// ---------------------------------------------------------------------------
+// p77 STORY-005 — the RP route factories and gates (specs.md §5.2 `./next-auth`)
+// ---------------------------------------------------------------------------
+
+export {
+  createBackchannelLogoutRoute,
+  type BackchannelLogoutRoute,
+  type BackchannelLogoutRouteDeps,
+} from './backchannel-route.js'
+
+export {
+  CONNECT_ENVS,
+  CUTOVER_OPERATOR_HEADER,
+  HANDOFF_OPS,
+  INTERNAL_API_KEY_HEADER,
+  RP_KEY_ONLY_OPS,
+  SHARED_INTERNAL_KEY_ENV_NAMES,
+  createConnectInternalAuth,
+  createConnectInternalRoutes,
+  isConnectEnv,
+  isHandoffOp,
+  withConnectInternalAuth,
+  type ConnectEnv,
+  type ConnectInternalAuthOptions,
+  type ConnectInternalRouteDeps,
+  type ConnectInternalRoutes,
+  type DeactivateAllowlistEntry,
+  type HandoffOp,
+  type InventoryRowAnswer,
+  type MembershipAnswer,
+  type RouteHandler,
+  type RpStateAnswer,
+} from './internal-routes.js'
+
+export {
+  WOULD_REFUSE_PREFIX,
+  refusedToken,
+  resolveEpochEnforcementMode,
+  stampOnSignIn,
+  withEpochEnforcement,
+  type EpochEnforcementDeps,
+  type EpochEnforcementMode,
+  type SignInEpoch,
+  type StampOnSignInDeps,
+} from './epoch-enforcement.js'
+
+export {
+  connectOwnerLoginResolution,
+  resolutionForOwner,
+  type LoginResolution,
+  type LoginResolutionOptions,
+  type LoginResolver,
+} from './login-resolution.js'
+
+export {
+  MAINTENANCE_ERROR,
+  MAINTENANCE_PAGE_TEXT,
+  MAINTENANCE_PAGE_TITLE,
+  MAINTENANCE_PATH,
+  MAINTENANCE_RETRY_AFTER_SECONDS,
+  MaintenanceRefusedError,
+  MaintenanceWriteRefusedError,
+  assertNotInMaintenance,
+  createMaintenancePage,
+  isEstatePaused,
+  isMaintenanceRefused,
+  maintenanceAuthorize,
+  maintenanceErrorText,
+  maintenanceGate,
+  maintenancePageHtml,
+  maintenanceResponse,
+  maintenanceResponseIfPaused,
+  type CreateElementLike,
+  type CredentialWriteGateLike,
+  type MaintenanceGateDeps,
+} from './maintenance.js'

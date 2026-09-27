@@ -67,6 +67,8 @@ function createFakeDb(rows: { users?: any[]; tokens?: any[] }) {
     }),
     delete: () => ({ where: () => { calls.deleted += 1; return Promise.resolve(); } }),
     transaction: (fn: any) => fn(db),
+    // p77: the credential-write seam's three SET LOCALs land here.
+    execute: async () => [],
     __calls: calls,
   };
 
@@ -238,6 +240,8 @@ function captureUserLookup() {
     update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
     delete: () => ({ where: () => Promise.resolve() }),
     transaction: (fn: any) => fn(db),
+    // p77: the credential-write seam's three SET LOCALs land here.
+    execute: async () => [],
   };
   return { db, captured };
 }

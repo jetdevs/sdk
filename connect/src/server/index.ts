@@ -8,7 +8,15 @@ export {
   type OrgPlatformRole,
   type MembershipStatus,
   type SourceSystem,
+  type KnownSourceSystem,
+  type RegisterIdentityArgs,
+  type RegisterIdentityResult,
+  type RegisterIdentityErrorCode,
+  ConnectIdentityRegisterError,
+  isConnectIdentityRegisterError,
+  isIdentityRefConflict,
 } from './provisioning.js'
+export { isSourceSystemKey, SOURCE_SYSTEM_KEY_RE } from '../adapter/index.js'
 
 import { generateCodeVerifier, generateCodeChallenge } from './pkce.js'
 import { DiscoveryCache, fetchDiscovery } from './discovery.js'

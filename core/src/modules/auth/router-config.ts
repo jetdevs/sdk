@@ -23,6 +23,10 @@ import {
   announceCredentialWritten,
   type OnCredentialWritten,
 } from './credential-written';
+import {
+  withCredentialWrite,
+  type CredentialWriteGate,
+} from './credential-write';
 
 // =============================================================================
 // TYPES
@@ -94,8 +98,19 @@ export interface AuthRouterDeps {
    * registration, or on a duplicate email — nothing was written in those
    * cases. `register` has no transaction, so it fires immediately after the
    * row is created, on the same `db` handle; errors propagate to the caller.
+   *
+   * p77: `register` now writes inside `withCredentialWrite`'s transaction, so
+   * the hook fires INSIDE it, on the transaction handle.
    */
   onCredentialWritten?: OnCredentialWritten;
+
+  /**
+   * p77 credential-write seam (D26). Asked by `register` AFTER the
+   * credential-owner resolver and BEFORE the hash. A throw refuses: nothing
+   * hashed or written, and a `CredentialWriteRefusedError` reaches tRPC as
+   * `SERVICE_UNAVAILABLE`. Absent, every write is admitted.
+   */
+  credentialWriteGate?: CredentialWriteGate;
 }
 
 /**
@@ -250,22 +265,26 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
           throw new AuthRouterError('FORBIDDEN', frozenCredentialMessage(owner));
         }
 
-        const hashedPassword = await deps.hashPassword(input.password, 12);
+        // p77 seam: gate, then hash + insert + announcement in one bounded
+        // transaction. The auth repository is bound to a handle at
+        // construction, so the write goes through one bound to the tx.
+        const newUser = await withCredentialWrite(deps, { operation: 'register', db }, async (tx) => {
+          const hashedPassword = await deps.hashPassword(input.password, 12);
 
-        const newUser = await repo.createUser({
-          email: input.email,
-          password: hashedPassword,
-          name: input.name || input.email.split('@')[0],
-        });
+          const created = await new deps.Repository(tx).createUser({
+            email: input.email,
+            password: hashedPassword,
+            name: input.name || input.email.split('@')[0],
+          });
 
-        // The verifier is stored: announce it. No transaction here, so this
-        // runs immediately after the write, on the same handle.
-        await announceCredentialWritten(deps.onCredentialWritten, {
-          db,
-          userId: newUser.id,
-          operation: 'register',
-          firstSet: true,
-          at: new Date(),
+          await announceCredentialWritten(deps.onCredentialWritten, {
+            db: tx,
+            userId: created.id,
+            operation: 'register',
+            firstSet: true,
+            at: new Date(),
+          });
+          return created;
         });
 
         return {
