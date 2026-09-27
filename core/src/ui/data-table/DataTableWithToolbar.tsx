@@ -394,6 +394,13 @@ export interface DataTableWithToolbarProps<TData> {
    */
   standardToolbar?: Partial<StandardToolbarConfig>;
 
+  /**
+   * Render the toolbar (and bulk-actions bar) only — no rows, no pagination.
+   * For consumers that draw their own grid view under the same toolbar.
+   * Opt-in; unset → unchanged.
+   */
+  hideTable?: boolean;
+
   // ---------------------------------------------------------------------------
   // Server-side mode (OPT-IN, backwards-compatible).
   //
@@ -628,6 +635,7 @@ export function createDataTableWithToolbar<TData>(
     isFetching,
     mobile: propMobile,
     standardToolbar,
+    hideTable = false,
   }: DataTableWithToolbarProps<TData>) {
     // Phone layout (p90). Always false on the server and ≥ md, so desktop
     // takes exactly the pre-p90 path below.
@@ -1282,6 +1290,7 @@ export function createDataTableWithToolbar<TData>(
           </div>
         )}
 
+        {!hideTable && (<>
         {/* Card layout (renderRow + rowLayout:'cards'): a spaced stack of
             consumer-styled cards instead of the bordered table. Each renderRow
             output owns its own rounded/border/bg/padding; `space-y` is the gap.
@@ -1520,6 +1529,8 @@ export function createDataTableWithToolbar<TData>(
           </div>
         </div>
         )}
+
+        </>)}
 
         {/* External Dialog (e.g., for bulk delete confirmation) */}
         {renderDialog && renderDialog({
