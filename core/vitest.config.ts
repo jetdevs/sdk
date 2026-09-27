@@ -20,6 +20,8 @@ export default defineConfig({
       ['src/ui/auth-pages/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
       // p90 batch 3d: the shared app header + brand mark.
       ['src/ui/app-header/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
+      // p90: THE searchable dropdown.
+      ['src/ui/select/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
     ],
     globals: true,
   },
