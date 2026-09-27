@@ -19,6 +19,7 @@ import {
     like,
     not,
     or,
+    sql,
     type SQL,
 } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
@@ -34,6 +35,8 @@ import type {
     UserUpdateData,
     UserWithRoles,
 } from './types';
+
+import { orgMembers as sdkOrgMembers } from '../../db/schema';
 
 // =============================================================================
 // SCHEMA INTERFACE
@@ -58,6 +61,7 @@ export interface UserRepositorySchema {
     sessionTimeoutPreference: any;
     themePreference: any;
     currentOrgId: any;
+    connectSub: any;
     createdAt: any;
     updatedAt: any;
   };
@@ -92,6 +96,16 @@ export interface UserRepositorySchema {
   rolePermissions: PgTable & {
     roleId: any;
     permissionId: any;
+  };
+  /**
+   * Optional org_members schema for org-scoped user filtering.
+   * When provided with an orgId filter, users are filtered through org_members.
+   * When NOT provided but orgId IS provided, findAll() throws (fail-closed).
+   */
+  orgMembers?: PgTable & {
+    userId: any;
+    orgId: any;
+    status: any;
   };
 }
 
@@ -136,6 +150,10 @@ export interface IUserRepository {
   updateSessionTimeout(db: any, userId: number, timeoutMinutes: number): Promise<UserWithRoles>;
   updateThemePreference(db: any, userId: number, theme: string): Promise<UserWithRoles>;
   getUserSettings(db: any, userId: number): Promise<any>;
+
+  // Membership status operations
+  getMembershipStatuses(db: any, userIds: number[], orgId: number): Promise<Map<number, string>>;
+  getMembershipStatusesAllOrgs(db: any, userIds: number[]): Promise<Map<number, string>>;
 }
 
 // =============================================================================
@@ -163,7 +181,7 @@ export interface IUserRepository {
  * ```
  */
 export function createUserRepositoryClass(schema: UserRepositorySchema) {
-  const { users, userRoles, roles, orgs, permissions, rolePermissions } = schema;
+  const { users, userRoles, roles, orgs, permissions, rolePermissions, orgMembers = sdkOrgMembers } = schema;
 
   return class UserRepository implements IUserRepository {
     // -------------------------------------------------------------------------
@@ -178,6 +196,25 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
 
       // Build where conditions
       const whereConditions: SQL<unknown>[] = [];
+
+      // Org-scoped filtering through org_members (security-critical)
+      if (filters.orgId) {
+        if (!orgMembers) {
+          throw new Error(
+            'SDKUserRepository: orgMembers schema is required for org-scoped queries. ' +
+            'Pass orgMembers to UserRepositorySchema to enable org membership filtering.'
+          );
+        }
+        // Filter users through org_members with active/suspended status
+        const activeMembers = db
+          .select({ userId: orgMembers.userId })
+          .from(orgMembers)
+          .where(and(
+            eq(orgMembers.orgId, filters.orgId),
+            inArray(orgMembers.status, ['active', 'suspended'])
+          ));
+        whereConditions.push(inArray(users.id, activeMembers));
+      }
 
       if (filters.search) {
         const searchCondition = or(
@@ -236,6 +273,24 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
     async count(db: PostgresJsDatabase<any>, filters: UserFilters): Promise<number> {
       const whereConditions: SQL<unknown>[] = [];
 
+      // Org-scoped filtering through org_members (security-critical)
+      if (filters.orgId) {
+        if (!orgMembers) {
+          throw new Error(
+            'SDKUserRepository: orgMembers schema is required for org-scoped queries. ' +
+            'Pass orgMembers to UserRepositorySchema to enable org membership filtering.'
+          );
+        }
+        const activeMembers = db
+          .select({ userId: orgMembers.userId })
+          .from(orgMembers)
+          .where(and(
+            eq(orgMembers.orgId, filters.orgId),
+            inArray(orgMembers.status, ['active', 'suspended'])
+          ));
+        whereConditions.push(inArray(users.id, activeMembers));
+      }
+
       if (filters.search) {
         const searchCondition = or(
           like(users.name, `%${filters.search}%`),
@@ -277,10 +332,18 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
      * Get user by email
      */
     async findByEmail(db: PostgresJsDatabase<any>, email: string): Promise<UserWithRoles | null> {
+      // Case-insensitive on the STORED address as well as the argument: a row
+      // saved as `Sean@x.com` must be found by `sean@x.com`, or the writers
+      // that use this as their existence check allocate a second account for
+      // the same person (STORY-040 / STORY-042).
+      //
+      // INDEX: `lower(email)` does not use a plain b-tree on `email`. The SDK
+      // ships no such index — the app owns its DDL; cadra-web adds one in its
+      // migration 0136. Absent one, this is a sequential scan on `users`.
       const result = await db
         .select()
         .from(users)
-        .where(eq(users.email, email))
+        .where(sql`lower(${users.email}) = lower(${email})`)
         .limit(1);
 
       return (result[0] as unknown as UserWithRoles) || null;
@@ -748,6 +811,71 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
         .limit(1);
 
       return result[0] || null;
+    }
+
+    // -------------------------------------------------------------------------
+    // MEMBERSHIP STATUS OPERATIONS
+    // -------------------------------------------------------------------------
+
+    /**
+     * Get membership statuses for users in a specific org.
+     * Returns a map of userId -> status string.
+     */
+    async getMembershipStatuses(db: PostgresJsDatabase<any>, userIds: number[], orgId: number): Promise<Map<number, string>> {
+      if (!orgMembers || userIds.length === 0) {
+        return new Map();
+      }
+
+      const memberStatuses = await db
+        .select({
+          userId: orgMembers.userId,
+          status: orgMembers.status,
+        })
+        .from(orgMembers)
+        .where(
+          and(
+            inArray(orgMembers.userId, userIds),
+            eq(orgMembers.orgId, orgId)
+          )
+        );
+
+      return new Map(memberStatuses.map((m: any) => [m.userId, m.status]));
+    }
+
+    /**
+     * Get effective membership statuses for users across ALL orgs (system-wide view).
+     * Uses priority ordering: active > suspended > invited > removed.
+     * Returns a map of userId -> effective status string.
+     */
+    async getMembershipStatusesAllOrgs(db: PostgresJsDatabase<any>, userIds: number[]): Promise<Map<number, string>> {
+      if (!orgMembers || userIds.length === 0) {
+        return new Map();
+      }
+
+      const memberStatuses = await db
+        .select({
+          userId: orgMembers.userId,
+          status: orgMembers.status,
+        })
+        .from(orgMembers)
+        .where(inArray(orgMembers.userId, userIds));
+
+      // Build effective status per user: active > suspended > invited > removed
+      const statusMap = new Map<number, string>();
+      for (const ms of memberStatuses) {
+        const current = statusMap.get(ms.userId);
+        if (ms.status === 'active') {
+          statusMap.set(ms.userId, 'active');
+        } else if (ms.status === 'suspended' && current !== 'active') {
+          statusMap.set(ms.userId, 'suspended');
+        } else if (ms.status === 'invited' && !current) {
+          statusMap.set(ms.userId, 'invited');
+        } else if (ms.status === 'removed' && !current) {
+          statusMap.set(ms.userId, 'removed');
+        }
+      }
+
+      return statusMap;
     }
   };
 }

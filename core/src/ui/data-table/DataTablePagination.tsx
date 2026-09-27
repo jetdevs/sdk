@@ -77,6 +77,15 @@ export function createDataTablePagination(ui: PaginationUIComponents) {
     showSelectedCount = true,
     className,
   }: DataTablePaginationProps<TData>) {
+    // Nothing to page through: no rows on the first page. Without this the
+    // pager reads "Page 1 of 0" under an empty state.
+    if (
+      table.getRowModel().rows.length === 0 &&
+      table.getState().pagination.pageIndex === 0
+    ) {
+      return null;
+    }
+
     return (
       <div className={`flex items-center justify-between px-2 ${className || ''}`}>
         <div className="flex-1 text-sm text-muted-foreground">

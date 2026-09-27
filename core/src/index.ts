@@ -207,17 +207,19 @@ export type {
 
 export {
     // Theme Providers
-    ThemeProvider, UserThemeProvider,
+    ThemeProvider, UserThemeProvider, ThemeEnforcer,
+    // Theme Hooks
+    useTheme, useUserTheme, useThemeEnforcement,
     // tRPC Provider Factory
     createTRPCProvider,
     createTRPCQueryClient,
     getBaseUrl,
-    getTRPCUrl, useTheme, useUserTheme
+    getTRPCUrl,
 } from './providers';
 
 export type {
     QueryClientConfig, TRPCProviderConfig, TRPCProviderProps, ThemeContextValue, ThemeMode, ThemeProviderProps,
-    UserThemeProviderProps
+    UserThemeProviderProps, ThemeEnforcerProps,
 } from './providers';
 
 // =============================================================================

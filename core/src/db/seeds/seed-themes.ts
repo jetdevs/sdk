@@ -8,11 +8,11 @@
 import { eq } from 'drizzle-orm';
 import { seedLog } from '../../cli';
 import type {
-    SeedDatabase,
-    SeedResult,
-    ThemeSeedData,
-    ThemeSeedOptions,
-    ThemeSeedSchema,
+  SeedDatabase,
+  SeedResult,
+  ThemeSeedData,
+  ThemeSeedOptions,
+  ThemeSeedSchema,
 } from './types';
 import { createSeedResult } from './types';
 
@@ -105,6 +105,22 @@ export const EXTENDED_THEMES: ThemeSeedData[] = [
     displayName: 'Soft Pop',
     description: 'Gentle pastel colors with a modern, friendly aesthetic',
     cssFile: '/themes/soft-pop.css',
+    isActive: true,
+    isDefault: false,
+  },
+  {
+    name: 'gtm',
+    displayName: 'GTM',
+    description: 'Dark-first zinc palette with indigo primary, designed for data-dense campaign management',
+    cssFile: '/themes/gtm.css',
+    isActive: true,
+    isDefault: false,
+  },
+  {
+    name: 'cadraos',
+    displayName: 'CadraOS',
+    description: 'Dark-first cyan/teal tech aesthetic with Space Grotesk and glow accents',
+    cssFile: '/themes/cadraos.css',
     isActive: true,
     isDefault: false,
   },

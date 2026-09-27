@@ -189,3 +189,129 @@ export type {
   AuthContext,
   AuthHandlerContext,
 } from './router-config';
+
+// =============================================================================
+// LOCAL CREDENTIAL WRITE POLICY (caller-injected guard)
+// =============================================================================
+
+export { askLocalCredentialGuard } from './local-credential-policy';
+
+export type {
+  LocalCredentialWriteArgs,
+  LocalCredentialWriteGuard,
+  LocalCredentialWriteOperation,
+  LocalCredentialWriteVerdict,
+} from './local-credential-policy';
+
+// =============================================================================
+// CREDENTIAL OWNER (routing port: where a credential lives, for every writer
+// and the login path)
+// =============================================================================
+
+export {
+  askCredentialOwner,
+  credentialOwnerOf,
+  credentialRedirect,
+  CredentialOwnedElsewhereError,
+  FROZEN_CREDENTIAL_MESSAGE,
+  fromLocalCredentialGuard,
+  frozenCredentialMessage,
+  isCredentialRedirect,
+  localOnlyOwner,
+  selectCredentialOwnerResolver,
+} from './credential-owner';
+
+export type {
+  CredentialOwner,
+  CredentialOwnerDeps,
+  CredentialOwnerKind,
+  CredentialOwnerOperation,
+  CredentialRedirect,
+  ExternalCredentialOwner,
+  FrozenCredentialOwner,
+  ResolveCredentialOwner,
+  ResolveCredentialOwnerArgs,
+} from './credential-owner';
+
+// =============================================================================
+// CREDENTIAL WRITTEN (announcement port: a successful local verifier write)
+// =============================================================================
+
+export { announceCredentialWritten } from './credential-written';
+
+export type {
+  CredentialWriteOperation,
+  CredentialWrittenArgs,
+  CredentialWrittenDeps,
+  OnCredentialWritten,
+} from './credential-written';
+
+export { verifyLocalCredential } from './verify-local-credential';
+
+export type {
+  VerifyLocalCredentialArgs,
+  VerifyLocalCredentialDeps,
+  VerifyLocalCredentialResult,
+} from './verify-local-credential';
+
+// =============================================================================
+// p77 — CREDENTIAL AUTHORITY, SCHEMA PIN, CREDENTIAL-WRITE SEAM
+// =============================================================================
+
+export {
+  AUTHORITY_TRANSITIONS,
+  CREDENTIAL_AUTHORITY,
+  canTransition,
+  isCredentialAuthority,
+  isTerminalAuthority,
+} from './credential-authority';
+
+export type { CredentialAuthority } from './credential-authority';
+
+export {
+  assertUsersSchemaCarriesConnectColumns,
+  CONNECT_USERS_COLUMNS,
+} from './schema-pin';
+
+export type {
+  ConnectUsersColumn,
+  SchemaPinOptions,
+  SchemaPinResult,
+} from './schema-pin';
+
+export {
+  CREDENTIAL_WRITE_DEADLINE_MS,
+  CREDENTIAL_WRITE_RETRY_AFTER_SECONDS,
+  CREDENTIAL_WRITE_SET_LOCALS,
+  CredentialWriteRefusedError,
+  credentialWriteRefusedResponse,
+  isCredentialWriteRefused,
+  withCredentialWrite,
+} from './credential-write';
+
+export type {
+  CredentialWriteDeps,
+  CredentialWriteGate,
+  CredentialWriteGateContext,
+  CredentialWriteGateOperation,
+  CredentialWriteOptions,
+  CredentialWriteRefusalReason,
+} from './credential-write';
+
+// =============================================================================
+// p77 TRIGGER SQL TEMPLATES (M2 writers-closed, M3 one-allocator, M6 bump)
+// =============================================================================
+
+export {
+  AUTHORITY_ROLLBACK_ERROR_PREFIX,
+  AUTHORITY_TRANSITION_ERROR_PREFIX,
+  WRITERS_CLOSED_ERROR_PREFIX,
+  writersClosedTriggerSql,
+  ONE_ALLOCATOR_ERROR_PREFIX,
+  ONE_ALLOCATOR_GUC,
+  oneAllocatorGucSql,
+  oneAllocatorTriggerSql,
+  credentialVersionBumpTriggerSql,
+} from './sql';
+
+export type { WritersClosedOptions } from './sql';

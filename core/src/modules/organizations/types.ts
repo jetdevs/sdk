@@ -151,7 +151,7 @@ export interface OrgFilters {
 export interface OrgListOptions {
   page: number;
   pageSize: number;
-  sortBy: 'name' | 'createdAt' | 'updatedAt' | 'userCount';
+  sortBy: 'name' | 'createdAt' | 'updatedAt' | 'userCount' | 'isActive' | (string & {});
   sortOrder: 'asc' | 'desc';
   filters: OrgFilters;
   includeStats?: boolean;

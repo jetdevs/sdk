@@ -1,0 +1,140 @@
+/**
+ * RBAC Feature Module
+ *
+ * Role-based access control functionality including:
+ * - Role management
+ * - Permission management
+ * - Role dialogs and factories
+ *
+ * @module @jetdevs/core/features/rbac
+ */
+
+// Note: We don't use `export * from` here because backend and ui both export RoleWithStats
+// Import from specific paths: @jetdevs/core/features/rbac/backend or @jetdevs/core/features/rbac/ui
+
+// Re-export backend types and functions (server-side)
+export {
+  // Types
+  type Actor,
+  type CategoryCount,
+  type Permission,
+  type PermissionCreateData,
+  type PermissionStats,
+  type PermissionUpdateData,
+  type PermissionWithUsage,
+  type RbacServiceContext,
+  type Role,
+  type RoleAssignPermissionsParams,
+  type RoleBulkDeleteParams,
+  type RoleBulkUpdateParams,
+  type RoleCreateData,
+  type RoleCreateParams,
+  type RoleDeleteParams,
+  type RoleFilters,
+  type RoleGetByIdParams,
+  type RoleListOptions,
+  type RoleListParams,
+  type RoleListResult,
+  type RolePermission,
+  type RolePermissionAssignment,
+  type RolePermissionStats,
+  type RoleRemovePermissionsParams,
+  type RoleStats,
+  type RoleUpdateData,
+  type RoleUpdateParams,
+  type RoleWithStats,
+  type UserRoleStats,
+  // Repositories
+  PermissionRepository,
+  SDKPermissionRepository,
+  RoleRepository,
+  SDKRoleRepository,
+  sdkRoleRepositorySchema,
+  // Services
+  ADMIN_FULL_ACCESS_PERMISSION,
+  RbacError,
+  RoleService,
+  SDKRoleService,
+  createRoleService,
+  createSDKRoleService,
+  sdkRbacSchema,
+  type RoleServiceHooks,
+  type RoleServiceSchema,
+  // Utilities
+  ORG_ROLES,
+  SYSTEM_ROLES,
+  canAssignPermissions,
+  canManageRoles,
+  canViewRoles,
+  hasBackofficeAccess,
+  hasPlatformSystemRole,
+  hasSystemAccess,
+  isGlobalRole,
+  isGlobalRoleName,
+  isOrgRoleName,
+  isOrgSpecificRole,
+  isPlatformSystemRole,
+  isSystemRole,
+  isSystemRoleName,
+  type OrgRoleName,
+  type RoleName,
+  type SystemRoleName,
+  // Schemas
+  assignPermissionsSchema,
+  bulkDeleteRolesSchema,
+  bulkUpdateRolesSchema,
+  copyRoleSchema,
+  createPermissionSchema,
+  createRoleSchema,
+  deleteRoleSchema,
+  getPermissionByIdSchema,
+  getPermissionBySlugSchema,
+  getRoleByIdSchema,
+  getRoleWithPermissionsSchema,
+  permissionFiltersSchema,
+  removePermissionsSchema,
+  roleFiltersSchema,
+  updatePermissionSchema,
+  updateRoleSchema,
+  type AssignPermissionsInput,
+  type BulkDeleteRolesInput,
+  type BulkUpdateRolesInput,
+  type CopyRoleInput,
+  type CreatePermissionInput,
+  type CreateRoleInput,
+  type GetPermissionByIdInput,
+  type GetPermissionBySlugInput,
+  type GetRoleByIdInput,
+  type GetRoleWithPermissionsInput,
+  type PermissionFiltersInput,
+  type RemovePermissionsInput,
+  type RoleFiltersInput,
+  type UpdatePermissionInput,
+  type UpdateRoleInput,
+  // Router config
+  createRoleRouterConfig,
+  defaultCreateServiceContext,
+  roleRouterConfig,
+  type CreateRoleRouterConfigOptions,
+  type CreateServiceContext,
+} from "./backend";
+
+// Re-export UI factories (client-side)
+export {
+  createDeleteRoleDialogFactory,
+  createBulkDeleteDialogFactory,
+  createCreateRoleDialogFactory,
+  type RoleWithStats as RoleWithStatsUI,
+  type ToastInterface,
+  type DeleteRoleDialogUIComponents,
+  type DeleteRoleDialogApi,
+  type DeleteRoleDialogFactoryConfig,
+  type DeleteRoleDialogProps,
+  type BulkDeleteDialogUIComponents,
+  type BulkDeleteDialogFactoryConfig,
+  type BulkDeleteDialogProps,
+  type CreateRoleDialogUIComponents,
+  type CreateRoleDialogApi,
+  type CreateRoleDialogFactoryConfig,
+  type CreateRoleDialogProps,
+} from "./ui";

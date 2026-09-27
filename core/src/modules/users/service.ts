@@ -13,6 +13,26 @@
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { IUserRepository } from './repository';
+import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
+import {
+  askCredentialOwner,
+  CredentialOwnedElsewhereError,
+  credentialRedirect,
+  frozenCredentialMessage,
+  selectCredentialOwnerResolver,
+  type CredentialOwner,
+  type CredentialRedirect,
+  type ResolveCredentialOwner,
+  type ResolveCredentialOwnerArgs,
+} from '../auth/credential-owner';
+import {
+  announceCredentialWritten,
+  type OnCredentialWritten,
+} from '../auth/credential-written';
+import {
+  withCredentialWrite,
+  type CredentialWriteGate,
+} from '../auth/credential-write';
 import type {
     UserPermissionsData,
     UserRecord,
@@ -273,6 +293,52 @@ export interface UserServiceHooks {
    * Required for password verification.
    */
   comparePassword: (password: string, hash: string) => Promise<boolean>;
+
+  /**
+   * Optional resolver asked BEFORE any local verifier is hashed or stored
+   * (invite of a new user, update with a password, changePassword). It
+   * answers WHERE the credential lives. Per kind: `local` writes; `external`
+   * makes `invite` throw `CredentialOwnedElsewhereError` and makes `update` /
+   * `changePassword` RETURN a `CredentialRedirect` with nothing written;
+   * `frozen` is a FORBIDDEN `UserServiceError` with the reason; `none` lets
+   * `invite` allocate and makes `update` / `changePassword` NOT_FOUND.
+   * Same contract as `UserRouterDeps.resolveCredentialOwner`.
+   */
+  resolveCredentialOwner?: ResolveCredentialOwner;
+
+  /**
+   * Legacy yes/no guard, kept for one minor. Ignored when
+   * `resolveCredentialOwner` is given; otherwise adapted onto it with the same
+   * outcomes as before (allow → write, refuse → FORBIDDEN with the reason).
+   * Same contract as `UserRouterDeps.canWriteLocalCredential`.
+   */
+  canWriteLocalCredential?: LocalCredentialWriteGuard;
+
+  /**
+   * Optional hook fired ONCE after a method here has successfully stored a
+   * local verifier — `invite` of a NEW user whose params carried a password
+   * (`firstSet: true`), `update` with a password, and `changePassword`. Never
+   * fired on a refusal, on a wrong current password, on an invite that only
+   * added an existing user to an org, or on an invite with no password.
+   *
+   * These writes go through `withPrivilegedDb`, so the hook is called INSIDE
+   * that same callback and receives the privileged handle the write used — an
+   * app recording an RLS-protected audit row needs exactly that handle.
+   * Errors propagate. Same contract as `UserRouterDeps.onCredentialWritten`.
+   *
+   * p77: those writes now run inside `withCredentialWrite`'s transaction,
+   * opened on the privileged handle, so the hook receives that transaction.
+   */
+  onCredentialWritten?: OnCredentialWritten;
+
+  /**
+   * p77 credential-write seam (D26). Asked AFTER the credential-owner
+   * resolver and BEFORE any hash, by `invite` of a new user, `update` with a
+   * password and `changePassword`, with the privileged handle. A throw
+   * refuses: nothing hashed or written. Absent, every write is admitted. Same
+   * contract as `UserRouterDeps.credentialWriteGate`.
+   */
+  credentialWriteGate?: CredentialWriteGate;
 }
 
 /**
@@ -304,6 +370,22 @@ export class UserServiceError extends Error {
   }
 }
 
+/**
+ * Ask where the credential lives and refuse `frozen` in this module's error
+ * shape. `external` and `none` are returned for the caller to route, since
+ * the right answer differs per writer (throw, redirect, allocate, 404).
+ */
+async function ownerOrFrozen(
+  resolveOwner: ResolveCredentialOwner,
+  args: ResolveCredentialOwnerArgs,
+): Promise<CredentialOwner> {
+  const owner = await askCredentialOwner(resolveOwner, args);
+  if (owner.kind === 'frozen') {
+    throw new UserServiceError('FORBIDDEN', frozenCredentialMessage(owner));
+  }
+  return owner;
+}
+
 // =============================================================================
 // SERVICE INTERFACE
 // =============================================================================
@@ -330,7 +412,11 @@ export interface IUserService {
   invite(params: UserInviteParams, ctx: UserServiceContext): Promise<UserWithRoles & { isNewUser: boolean; message: string }>;
 
   // User updates
-  update(params: UserUpdateParams, ctx: UserServiceContext): Promise<UserWithRoles>;
+  /**
+   * Resolves to a `CredentialRedirect` (not a user) only when `password` was
+   * supplied and the credential is owned elsewhere; nothing is stored then.
+   */
+  update(params: UserUpdateParams, ctx: UserServiceContext): Promise<UserWithRoles | CredentialRedirect>;
   delete(id: number, ctx: UserServiceContext): Promise<UserWithRoles>;
 
   // Bulk operations
@@ -359,7 +445,11 @@ export interface IUserService {
     success: boolean;
     themePreference: string | null;
   }>;
-  changePassword(params: ChangePasswordParams, ctx: UserServiceContext): Promise<{ success: boolean; message?: string }>;
+  /** `{ success: false, redirect, … }` when the credential is owned elsewhere. */
+  changePassword(params: ChangePasswordParams, ctx: UserServiceContext): Promise<
+    | { success: true; message?: string }
+    | ({ success: false; message?: string } & CredentialRedirect)
+  >;
   getCurrentUserSettings(userId: number, ctx: UserServiceContext): Promise<any>;
 
   // Username operations
@@ -408,6 +498,7 @@ export interface IUserService {
  */
 export function createUserService(deps: UserServiceDeps): IUserService {
   const { hooks, repository, RepositoryClass } = deps;
+  const resolveOwner = selectCredentialOwnerResolver(hooks);
 
   // Helper to get repository instance
   function getRepo(db: PostgresJsDatabase<any>): IUserRepository {
@@ -723,20 +814,49 @@ export function createUserService(deps: UserServiceDeps): IUserService {
           }
         }
 
-        // Hash password if provided
-        let hashedPassword: string | null = null;
-        if (params.password) {
-          hashedPassword = await hooks.hashPassword(params.password, 12);
+        // The write would allocate a new user: ask WHERE its credential lives
+        // before hashing anything. `local` and `none` both allocate.
+        const inviteOwner = await ownerOrFrozen(resolveOwner, {
+          db: ctx.db,
+          operation: 'invite',
+          user: null,
+          email: params.email,
+        });
+        if (inviteOwner.kind === 'external') {
+          throw new CredentialOwnedElsewhereError(inviteOwner, 'invite');
         }
 
-        const createdUser = await hooks.withPrivilegedDb(async (db) => {
-          const repo = getRepo(db);
-          return await repo.create(db, {
-            ...params,
-            password: hashedPassword,
-            currentOrgId: sessionOrgId,
-          });
-        });
+        // p77 seam, on the privileged handle: gate, then hash + insert +
+        // announcement in one bounded transaction.
+        const createdUser = await hooks.withPrivilegedDb(async (db) =>
+          withCredentialWrite(hooks, { operation: 'invite', db }, async (tx) => {
+            const hashedPassword = params.password
+              ? await hooks.hashPassword(params.password, 12)
+              : null;
+
+            const repo = getRepo(tx);
+            const created = await repo.create(tx, {
+              ...params,
+              password: hashedPassword,
+              currentOrgId: sessionOrgId,
+            });
+
+            // Only an invite that CARRIED a password stored a verifier. Fired
+            // on the transaction the write used.
+            if (hashedPassword) {
+              await announceCredentialWritten(hooks.onCredentialWritten, {
+                db: tx,
+                userId: created.id,
+                operation: 'invite',
+                actorUserId: ctx.userId,
+                firstSet: true,
+                at: new Date(),
+              });
+            }
+
+            return created;
+          }),
+        );
 
         userId = createdUser.id;
       }
@@ -849,17 +969,49 @@ export function createUserService(deps: UserServiceDeps): IUserService {
         }
       }
 
-      // Hash password if provided
-      let hashedPassword: string | undefined;
+      // Hash password if provided — only then is a local verifier written,
+      // so only then is the owner asked.
       if (password) {
-        hashedPassword = await hooks.hashPassword(password, 12);
+        const owner = await ownerOrFrozen(resolveOwner, {
+          db: ctx.db,
+          operation: 'update',
+          user: existingUser,
+          email: existingUser.email ?? null,
+        });
+        if (owner.kind === 'external') {
+          // Not ours to set: nothing is hashed or stored, the caller is told
+          // where the credential is managed.
+          return credentialRedirect(owner);
+        }
+        if (owner.kind === 'none') {
+          throw new UserServiceError('NOT_FOUND', 'User not found');
+        }
       }
 
       const updatedUser = await hooks.withPrivilegedDb(async (db) => {
-        const repo = getRepo(db);
-        return await repo.update(db, id, {
-          ...updateData,
-          ...(hashedPassword && { password: hashedPassword }),
+        if (!password) {
+          // No password: not a credential write, so not through the seam.
+          return getRepo(db).update(db, id, updateData);
+        }
+
+        // p77 seam: gate, then hash + write + announcement in one bounded tx.
+        return withCredentialWrite(hooks, { operation: 'update', db }, async (tx) => {
+          const hashedPassword = await hooks.hashPassword(password, 12);
+          const result = await getRepo(tx).update(tx, id, {
+            ...updateData,
+            password: hashedPassword,
+          });
+
+          await announceCredentialWritten(hooks.onCredentialWritten, {
+            db: tx,
+            userId: id,
+            operation: 'update',
+            actorUserId: ctx.userId,
+            firstSet: !existingUser.password,
+            at: new Date(),
+          });
+
+          return result;
         });
       });
 
@@ -1134,6 +1286,21 @@ export function createUserService(deps: UserServiceDeps): IUserService {
         throw new UserServiceError('NOT_FOUND', 'User not found');
       }
 
+      // Asked BEFORE the compare: an account owned elsewhere must not learn
+      // whether the supplied current password matched a stale local hash.
+      const owner = await ownerOrFrozen(resolveOwner, {
+        db: ctx.db,
+        operation: 'change-password',
+        user,
+        email: user.email ?? null,
+      });
+      if (owner.kind === 'external') {
+        return { success: false as const, ...credentialRedirect(owner) };
+      }
+      if (owner.kind === 'none') {
+        throw new UserServiceError('NOT_FOUND', 'User not found');
+      }
+
       if (!user.password) {
         throw new UserServiceError(
           'BAD_REQUEST',
@@ -1157,12 +1324,29 @@ export function createUserService(deps: UserServiceDeps): IUserService {
         );
       }
 
-      const hashedPassword = await hooks.hashPassword(newPassword, 12);
+      // p77 seam: gate, then hash + write + announcement in one bounded tx.
+      const updatedUser = await hooks.withPrivilegedDb(async (db) =>
+        withCredentialWrite(hooks, { operation: 'change-password', db }, async (tx) => {
+          const hashedPassword = await hooks.hashPassword(newPassword, 12);
+          const result = await getRepo(tx).updatePassword(tx, userId, hashedPassword);
 
-      const updatedUser = await hooks.withPrivilegedDb(async (db) => {
-        const repo = getRepo(db);
-        return await repo.updatePassword(db, userId, hashedPassword);
-      });
+          // `result` is the repository's confirmation; announce only once the
+          // row came back, so a no-op update never produces a record. The
+          // compare above succeeded, so a verifier existed: never a first set.
+          if (result) {
+            await announceCredentialWritten(hooks.onCredentialWritten, {
+              db: tx,
+              userId,
+              operation: 'change-password',
+              actorUserId: userId,
+              firstSet: false,
+              at: new Date(),
+            });
+          }
+
+          return result;
+        }),
+      );
 
       if (!updatedUser) {
         throw new UserServiceError(
@@ -1171,7 +1355,7 @@ export function createUserService(deps: UserServiceDeps): IUserService {
         );
       }
 
-      return { success: true, message: 'Password changed successfully' };
+      return { success: true as const, message: 'Password changed successfully' };
     },
 
     /**

@@ -9,12 +9,23 @@ const clientEntries = [
   'ui/auth/index',
   'ui/feedback/index',
   'ui/display/index',
+  'ui/forms/index',
+  'media/index',
   'ui/skeletons/index',
   'ui/theme/index',
   'ui/admin/index',
+  'ui/auth-pages/index',
+  'ui/app-header/index',
+  'ui/select/index',
   'hooks/index',
   'stores/index',
   'providers/index',
+  // Feature-based UI exports
+  'features/users/ui/index',
+  'features/organizations/ui/index',
+  'features/themes/ui/index',
+  'features/api-keys/ui/index',
+  'features/rbac/ui/index',
 ]
 
 // Server-only entry points (no React hooks)
@@ -25,6 +36,8 @@ const serverEntries = {
   'db/seeds/index': 'src/db/seeds/index.ts',
   'auth/index': 'src/modules/auth/index.ts',
   'auth/providers/index': 'src/modules/auth/providers/index.ts',
+  'password-reset/index': 'src/modules/password-reset/index.ts',
+  'password-reset/policy': 'src/modules/password-reset/password-policy.ts',
   'trpc/index': 'src/trpc/index.ts',
   'trpc/routers/index': 'src/trpc/routers/index.ts',
   'permissions/index': 'src/modules/permissions/index.ts',
@@ -40,8 +53,22 @@ const serverEntries = {
   'users/index': 'src/modules/users/index.ts',
   'organizations/index': 'src/modules/organizations/index.ts',
   'user-org/index': 'src/modules/user-org/index.ts',
+  'org-membership/index': 'src/modules/org-membership/index.ts',
   'middleware/index': 'src/middleware/index.ts',
   'db/drivers/index': 'src/db/drivers/index.ts',
+  // Feature-based backend exports
+  'features/index': 'src/features/index.ts',
+  'features/users/index': 'src/features/users/index.ts',
+  'features/users/backend/index': 'src/features/users/backend/index.ts',
+  'features/organizations/index': 'src/features/organizations/index.ts',
+  'features/organizations/backend/index': 'src/features/organizations/backend/index.ts',
+  'features/themes/index': 'src/features/themes/index.ts',
+  'features/themes/backend/index': 'src/features/themes/backend/index.ts',
+  'features/api-keys/index': 'src/features/api-keys/index.ts',
+  'features/api-keys/backend/index': 'src/features/api-keys/backend/index.ts',
+  'features/rbac/index': 'src/features/rbac/index.ts',
+  'features/rbac/backend/index': 'src/features/rbac/backend/index.ts',
+  'features/shared/index': 'src/features/shared/index.ts',
 }
 
 // Client entry points with their source paths

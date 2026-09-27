@@ -11,6 +11,25 @@
 import { and, ilike, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { IUserRepository } from './repository';
+import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
+import {
+  askCredentialOwner,
+  CredentialOwnedElsewhereError,
+  credentialRedirect,
+  frozenCredentialMessage,
+  selectCredentialOwnerResolver,
+  type CredentialOwner,
+  type ResolveCredentialOwner,
+  type ResolveCredentialOwnerArgs,
+} from '../auth/credential-owner';
+import {
+  announceCredentialWritten,
+  type OnCredentialWritten,
+} from '../auth/credential-written';
+import {
+  withCredentialWrite,
+  type CredentialWriteGate,
+} from '../auth/credential-write';
 import {
     assignRoleSchema,
     changePasswordSchema,
@@ -55,6 +74,68 @@ export interface UserRouterDeps {
    * Optional - if not provided, RLS-enabled db will be used.
    */
   withPrivilegedDb?: <T>(fn: (db: any) => Promise<T>) => Promise<T>;
+
+  /**
+   * Optional hook fired after a user is invited (created OR an existing user
+   * re-invited into the org). Used by RPs to provision a canonical Yobo Connect
+   * identity at invite time. Receives the resulting user, the target org id, and
+   * the db handle. Errors should be swallowed by the implementer (non-fatal).
+   */
+  onUserInvited?: (args: { user: any; orgId: number | null; db: any }) => Promise<void>;
+
+  /**
+   * Optional resolver consulted before any procedure here writes a local
+   * verifier — `invite` and `create` (a new user), `update` (a password on an
+   * existing user) and `changePassword`. It answers WHERE the credential
+   * lives; the SDK has no opinion of its own. Per kind:
+   *
+   * - `local`: write.
+   * - `external`: `invite`/`create` throw `CredentialOwnedElsewhereError`
+   *   (`code: 'OWNED_ELSEWHERE'`, carrying `accountUrl`); `update` and
+   *   `changePassword` RETURN a `CredentialRedirect` (`{ redirect: accountUrl,
+   *   ownedBy: 'external', … }`) without hashing or storing anything.
+   * - `frozen`: `UserRouterError('FORBIDDEN', reason)`; nothing written.
+   * - `none`: `invite`/`create` allocate; `update`/`changePassword` are
+   *   `NOT_FOUND`.
+   *
+   * Absent, `canWriteLocalCredential` is adapted if given, else every
+   * credential is local (today's behaviour).
+   */
+  resolveCredentialOwner?: ResolveCredentialOwner;
+
+  /**
+   * Legacy yes/no guard, kept for one minor. Ignored when
+   * `resolveCredentialOwner` is given; otherwise adapted onto it with the same
+   * outcomes as before: allow → write, refuse →
+   * `UserRouterError('FORBIDDEN', reason)` and nothing written.
+   */
+  canWriteLocalCredential?: LocalCredentialWriteGuard;
+
+  /**
+   * Optional hook fired ONCE after a procedure here has successfully stored a
+   * local verifier — `invite` and `create` when the input CARRIED a password
+   * (`firstSet: true`), `update` with a password, and `changePassword`. It is
+   * never fired on a refusal (`external` → redirect, `frozen` → FORBIDDEN,
+   * `none` → NOT_FOUND), on a wrong current password, on an invite that only
+   * added an existing user to an org, or on an invite/create with no password:
+   * no verifier was written in any of those. None of these procedures runs in
+   * a transaction, so it fires immediately after the write, on the same `db`
+   * handle; errors propagate to the caller.
+   *
+   * p77: every one of those writes now runs inside `withCredentialWrite`'s
+   * transaction, so the hook fires INSIDE it, on the transaction handle.
+   */
+  onCredentialWritten?: OnCredentialWritten;
+
+  /**
+   * p77 credential-write seam (D26). Asked AFTER the credential-owner
+   * resolver and BEFORE any hash, by `invite` and `create` of a new user,
+   * `update` with a password and `changePassword`. A throw refuses: nothing is
+   * hashed or written, and a `CredentialWriteRefusedError` reaches tRPC as
+   * `SERVICE_UNAVAILABLE`. Absent, every write is admitted (today's
+   * behaviour). See `withCredentialWrite`.
+   */
+  credentialWriteGate?: CredentialWriteGate;
 }
 
 /**
@@ -92,6 +173,22 @@ export class UserRouterError extends Error {
   }
 }
 
+/**
+ * Ask where the credential lives and refuse `frozen` in this module's error
+ * shape. `external` and `none` are returned for the caller to route, since
+ * the right answer differs per writer (throw, redirect, allocate, 404).
+ */
+async function ownerOrFrozen(
+  resolveOwner: ResolveCredentialOwner,
+  args: ResolveCredentialOwnerArgs,
+): Promise<CredentialOwner> {
+  const owner = await askCredentialOwner(resolveOwner, args);
+  if (owner.kind === 'frozen') {
+    throw new UserRouterError('FORBIDDEN', frozenCredentialMessage(owner));
+  }
+  return owner;
+}
+
 // =============================================================================
 // ROUTER CONFIG FACTORY
 // =============================================================================
@@ -119,6 +216,8 @@ export class UserRouterError extends Error {
  * ```
  */
 export function createUserRouterConfig(deps: UserRouterDeps) {
+  const resolveOwner = selectCredentialOwnerResolver(deps);
+
   return {
     // -------------------------------------------------------------------------
     // GET ALL USERS WITH STATS (org-scoped)
@@ -129,6 +228,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       input: userFiltersSchema,
       repository: deps.Repository,
       handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userFiltersSchema>>) => {
+        const effectiveOrgId = input.orgId ?? (service.orgId ?? undefined);
+
         const users = await repo.findAll(db, {
           limit: input.limit,
           offset: input.offset,
@@ -136,8 +237,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             search: input.search,
             isActive: input.isActive,
             roleId: input.roleId,
-            // Convert null to undefined for repository compatibility
-            orgId: input.orgId ?? (service.orgId ?? undefined),
+            orgId: effectiveOrgId,
           },
         });
 
@@ -145,18 +245,35 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           search: input.search,
           isActive: input.isActive,
           roleId: input.roleId,
-          orgId: input.orgId ?? (service.orgId ?? undefined),
+          orgId: effectiveOrgId,
         });
 
         // Get roles for users
         const userIds = users.map(u => u.id);
-        // Convert null to undefined for repository compatibility
         const rolesByUser = await repo.getUserRolesBatch(db, userIds, service.orgId ?? undefined);
 
-        const usersWithRoles = users.map(user => ({
-          ...user,
-          roles: rolesByUser.get(user.id) || [],
-        }));
+        // Get membership statuses for the org (if org-scoped)
+        const orgId = service.orgId;
+        const statusMap = orgId
+          ? await repo.getMembershipStatuses(db, userIds, orgId)
+          : new Map<number, string>();
+
+        const usersWithRoles = users.map(user => {
+          // Filter to only active roles
+          const allRoles = rolesByUser.get(user.id) || [];
+          const activeRoles = allRoles.filter((r: any) => r.isActive !== false);
+
+          return {
+            ...user,
+            roles: activeRoles,
+            roleCount: activeRoles.length,
+            orgCount: orgId ? 1 : undefined,
+            lastLoginAt: (user as any).lastLoginAt ?? null,
+            membershipStatus: orgId
+              ? (statusMap.get(user.id) || 'active')
+              : undefined,
+          };
+        });
 
         return {
           users: usersWithRoles,
@@ -215,13 +332,37 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         const userIds = users.map(u => u.id);
         const rolesByUser = await repo.getUserRolesBatch(db, userIds);
 
-        const usersWithRoles = users.map(user => ({
-          ...user,
-          roles: rolesByUser.get(user.id) || [],
-        }));
+        // Get effective membership statuses across all orgs
+        const statusMap = await repo.getMembershipStatusesAllOrgs(db, userIds);
+
+        const usersWithRoles = users.map(user => {
+          // Filter to only active roles
+          const allRoles = rolesByUser.get(user.id) || [];
+          const activeRoles = allRoles.filter((r: any) => r.isActive !== false);
+
+          return {
+            ...user,
+            roles: activeRoles,
+            roleCount: activeRoles.length,
+            membershipStatus: statusMap.get(user.id) || undefined,
+          };
+        });
+
+        // Post-query filter by membership status
+        let filteredUsers = usersWithRoles;
+
+        if (input.membershipStatus) {
+          // Explicit filter: show only users with this specific membership status
+          filteredUsers = filteredUsers.filter(u => u.membershipStatus === input.membershipStatus);
+        } else if (!input.includeRemoved) {
+          // Default behavior: exclude only explicitly 'removed' users.
+          // Users with no org_members records (membershipStatus undefined) are still shown
+          // since they may be pre-existing users or system users without membership entries.
+          filteredUsers = filteredUsers.filter(u => u.membershipStatus !== 'removed');
+        }
 
         return {
-          users: usersWithRoles,
+          users: filteredUsers,
           totalCount,
           hasMore: input.offset + input.limit < totalCount,
         };
@@ -322,41 +463,78 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
               });
             }
           }
+          await deps.onUserInvited?.({ user: existing, orgId: service.orgId ?? null, db });
           return existing;
         }
 
-        // Hash password before storing
-        const hashedPassword = input.password
-          ? await deps.hashPassword(input.password, 10)
-          : undefined;
-
-        // Create new user
-        const newUser = await repo.create(db, {
-          name: input.name,
-          firstName: input.firstName,
-          lastName: input.lastName,
+        // Server-side closure: a new user is a new identity, and may carry a
+        // local verifier. Ask WHERE it lives before allocating either;
+        // `local` and `none` both allocate.
+        const inviteOwner = await ownerOrFrozen(resolveOwner, {
+          db,
+          operation: 'invite',
+          user: null,
           email: input.email,
-          phone: input.phone,
-          username: input.username,
-          password: hashedPassword,
-          isActive: input.isActive,
-          currentOrgId: service.orgId,
         });
+        if (inviteOwner.kind === 'external') {
+          throw new CredentialOwnedElsewhereError(inviteOwner, 'invite');
+        }
 
-        // Assign role - use provided roleId or find global "Standard User" role
+        // Derive name from firstName/lastName if not provided
+        const derivedName = input.name ||
+          [input.firstName, input.lastName].filter(Boolean).join(' ').trim() ||
+          input.email.split('@')[0];  // Fallback to email username
+
+        // Role - use provided roleId or find global "Standard User" role.
+        // Resolved BEFORE the seam: it is a read, and the seam's clock runs.
         let roleIdToAssign = input.roleId;
         if (!roleIdToAssign) {
           roleIdToAssign = await findDefaultRoleId();
         }
 
-        if (roleIdToAssign && service.orgId) {
-          await repo.assignRole(db, {
-            userId: newUser.id,
-            roleId: roleIdToAssign,
-            orgId: service.orgId,
-            assignedBy: parseInt(service.userId),
+        // p77 seam: allocating a user goes through the gate, and the hash,
+        // the insert, the role and the announcement share one bounded tx.
+        const newUser = await withCredentialWrite(deps, { operation: 'invite', db }, async (tx) => {
+          const hashedPassword = input.password
+            ? await deps.hashPassword(input.password, 10)
+            : undefined;
+
+          const created = await repo.create(tx, {
+            name: derivedName,
+            firstName: input.firstName,
+            lastName: input.lastName,
+            email: input.email,
+            phone: input.phone,
+            username: input.username,
+            password: hashedPassword,
+            isActive: input.isActive,
+            currentOrgId: service.orgId,
           });
-        }
+
+          if (roleIdToAssign && service.orgId) {
+            await repo.assignRole(tx, {
+              userId: created.id,
+              roleId: roleIdToAssign,
+              orgId: service.orgId,
+              assignedBy: parseInt(service.userId),
+            });
+          }
+
+          // Only an invite that CARRIED a password stored a verifier.
+          if (hashedPassword) {
+            await announceCredentialWritten(deps.onCredentialWritten, {
+              db: tx,
+              userId: created.id,
+              operation: 'invite',
+              actorUserId: parseInt(service.userId),
+              firstSet: true,
+              at: new Date(),
+            });
+          }
+          return created;
+        });
+
+        await deps.onUserInvited?.({ user: newUser, orgId: service.orgId ?? null, db });
 
         return newUser;
       },
@@ -367,6 +545,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
     // -------------------------------------------------------------------------
     create: {
       permission: 'admin:manage',
+      crossOrg: true,
       input: userCreateSchema,
       invalidates: ['users'],
       entityType: 'user',
@@ -378,35 +557,65 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('CONFLICT', 'User with this email already exists');
         }
 
-        // Hash password before storing
-        const hashedPassword = input.password
-          ? await deps.hashPassword(input.password, 10)
-          : undefined;
-
-        // Create new user
-        const newUser = await repo.create(db, {
-          name: input.name,
-          firstName: input.firstName,
-          lastName: input.lastName,
+        // Server-side closure: same question as `invite`.
+        const createOwner = await ownerOrFrozen(resolveOwner, {
+          db,
+          operation: 'create',
+          user: null,
           email: input.email,
-          phone: input.phone,
-          username: input.username,
-          password: hashedPassword,
-          isActive: input.isActive,
-          currentOrgId: input.orgId,
         });
-
-        // Assign role if provided
-        if (input.roleId && input.orgId) {
-          await repo.assignRole(db, {
-            userId: newUser.id,
-            roleId: input.roleId,
-            orgId: input.orgId,
-            assignedBy: parseInt(service.userId),
-          });
+        if (createOwner.kind === 'external') {
+          throw new CredentialOwnedElsewhereError(createOwner, 'create');
         }
 
-        return newUser;
+        // Derive name from firstName/lastName if not provided
+        const derivedName = input.name ||
+          [input.firstName, input.lastName].filter(Boolean).join(' ').trim() ||
+          input.email.split('@')[0];  // Fallback to email username
+
+        // p77 seam: gate, then hash + insert + announcement + role in one
+        // bounded transaction.
+        return withCredentialWrite(deps, { operation: 'create', db }, async (tx) => {
+          const hashedPassword = input.password
+            ? await deps.hashPassword(input.password, 10)
+            : undefined;
+
+          const newUser = await repo.create(tx, {
+            name: derivedName,
+            firstName: input.firstName,
+            lastName: input.lastName,
+            email: input.email,
+            phone: input.phone,
+            username: input.username,
+            password: hashedPassword,
+            isActive: input.isActive,
+            currentOrgId: input.orgId,
+          });
+
+          // Only a create that CARRIED a password stored a verifier.
+          if (hashedPassword) {
+            await announceCredentialWritten(deps.onCredentialWritten, {
+              db: tx,
+              userId: newUser.id,
+              operation: 'create',
+              actorUserId: parseInt(service.userId),
+              firstSet: true,
+              at: new Date(),
+            });
+          }
+
+          // Assign role if provided
+          if (input.roleId && input.orgId) {
+            await repo.assignRole(tx, {
+              userId: newUser.id,
+              roleId: input.roleId,
+              orgId: input.orgId,
+              assignedBy: parseInt(service.userId),
+            });
+          }
+
+          return newUser;
+        });
       },
     },
 
@@ -415,6 +624,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
     // -------------------------------------------------------------------------
     update: {
       input: userUpdateSchema,
+      crossOrg: true,
       invalidates: ['users'],
       entityType: 'user',
       repository: deps.Repository,
@@ -445,16 +655,40 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         // Hash password if provided
         const finalUpdateData = { ...updateData } as typeof updateData & { password?: string };
         if (password) {
-          finalUpdateData.password = await deps.hashPassword(password, 10);
-          console.log('[SDK User Update] Password hashed and added to finalUpdateData');
+          // Server-side closure: an admin setting a password IS a local
+          // verifier write. Ask WHERE the credential lives before hashing.
+          const owner = await ownerOrFrozen(resolveOwner, {
+            db,
+            operation: 'update',
+            user: existing,
+            email: existing.email ?? null,
+          });
+          if (owner.kind === 'external') {
+            // Not ours to set: nothing is hashed or stored, the caller is
+            // told where the credential is managed.
+            return credentialRedirect(owner);
+          }
+          if (owner.kind === 'none') {
+            throw new UserRouterError('NOT_FOUND', `User with ID ${id} not found`);
+          }
+
+          // p77 seam: gate, then hash + write + announcement in one bounded tx.
+          return withCredentialWrite(deps, { operation: 'update', db }, async (tx) => {
+            finalUpdateData.password = await deps.hashPassword(password, 10);
+            const updated = await repo.update(tx, id, finalUpdateData);
+            await announceCredentialWritten(deps.onCredentialWritten, {
+              db: tx,
+              userId: id,
+              operation: 'update',
+              actorUserId: parseInt(service.userId),
+              firstSet: !existing.password,
+              at: new Date(),
+            });
+            return updated;
+          });
         }
 
-        // DEBUG: Log final update data
-        console.log('[SDK User Update] Final update data:', JSON.stringify({
-          hasPassword: !!finalUpdateData.password,
-          allKeys: Object.keys(finalUpdateData),
-        }));
-
+        // No password: not a credential write, so not through the seam.
         return repo.update(db, id, finalUpdateData);
       },
     },
@@ -558,6 +792,21 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('NOT_FOUND', 'User not found');
         }
 
+        // Server-side closure: route BEFORE the compare, so a user whose
+        // credential lives elsewhere learns nothing about a stale local hash.
+        const owner = await ownerOrFrozen(resolveOwner, {
+          db,
+          operation: 'change-password',
+          user,
+          email: user.email ?? null,
+        });
+        if (owner.kind === 'external') {
+          return { success: false as const, ...credentialRedirect(owner) };
+        }
+        if (owner.kind === 'none') {
+          throw new UserRouterError('NOT_FOUND', 'User not found');
+        }
+
         // Verify current password
         const isValid = user.password
           ? await deps.comparePassword(input.currentPassword, user.password)
@@ -567,9 +816,21 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           throw new UserRouterError('UNAUTHORIZED', 'Current password is incorrect');
         }
 
-        // Hash and update new password
-        const hashedPassword = await deps.hashPassword(input.newPassword, 10);
-        await repo.updatePassword(db, userId, hashedPassword);
+        // p77 seam: gate, then hash + write + announcement in one bounded tx.
+        await withCredentialWrite(deps, { operation: 'change-password', db }, async (tx) => {
+          const hashedPassword = await deps.hashPassword(input.newPassword, 10);
+          await repo.updatePassword(tx, userId, hashedPassword);
+
+          // The compare above succeeded, so a verifier existed: never a first set.
+          await announceCredentialWritten(deps.onCredentialWritten, {
+            db: tx,
+            userId,
+            operation: 'change-password',
+            actorUserId: userId,
+            firstSet: false,
+            at: new Date(),
+          });
+        });
 
         return { success: true };
       },
@@ -726,6 +987,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
 // =============================================================================
 
 import {
+    orgMembers,
     orgs,
     permissions,
     rolePermissions,
@@ -738,8 +1000,8 @@ import { createUserRepositoryClass } from './repository';
 /**
  * SDK User Repository
  *
- * A repository class configured with the SDK's own schema tables.
- * Useful for apps that don't need to customize the schema.
+ * A repository class configured with the SDK's own schema tables,
+ * including orgMembers for org-scoped user filtering.
  *
  * @example
  * ```typescript
@@ -757,6 +1019,7 @@ export const SDKUserRepository = createUserRepositoryClass({
   orgs,
   permissions,
   rolePermissions,
+  orgMembers,
 });
 
 // =============================================================================

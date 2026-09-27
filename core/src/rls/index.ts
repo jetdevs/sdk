@@ -11,6 +11,7 @@
 export type {
   RlsIsolation,
   RlsPolicy,
+  RlsCommandPolicies,
   RlsTableConfig,
   RlsRegistry,
   TableValidationResult,

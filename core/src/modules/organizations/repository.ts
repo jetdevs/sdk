@@ -137,6 +137,7 @@ export interface IOrgRepository {
   findBySlug(db: any, slug: string): Promise<OrgRecord | null>;
   exists(db: any, field: 'name' | 'slug', value: string, excludeId?: number): Promise<boolean>;
   create(db: any, data: OrgCreateData): Promise<OrgRecord>;
+  createOrg(db: any, data: { name: string }): Promise<{ org: any }>;
   update(db: any, id: number, data: OrgUpdateData): Promise<OrgRecord | null>;
   softDelete(db: any, id: number): Promise<OrgRecord | null>;
   hardDelete(db: any, id: number): Promise<void>;
@@ -302,8 +303,14 @@ export function createOrgRepositoryClass(schema: OrgRepositorySchema) {
             orderByClause = sortOrder === 'asc' ? asc(orgs.createdAt) : desc(orgs.createdAt);
           }
           break;
+        case 'isActive':
+          orderByClause = sortOrder === 'asc' ? asc(orgs.isActive) : desc(orgs.isActive);
+          break;
         case 'createdAt':
         default:
+          // Apps may extend `sortBy` with their own columns (the type is an open
+          // union for exactly that). Unknown keys fall through to createdAt here
+          // rather than throwing — the app's own repository implements them.
           orderByClause = sortOrder === 'asc' ? asc(orgs.createdAt) : desc(orgs.createdAt);
           break;
       }
@@ -445,6 +452,22 @@ export function createOrgRepositoryClass(schema: OrgRepositorySchema) {
         .returning();
 
       return result[0] as unknown as OrgRecord;
+    }
+
+    /**
+     * Minimal create-by-name (Yobo Connect). Idempotency for canonical orgs is
+     * enforced by the caller via yobo-auth's org_source_map (C5) — do NOT add
+     * slug/externalRef keying here; RP-local slugs/ids collide across systems.
+     */
+    async createOrg(
+      db: PostgresJsDatabase<any>,
+      data: { name: string }
+    ): Promise<{ org: any }> {
+      const inserted = await db
+        .insert(orgs)
+        .values({ name: data.name } as any)
+        .returning();
+      return { org: inserted[0] };
     }
 
     /**

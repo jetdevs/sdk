@@ -140,6 +140,14 @@ export const coreRlsTables: RlsRegistry = {
     )`,
   },
 
+  org_members: {
+    isolation: 'org',
+    orgId: true,
+    workspaceId: false,
+    description: 'Organization membership records - tracks user lifecycle within orgs',
+    rlsEnabled: true,
+  },
+
   api_keys: {
     isolation: 'org',
     orgId: true,
@@ -310,6 +318,10 @@ export function validateTableConfig(
   // Warnings
   if (config.isolation === 'public' && config.rlsEnabled === true) {
     warnings.push(`Table ${tableName} is public but has RLS enabled - this may be intentional`);
+  }
+
+  if (config.policies && config.isolation !== 'org') {
+    warnings.push(`Table ${tableName} sets per-command policies but has isolation '${config.isolation}' - policies only apply to org isolation and will be ignored`);
   }
 
   return {

@@ -8,13 +8,29 @@ import {
     getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
+    Row,
     RowSelectionState,
     SortingState,
     useReactTable,
     VisibilityState
 } from '@tanstack/react-table';
 import * as React from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { PaginationConfig } from './BaseListTable';
+import { getAlignCellClass } from './column-meta';
+import {
+    FilterIcon,
+    MobileRowList,
+    MobileSheet,
+    MobileSheetField,
+    useIsMobileList,
+    type MobileListOption,
+} from './mobile';
+import {
+    createStandardListToolbar,
+    type StandardToolbarConfig,
+    type StandardToolbarFilter,
+} from './standard-toolbar';
 
 // =============================================================================
 // SVG ICONS - Built-in to avoid lucide-react dependency in this component
@@ -151,7 +167,10 @@ export interface DataTableWithToolbarUIComponents {
     children: React.ReactNode
   }>;
   SelectTrigger: React.ComponentType<{ className?: string; children: React.ReactNode }>;
-  SelectValue: React.ComponentType<{ placeholder?: string }>;
+  // `children` is optional and additive: Radix's real SelectValue already
+  // accepts it, and it is what lets a ServerFilterConfig render a custom
+  // trigger label (e.g. a flag emoji) instead of the raw value.
+  SelectValue: React.ComponentType<{ placeholder?: string; children?: React.ReactNode }>;
   SelectContent: React.ComponentType<{ side?: 'top' | 'bottom'; children: React.ReactNode }>;
   SelectItem: React.ComponentType<{ value: string; children: React.ReactNode }>;
 
@@ -187,6 +206,55 @@ export interface FilterColumnConfig {
   columnId: string;
   label: string;
   options: Array<{ label: string; value: string }>;
+}
+
+/**
+ * Server-driven sorting. When supplied, TanStack stops re-sorting rows locally
+ * (`manualSorting: true`) and the consumer is responsible for translating the
+ * `SortingState` into a backend `sortBy`/`sortOrder`.
+ *
+ * Without this, a server-paginated table sorts only the rows of the CURRENT
+ * page — a wrong-answer bug, not a cosmetic one. Always pair this with
+ * `pagination` when the backend pages.
+ */
+export interface ServerSortingConfig {
+  /** Controlled sorting state (usually a single entry). */
+  state: SortingState;
+  /** Called with the next state when a column header is clicked. */
+  onChange: (next: SortingState) => void;
+}
+
+/**
+ * Server-driven search. When supplied, the toolbar's search box drives this
+ * instead of TanStack's client-side `globalFilter`, so a search matches rows on
+ * every page rather than only the loaded ones.
+ */
+export interface ServerSearchConfig {
+  /** Current (undebounced) input value — the consumer owns this state. */
+  value: string;
+  /** Called after `debounceMs` with the new value. */
+  onChange: (value: string) => void;
+  placeholder?: string;
+  /** Debounce applied before `onChange` fires. Default 300ms. */
+  debounceMs?: number;
+}
+
+/**
+ * A server-evaluated dropdown filter. Unlike `filterColumns` (which filter the
+ * loaded rows via TanStack `columnFilters`), these are round-tripped to the
+ * backend so they apply across the whole result set.
+ */
+export interface ServerFilterConfig {
+  /** Stable key — used for the React key only, not a column id. */
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ label: string; value: string }>;
+  /** Trigger width class. Default `w-[130px]`. */
+  className?: string;
+  /** Optional custom trigger text (e.g. to render a flag emoji). */
+  renderValue?: (value: string) => React.ReactNode;
 }
 
 /**
@@ -229,6 +297,13 @@ export interface DataTableWithToolbarConfig<TData> {
   defaultPageSize?: number;
   /** Initial column visibility state (e.g., { columnId: false } to hide a column by default) */
   initialColumnVisibility?: VisibilityState;
+  /**
+   * Phone layout (p90): below `md`, rows render as compact divider-separated
+   * lines (title + one status line + ⋯) and the toolbar collapses to search +
+   * one filters button. `false` keeps the table on phones. Overridable per
+   * render via the `mobile` prop.
+   */
+  mobile?: MobileListOption;
 }
 
 /**
@@ -246,6 +321,151 @@ export interface DataTableWithToolbarProps<TData> {
     onClose: () => void;
     onConfirm: () => void;
   }) => React.ReactNode;
+
+  // ---------------------------------------------------------------------------
+  // Card / expand extension (OPT-IN, backwards-compatible — p6 Track A).
+  //
+  // When `renderRow` is UNSET, every line below is inert and the `useReactTable`
+  // options object is byte-identical to before this addition (no `getRowId`, no
+  // expanded row model). This is what keeps existing consumers (cadra-web, crm,
+  // core-saas, …) unaffected.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Render each row as a bespoke node instead of the column-cell grid. When
+   * provided, the table header is suppressed and the body renders these, each
+   * wrapped in `<TableRow><TableCell colSpan={visibleLeafCount}>`. `ctx` exposes
+   * the TanStack row + index + expand controls.
+   */
+  renderRow?: (
+    row: TData,
+    ctx: {
+      row: Row<TData>;
+      index: number;
+      isExpanded: boolean;
+      toggleExpanded: () => void;
+    },
+  ) => React.ReactNode;
+
+  /** Detail panel shown under an expanded row (only meaningful with renderRow). */
+  renderExpanded?: (row: TData) => React.ReactNode;
+
+  /** Gate which rows can expand (default: () => Boolean(renderExpanded)). */
+  getRowCanExpand?: (row: TData) => boolean;
+
+  /**
+   * Stable row id, applied to `useReactTable` ONLY when `renderRow` is set
+   * (REQUIRED for renderRow consumers — pass the row uuid) so expand state
+   * attaches to the entity, not the array index. Untouched (back-compat) when
+   * `renderRow` is unset.
+   */
+  getRowId?: (row: TData) => string;
+
+  /**
+   * Wrapper semantics for renderRow mode.
+   *   - `'list'` (default): stacked full-width rows inside the existing
+   *     `<Table>` (bordered box, divider rows — no gaps/rounding).
+   *   - `'cards'`: a spaced vertical stack of standalone blocks (NOT a table),
+   *     where each consumer `renderRow` output owns its own card chrome
+   *     (rounded/border/bg/padding) and `space-y` provides the gap. Pagination,
+   *     sorting and expand state still come from the table instance.
+   */
+  rowLayout?: 'list' | 'cards';
+
+  /**
+   * Suppress the built-in toolbar (search + filters + results count + refresh +
+   * export + view/density). OPT-IN, backwards-compatible: when unset the toolbar
+   * renders exactly as before. Intended for `renderRow` consumers that supply
+   * their own search/count chrome (e.g. the prototype-parity guest list), so the
+   * page doesn't show two stacked search bars. Pagination is unaffected.
+   */
+  hideToolbar?: boolean;
+
+  /**
+   * The standard list toolbar (p90): search with the filter menu INSIDE it,
+   * status chips, list/grid toggle. When set it REPLACES the built-in toolbar
+   * and also drops export, the View (columns/density) menu, refresh, the result
+   * count and the "Rows per page" select. Every field is optional:
+   *   - `search` defaults to the table's own search (server `search` if set,
+   *     else the client-side global filter);
+   *   - `filters` defaults to `serverFilters` + the config's `filterColumns`,
+   *     moved into the search box's filter menu.
+   * Opt-in; unset → the table renders exactly as before.
+   */
+  standardToolbar?: Partial<StandardToolbarConfig>;
+
+  /**
+   * Render the toolbar (and bulk-actions bar) only — no rows, no pagination.
+   * For consumers that draw their own grid view under the same toolbar.
+   * Opt-in; unset → unchanged.
+   */
+  hideTable?: boolean;
+
+  // ---------------------------------------------------------------------------
+  // Server-side mode (OPT-IN, backwards-compatible).
+  //
+  // Every prop below is independently optional. When ALL of them are unset the
+  // `useReactTable` options object is byte-identical to before this addition,
+  // so existing client-side consumers (cadra-web roles, crm, core-saas, the yobo
+  // connectors tab, …) are untouched.
+  //
+  // Before this existed, `DataTableWithToolbar` was client-only, which is why
+  // every server-paginated backoffice list forked into a bespoke table. Reach
+  // for these instead of forking.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Server-side pagination. When set, the table pages via the backend
+   * (`manualPagination`) and `pageCount` is derived from `totalCount` — the
+   * built-in pager drives `onPageChange`/`onPageSizeChange` instead of slicing
+   * the loaded array.
+   */
+  pagination?: PaginationConfig;
+
+  /**
+   * Server-side sorting. When set, `manualSorting` is enabled so TanStack does
+   * NOT re-sort the loaded page. Required for correctness alongside
+   * `pagination`. Columns still need `DataTableColumnHeader` headers to render
+   * a clickable sort affordance; mark the non-sortable ones `enableSorting: false`
+   * so no dead affordance is shown.
+   */
+  sorting?: ServerSortingConfig;
+
+  /**
+   * Server-side search. When set, the toolbar search box becomes controlled and
+   * debounced, and the client-side `globalFilter` is left untouched.
+   */
+  search?: ServerSearchConfig;
+
+  /**
+   * Server-evaluated dropdown filters, rendered alongside any `filterColumns`.
+   * Use these when the filter must apply across the whole result set rather
+   * than the loaded page.
+   */
+  serverFilters?: ServerFilterConfig[];
+
+  /**
+   * Export source override. Client-side exports only ever see the loaded rows;
+   * a server-paginated table must page through the backend to export the full
+   * filtered set. When set, CSV/JSON export awaits this instead.
+   */
+  onExportData?: () => Promise<TData[]>;
+
+  /**
+   * Override the toolbar result label (default `"<shown> of <loaded> <entity>"`,
+   * which is misleading under server pagination). Pair with
+   * `formatResultLabel(shown, totalCount)` from the app convention layer.
+   */
+  resultLabel?: string;
+
+  /**
+   * True while a background refetch is in flight (e.g. after a filter change).
+   * Renders a small spinner in the toolbar without swapping in the skeleton.
+   */
+  isFetching?: boolean;
+
+  /** Phone layout override (see `DataTableWithToolbarConfig.mobile`). */
+  mobile?: MobileListOption;
 }
 
 /**
@@ -321,6 +541,7 @@ export function createDataTableWithToolbar<TData>(
     pageSizeOptions = [10, 20, 30, 40, 50],
     defaultPageSize = 10,
     initialColumnVisibility = {},
+    mobile: configMobile,
   } = config;
 
   const {
@@ -347,6 +568,16 @@ export function createDataTableWithToolbar<TData>(
     DropdownMenuCheckboxItem,
     toast,
   } = ui;
+
+  const StandardListToolbar = createStandardListToolbar({
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuCheckboxItem,
+    SearchIcon,
+  });
 
   // =========================================================================
   // SKELETON COMPONENT
@@ -389,7 +620,32 @@ export function createDataTableWithToolbar<TData>(
     isLoading,
     onRefresh,
     renderDialog,
+    renderRow,
+    renderExpanded,
+    getRowCanExpand,
+    getRowId,
+    rowLayout = 'list',
+    hideToolbar = false,
+    pagination: serverPagination,
+    sorting: serverSorting,
+    search: serverSearch,
+    serverFilters,
+    onExportData,
+    resultLabel,
+    isFetching,
+    mobile: propMobile,
+    standardToolbar,
+    hideTable = false,
   }: DataTableWithToolbarProps<TData>) {
+    // Phone layout (p90). Always false on the server and ≥ md, so desktop
+    // takes exactly the pre-p90 path below.
+    const mobile = propMobile !== undefined ? propMobile : configMobile;
+    const isMobile = useIsMobileList(mobile !== false);
+    const mobileConfig = mobile || {};
+    // renderRow consumers own their row layout — only the toolbar goes compact.
+    const cardMode = isMobile && !renderRow;
+    const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+    const closeFilterSheet = React.useCallback(() => setFilterSheetOpen(false), []);
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
@@ -399,19 +655,69 @@ export function createDataTableWithToolbar<TData>(
     const [dialogOpen, setDialogOpen] = useState(false);
     const [dialogAction, setDialogAction] = useState<string | null>(null);
 
+    // Expand state — only used in renderRow mode. Keyed by getRowId(row) so it
+    // survives pagination/refetch (renderRow consumers MUST pass getRowId).
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+
+    // Server-search mirror: the input stays responsive locally while `onChange`
+    // is pushed up on a debounce. `lastPushedSearch` is what the consumer last
+    // saw, so an external reset (Clear filters) flows back DOWN without the
+    // debounce immediately echoing the stale value back up.
+    const [searchInput, setSearchInput] = useState(serverSearch?.value ?? '');
+    const lastPushedSearch = useRef(serverSearch?.value ?? '');
+    const serverSearchValue = serverSearch?.value;
+    const serverSearchDebounce = serverSearch?.debounceMs ?? 300;
+    const serverSearchOnChange = serverSearch?.onChange;
+
+    useEffect(() => {
+      if (serverSearchValue === undefined) return;
+      if (serverSearchValue !== lastPushedSearch.current) {
+        lastPushedSearch.current = serverSearchValue;
+        setSearchInput(serverSearchValue);
+      }
+    }, [serverSearchValue]);
+
+    useEffect(() => {
+      if (!serverSearchOnChange) return;
+      if (searchInput === lastPushedSearch.current) return;
+      const timer = setTimeout(() => {
+        lastPushedSearch.current = searchInput;
+        serverSearchOnChange(searchInput);
+      }, serverSearchDebounce);
+      return () => clearTimeout(timer);
+    }, [searchInput, serverSearchDebounce, serverSearchOnChange]);
+
+    // Server-side mode. Each block below is inert when its prop is unset, so
+    // the options object stays byte-identical for client-side consumers.
+    const isServerSorted = serverSorting !== undefined;
+    const isServerPaginated = serverPagination !== undefined;
+
     const table = useReactTable({
       data,
       columns,
       state: {
-        sorting,
+        sorting: isServerSorted ? serverSorting.state : sorting,
         columnFilters,
         globalFilter,
         rowSelection,
         columnVisibility,
+        ...(isServerPaginated
+          ? {
+              pagination: {
+                pageIndex: serverPagination.pageIndex,
+                pageSize: serverPagination.pageSize,
+              },
+            }
+          : {}),
       },
       enableRowSelection,
       onRowSelectionChange: setRowSelection,
-      onSortingChange: setSorting,
+      onSortingChange: isServerSorted
+        ? (updater) =>
+            serverSorting.onChange(
+              typeof updater === 'function' ? updater(serverSorting.state) : updater,
+            )
+        : setSorting,
       onColumnFiltersChange: setColumnFilters,
       onGlobalFilterChange: setGlobalFilter,
       onColumnVisibilityChange: setColumnVisibility,
@@ -419,24 +725,86 @@ export function createDataTableWithToolbar<TData>(
       getSortedRowModel: getSortedRowModel(),
       getFilteredRowModel: getFilteredRowModel(),
       getPaginationRowModel: getPaginationRowModel(),
-      initialState: {
-        pagination: {
-          pageSize: defaultPageSize,
-        },
-      },
+      // GATED: only thread getRowId when renderRow is set, so the options object
+      // is byte-identical to before when the card/expand props are unused. An
+      // unconditional getRowId would re-key RowSelectionState and break bulk-select.
+      ...(renderRow && getRowId ? { getRowId } : {}),
+      // GATED: `manualSorting` stops TanStack re-sorting the loaded page on top
+      // of the backend's ordering — without it a server sort would be silently
+      // overwritten by a client sort over 1 page of N.
+      ...(isServerSorted ? { manualSorting: true as const } : {}),
+      ...(isServerPaginated
+        ? {
+            manualPagination: true as const,
+            pageCount:
+              serverPagination.totalCount !== undefined
+                ? Math.ceil(serverPagination.totalCount / serverPagination.pageSize)
+                : -1,
+            onPaginationChange: (updater: unknown) => {
+              const prev = {
+                pageIndex: serverPagination.pageIndex,
+                pageSize: serverPagination.pageSize,
+              };
+              const next =
+                typeof updater === 'function'
+                  ? (updater as (p: typeof prev) => typeof prev)(prev)
+                  : (updater as typeof prev);
+              if (next.pageSize !== prev.pageSize) {
+                serverPagination.onPageSizeChange?.(next.pageSize);
+              }
+              if (next.pageIndex !== prev.pageIndex) {
+                serverPagination.onPageChange?.(next.pageIndex);
+              }
+            },
+          }
+        : {
+            initialState: {
+              pagination: {
+                pageSize: defaultPageSize,
+              },
+            },
+          }),
     });
 
     const selectedRows = table.getFilteredSelectedRowModel().rows;
     const selectedData = selectedRows.map(row => row.original);
     const hasSelection = selectedRows.length > 0;
 
+    // renderRow mode helpers (inert when renderRow is unset).
+    const rowCanExpand = getRowCanExpand ?? (() => Boolean(renderExpanded));
+    const resolveRowId = (row: Row<TData>): string =>
+      getRowId ? getRowId(row.original) : row.id;
+    const toggleExpanded = (id: string) => {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
+
     // Export functions
-    const exportToCSV = () => {
+    //
+    // `onExportData` exists because the client-side path below can only ever see
+    // the LOADED rows — under server pagination that silently exports page 1 of
+    // N. When supplied it pages the backend for the full filtered set, and the
+    // rows come back as raw `TData` (no TanStack row wrapper), so values are
+    // read off the object rather than via `row.getValue`.
+    const exportToCSV = async () => {
       const headers = table.getVisibleFlatColumns()
         .filter(col => col.id !== 'select' && col.id !== 'actions')
         .map(col => col.id);
 
-      const csvData = table.getFilteredRowModel().rows.map(row => {
+      const csvData = onExportData
+        ? (await onExportData()).map(item => {
+            const rowData: Record<string, unknown> = {};
+            headers.forEach(header => {
+              const cell = (item as Record<string, unknown>)[header];
+              rowData[header] = typeof cell === 'object' ? JSON.stringify(cell) : cell;
+            });
+            return rowData;
+          })
+        : table.getFilteredRowModel().rows.map(row => {
         const rowData: Record<string, unknown> = {};
         headers.forEach(header => {
           const cell = row.getValue(header);
@@ -459,8 +827,10 @@ export function createDataTableWithToolbar<TData>(
       toast.success(`${entityName} exported to CSV`);
     };
 
-    const exportToJSON = () => {
-      const exportData = table.getFilteredRowModel().rows.map(row => row.original);
+    const exportToJSON = async () => {
+      const exportData = onExportData
+        ? await onExportData()
+        : table.getFilteredRowModel().rows.map(row => row.original);
       const jsonContent = JSON.stringify(exportData, null, 2);
 
       const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
@@ -477,9 +847,21 @@ export function createDataTableWithToolbar<TData>(
       setGlobalFilter('');
       setColumnFilters([]);
       table.resetColumnFilters();
+      // Server-side equivalents (inert when the props are unset).
+      if (serverSearch) {
+        setSearchInput('');
+        lastPushedSearch.current = '';
+        serverSearch.onChange('');
+      }
+      serverFilters?.forEach(filter => filter.onChange('all'));
     };
 
-    const hasActiveFilters = globalFilter || columnFilters.length > 0;
+    const hasActiveFilters = Boolean(
+      globalFilter ||
+        columnFilters.length > 0 ||
+        searchInput ||
+        serverFilters?.some(filter => filter.value !== 'all'),
+    );
 
     // Density classes
     const getDensityClasses = () => {
@@ -525,21 +907,210 @@ export function createDataTableWithToolbar<TData>(
       return <TableSkeleton columnCount={columns.length} />;
     }
 
+    // Nothing to page through: no rows on the first page ("Page 1 of 0").
+    const hidePagination =
+      table.getRowModel().rows.length === 0 && table.getState().pagination.pageIndex === 0;
+
+    const renderSearchInput = (className: string) =>
+      serverSearch ? (
+        <Input
+          placeholder={serverSearch.placeholder ?? `Search ${entityName}...`}
+          value={searchInput}
+          onChange={(event) => setSearchInput(String(event.target.value))}
+          className={className}
+        />
+      ) : (
+        <Input
+          placeholder={`Search ${entityName}...`}
+          value={globalFilter ?? ''}
+          onChange={(event) => setGlobalFilter(String(event.target.value))}
+          className={className}
+        />
+      );
+
+    // Phones (p90): one row — full-width search + one filters button. Export,
+    // view/density, column toggles, refresh and the result count are not shown;
+    // filters live in a bottom sheet. No wrapper box.
+    const hasMobileFilters = Boolean(serverFilters?.length || filterColumns.length);
+    const mobileToolbar = (
+      <div data-slot="list-toolbar-mobile" className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          {renderSearchInput('pl-8 w-full')}
+        </div>
+        {isFetching && (
+          <span
+            aria-label="Loading"
+            className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+          />
+        )}
+        {hasMobileFilters && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="relative h-9 w-9 shrink-0 p-0"
+            onClick={() => setFilterSheetOpen(true)}
+          >
+            <FilterIcon className="h-4 w-4" />
+            <span className="sr-only">Filters</span>
+            {(columnFilters.length > 0 || serverFilters?.some((f) => f.value !== 'all')) && (
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary" />
+            )}
+          </Button>
+        )}
+        {hasMobileFilters && (
+          <MobileSheet open={filterSheetOpen} onClose={closeFilterSheet} title="Filters">
+            {serverFilters?.map((filterConfig) => (
+              <MobileSheetField key={filterConfig.id} label={filterConfig.label}>
+                <Select value={filterConfig.value} onValueChange={filterConfig.onChange}>
+                  <SelectTrigger className="w-full">
+                    {filterConfig.renderValue ? (
+                      <SelectValue>{filterConfig.renderValue(filterConfig.value)}</SelectValue>
+                    ) : (
+                      <SelectValue placeholder={filterConfig.label} />
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filterConfig.options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </MobileSheetField>
+            ))}
+            {filterColumns.map((filterConfig) => (
+              <MobileSheetField key={filterConfig.columnId} label={filterConfig.label}>
+                <Select
+                  value={(table.getColumn(filterConfig.columnId)?.getFilterValue() as string) ?? 'all'}
+                  onValueChange={(value) =>
+                    table.getColumn(filterConfig.columnId)?.setFilterValue(
+                      value === 'all' ? undefined : value === 'true' ? true : value === 'false' ? false : value
+                    )
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={filterConfig.label} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filterConfig.options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </MobileSheetField>
+            ))}
+            <div className="flex items-center justify-end gap-2 pt-2">
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  Clear
+                </Button>
+              )}
+              <Button size="sm" onClick={closeFilterSheet}>
+                Done
+              </Button>
+            </div>
+          </MobileSheet>
+        )}
+      </div>
+    );
+
+    // Standard toolbar (opt-in): the table's own search + filters, configured.
+    const standardToolbarNode = standardToolbar ? (
+      <StandardListToolbar
+        {...standardToolbar}
+        search={
+          standardToolbar.search ??
+          (serverSearch
+            ? { value: searchInput, onChange: setSearchInput, placeholder: serverSearch.placeholder ?? `Search ${entityName}...` }
+            : { value: globalFilter ?? '', onChange: setGlobalFilter, placeholder: `Search ${entityName}...` })
+        }
+        filters={
+          standardToolbar.filters ?? [
+            ...(serverFilters ?? []).map(
+              (f): StandardToolbarFilter => ({ id: f.id, label: f.label, value: f.value, options: f.options, onChange: f.onChange }),
+            ),
+            ...filterColumns.map(
+              (f): StandardToolbarFilter => ({
+                id: f.columnId,
+                label: f.label,
+                value: String(table.getColumn(f.columnId)?.getFilterValue() ?? 'all'),
+                options: f.options,
+                onChange: (value) =>
+                  table
+                    .getColumn(f.columnId)
+                    ?.setFilterValue(value === 'all' ? undefined : value === 'true' ? true : value === 'false' ? false : value),
+              }),
+            ),
+          ]
+        }
+      />
+    ) : null;
+
     return (
       <div className="space-y-4">
-        {/* Toolbar */}
+        {!hideToolbar && standardToolbarNode}
+        {/* Toolbar — suppressed when `hideToolbar` (consumer owns its own
+            search/count chrome). GATED: byte-identical render when unset. */}
+        {!hideToolbar && !standardToolbar && isMobile && mobileToolbar}
+        {!hideToolbar && !standardToolbar && !isMobile && (
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            {/* Search */}
+            {/* Search — server-driven (debounced) when `search` is supplied,
+                otherwise the original client-side globalFilter. */}
             <div className="relative">
               <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={`Search ${entityName}...`}
-                value={globalFilter ?? ''}
-                onChange={(event) => setGlobalFilter(String(event.target.value))}
-                className="pl-8 max-w-sm"
-              />
+              {serverSearch ? (
+                <Input
+                  placeholder={serverSearch.placeholder ?? `Search ${entityName}...`}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(String(event.target.value))}
+                  className="pl-8 max-w-sm"
+                />
+              ) : (
+                <Input
+                  placeholder={`Search ${entityName}...`}
+                  value={globalFilter ?? ''}
+                  onChange={(event) => setGlobalFilter(String(event.target.value))}
+                  className="pl-8 max-w-sm"
+                />
+              )}
             </div>
+
+            {/* Server-evaluated filters (apply across the whole result set). */}
+            {serverFilters?.map((filterConfig) => (
+              <Select
+                key={filterConfig.id}
+                value={filterConfig.value}
+                onValueChange={filterConfig.onChange}
+              >
+                <SelectTrigger className={filterConfig.className ?? 'w-[130px]'}>
+                  {filterConfig.renderValue ? (
+                    <SelectValue>{filterConfig.renderValue(filterConfig.value)}</SelectValue>
+                  ) : (
+                    <SelectValue placeholder={filterConfig.label} />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {filterConfig.options.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ))}
+
+            {/* Background refetch indicator (server-side mode). */}
+            {isFetching && !isLoading && (
+              <span
+                aria-label="Loading"
+                className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+              />
+            )}
 
             {/* Column Filters */}
             {filterColumns.map((filterConfig) => (
@@ -580,9 +1151,11 @@ export function createDataTableWithToolbar<TData>(
           </div>
 
           <div className="flex items-center space-x-2">
-            {/* Results Count */}
+            {/* Results Count — the default counts LOADED rows, which is
+                misleading under server pagination; `resultLabel` overrides it. */}
             <div className="text-sm text-muted-foreground">
-              {table.getFilteredRowModel().rows.length} of {data.length} {entityName}
+              {resultLabel ??
+                `${table.getFilteredRowModel().rows.length} of ${data.length} ${entityName}`}
             </div>
 
             {/* Refresh */}
@@ -671,10 +1244,17 @@ export function createDataTableWithToolbar<TData>(
             )}
           </div>
         </div>
+        )}
 
         {/* Bulk Actions Bar */}
         {hasSelection && bulkActions.length > 0 && (
-          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
+          <div
+            className={
+              isMobile
+                ? 'flex flex-wrap items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg border'
+                : 'flex items-center justify-between p-3 bg-muted/50 rounded-lg border'
+            }
+          >
             <div className="flex items-center space-x-2">
               <Badge variant="secondary">
                 {selectedRows.length} selected
@@ -710,38 +1290,137 @@ export function createDataTableWithToolbar<TData>(
           </div>
         )}
 
-        {/* Table */}
+        {!hideTable && (<>
+        {/* Card layout (renderRow + rowLayout:'cards'): a spaced stack of
+            consumer-styled cards instead of the bordered table. Each renderRow
+            output owns its own rounded/border/bg/padding; `space-y` is the gap.
+            Pagination / sort / expand state still come from the table instance. */}
+        {cardMode ? (
+          <MobileRowList
+            table={table}
+            config={mobileConfig}
+            empty={<div className="text-sm text-muted-foreground">No {entityName} found.</div>}
+          />
+        ) : renderRow && rowLayout === 'cards' ? (
+          <div className="space-y-2">
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row, index) => {
+                const rowId = resolveRowId(row);
+                const canExpand = rowCanExpand(row.original);
+                const isExpanded = canExpand && expandedIds.has(rowId);
+                return (
+                  <React.Fragment key={rowId}>
+                    {renderRow(row.original, {
+                      row,
+                      index,
+                      isExpanded,
+                      toggleExpanded: () => {
+                        if (canExpand) toggleExpanded(rowId);
+                      },
+                    }) as React.ReactNode}
+                    {isExpanded &&
+                      renderExpanded &&
+                      (renderExpanded(row.original) as React.ReactNode)}
+                  </React.Fragment>
+                );
+              })
+            ) : (
+              <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
+                No {entityName} found.
+              </div>
+            )}
+          </div>
+        ) : (
         <div className="rounded-md border">
           <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className={getDensityClasses()}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
+            {/* Header suppressed in renderRow mode (custom rows own their layout). */}
+            {!renderRow && (
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => {
+                      const alignClass = getAlignCellClass(header.column.columnDef.meta?.align);
+                      return (
+                        <TableHead
+                          key={header.id}
+                          className={`${getDensityClasses()} ${alignClass}`.trim()}
+                        >
+                          {header.isPlaceholder
+                            ? null
+                            : (flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              ) as React.ReactNode)}
+                        </TableHead>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableHeader>
+            )}
             <TableBody>
-              {table.getRowModel().rows?.length ? (
+              {renderRow ? (
+                table.getRowModel().rows?.length ? (
+                  table.getRowModel().rows.map((row, index) => {
+                    const rowId = resolveRowId(row);
+                    const canExpand = rowCanExpand(row.original);
+                    const isExpanded = canExpand && expandedIds.has(rowId);
+                    const visibleLeafCount = table.getVisibleLeafColumns().length || 1;
+                    return (
+                      <React.Fragment key={rowId}>
+                        <TableRow
+                          data-state={row.getIsSelected() ? 'selected' : undefined}
+                          className={getDensityClasses()}
+                        >
+                          <TableCell colSpan={visibleLeafCount} className="p-0">
+                            {renderRow(row.original, {
+                              row,
+                              index,
+                              isExpanded,
+                              toggleExpanded: () => {
+                                if (canExpand) toggleExpanded(rowId);
+                              },
+                            }) as React.ReactNode}
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && renderExpanded && (
+                          <TableRow>
+                            <TableCell colSpan={visibleLeafCount} className="p-0">
+                              {renderExpanded(row.original) as React.ReactNode}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={table.getVisibleLeafColumns().length || 1}
+                      className="h-24 text-center"
+                    >
+                      No {entityName} found.
+                    </TableCell>
+                  </TableRow>
+                )
+              ) : table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() ? 'selected' : undefined}
                     className={getDensityClasses()}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className={getDensityClasses()}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
+                    {row.getVisibleCells().map((cell) => {
+                      const alignClass = getAlignCellClass(cell.column.columnDef.meta?.align);
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          className={`${getDensityClasses()} ${alignClass}`.trim()}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext()) as React.ReactNode}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))
               ) : (
@@ -754,10 +1433,37 @@ export function createDataTableWithToolbar<TData>(
             </TableBody>
           </Table>
         </div>
+        )}
 
-        {/* Pagination */}
+        {/* Pagination — phones: prev · Page x of y · next only. */}
+        {!hidePagination && isMobile && (
+          <div data-slot="mobile-pagination" className="flex items-center justify-center gap-3 py-2">
+            <Button
+              variant="outline"
+              className="h-9 w-9 p-0"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <span className="sr-only">Go to previous page</span>
+              <ChevronLeftIcon className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            </span>
+            <Button
+              variant="outline"
+              className="h-9 w-9 p-0"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              <span className="sr-only">Go to next page</span>
+              <ChevronRightIcon className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        {!hidePagination && !isMobile && (
         <div className="flex items-center justify-between space-x-2 py-4">
-          <div className="flex items-center space-x-2">
+          <div className={standardToolbar ? 'hidden' : 'flex items-center space-x-2'}>
             <p className="text-sm font-medium">Rows per page</p>
             <Select
               value={`${table.getState().pagination.pageSize}`}
@@ -769,7 +1475,7 @@ export function createDataTableWithToolbar<TData>(
                 <SelectValue placeholder={String(table.getState().pagination.pageSize)} />
               </SelectTrigger>
               <SelectContent side="top">
-                {pageSizeOptions.map((pageSize) => (
+                {(serverPagination?.pageSizeOptions ?? pageSizeOptions).map((pageSize) => (
                   <SelectItem key={pageSize} value={`${pageSize}`}>
                     {pageSize}
                   </SelectItem>
@@ -822,6 +1528,9 @@ export function createDataTableWithToolbar<TData>(
             </div>
           </div>
         </div>
+        )}
+
+        </>)}
 
         {/* External Dialog (e.g., for bulk delete confirmation) */}
         {renderDialog && renderDialog({

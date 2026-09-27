@@ -168,6 +168,45 @@ S3_ENDPOINT=https://your-endpoint.com
 
 The SDK automatically enables path-style access for custom endpoints.
 
+## WhatsApp Runtime URL Button Parameters
+
+`@jetdevs/cloud/whatsapp` supports optional runtime button parameters for
+approved WhatsApp templates that contain dynamic URL buttons, for example a
+template button URL ending in `?token={{1}}`.
+
+Existing callers do not need to change. When `buttonParameters` is omitted,
+`sendTemplateMessage` sends the same body, header, and quick reply payload shape
+as before.
+
+```typescript
+import { whatsapp } from '@jetdevs/cloud/whatsapp';
+
+await whatsapp.sendTemplateMessage({
+  templateId: 'onboarding_phase1_initial',
+  phoneNumber: '+14155550123',
+  bodyParameters: ['Ada', 'Ada Bakery'],
+  buttonParameters: [
+    { type: 'url', index: 0, text: 'resume-token-abc' },
+  ],
+  wabaId: 'waba-123',
+  senderLabel: 'META_DEFAULT',
+});
+```
+
+The SDK sends the runtime value in a separate button component:
+
+```json
+{
+  "type": "button",
+  "sub_type": "url",
+  "index": 0,
+  "parameters": [{ "type": "text", "text": "resume-token-abc" }]
+}
+```
+
+Do not put per-recipient URL tokens in `bodyParameters`, `metadata`, template
+definitions, or logs.
+
 ## License
 
 PRIVATE - Proprietary and confidential

@@ -7,6 +7,7 @@ import {
     getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
+    Row,
     SortingState,
     useReactTable,
     VisibilityState,
@@ -14,6 +15,17 @@ import {
 import * as React from 'react';
 import { useMemo, useState } from 'react';
 import { cn } from '../../lib';
+import { getAlignCellClass } from './column-meta';
+import {
+    collectHeaderLabels,
+    FilterIcon,
+    MobileRowList,
+    MobileSheet,
+    MobileSheetField,
+    useIsMobileList,
+    type MobileListOption,
+} from './mobile';
+import { createStandardListToolbar, type StandardToolbarConfig } from './standard-toolbar';
 
 // =============================================================================
 // UI COMPONENT TYPES - Types for injected UI components
@@ -70,6 +82,15 @@ export interface DataTableUIComponents {
   ChevronRightIcon: React.ComponentType<{ className?: string }>;
   ChevronsLeftIcon: React.ComponentType<{ className?: string }>;
   ChevronsRightIcon: React.ComponentType<{ className?: string }>;
+  /**
+   * Optional sort indicator icons. Used to auto-wrap columns whose `header` is
+   * a plain string into a sortable button. If any are omitted, a minimal
+   * Unicode fallback is rendered. Consumers upgrading to enable sortable
+   * string headers should pass lucide's ArrowUp / ArrowDown / ChevronsUpDown.
+   */
+  SortAscIcon?: React.ComponentType<{ className?: string }>;
+  SortDescIcon?: React.ComponentType<{ className?: string }>;
+  SortNeutralIcon?: React.ComponentType<{ className?: string }>;
 }
 
 // =============================================================================
@@ -122,6 +143,16 @@ export interface BaseListTableProps<TData> {
   getRowProps?: (row: TData) => React.HTMLAttributes<HTMLTableRowElement>;
   toolbarLayout?: 'single-row' | 'two-row';
   enableStickyActions?: boolean;
+  /** Hide the table body (useful for grid view where only the toolbar is needed) */
+  hideTable?: boolean;
+  /**
+   * Don't render the built-in toolbar (search, status filter, result count,
+   * refresh, column visibility, `rightContent`, `primaryAction`) at all — on
+   * desktop or phones. For consumers that own their own search/filter chrome.
+   * Opt-in; unset → toolbar renders exactly as before. Pagination unaffected.
+   * Mirrors `DataTableWithToolbar`'s `hideToolbar`.
+   */
+  hideToolbar?: boolean;
   /** Custom select component for status filter (apps can pass their own styled Select) */
   SelectComponent?: React.ComponentType<{
     value: string;
@@ -130,6 +161,79 @@ export interface BaseListTableProps<TData> {
     placeholder?: string;
     className?: string;
   }>;
+
+  // ---------------------------------------------------------------------------
+  // Card / expand extension (OPT-IN, backwards-compatible — p6 Track A).
+  //
+  // When `renderRow` is UNSET, every line below is inert and the `useReactTable`
+  // options object is byte-identical to before this addition (no `getRowId`, no
+  // expanded row model). This is what keeps existing consumers unaffected.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Render each row as a bespoke node instead of the column-cell grid. When
+   * provided, the table header is suppressed and the body renders these, each
+   * wrapped in `<TableRow><TableCell colSpan={visibleLeafCount}>`. `ctx` exposes
+   * the TanStack row + index + expand controls.
+   */
+  renderRow?: (
+    row: TData,
+    ctx: {
+      row: Row<TData>;
+      index: number;
+      isExpanded: boolean;
+      toggleExpanded: () => void;
+    },
+  ) => React.ReactNode;
+
+  /** Detail panel shown under an expanded row (only meaningful with renderRow). */
+  renderExpanded?: (row: TData) => React.ReactNode;
+
+  /** Gate which rows can expand (default: () => Boolean(renderExpanded)). */
+  getRowCanExpand?: (row: TData) => boolean;
+
+  /**
+   * Stable row id, applied to `useReactTable` ONLY when `renderRow` is set
+   * (REQUIRED for renderRow consumers — pass the row uuid) so expand state
+   * attaches to the entity, not the array index. Untouched (back-compat) when
+   * `renderRow` is unset.
+   */
+  getRowId?: (row: TData) => string;
+
+  /**
+   * Wrapper semantics for renderRow mode. p6 ships `'list'` only (stacked
+   * full-width rows in the existing `<Table>`). `'cards'` is reserved, not
+   * implemented. Default `'list'`.
+   */
+  rowLayout?: 'list';
+
+  // ---------------------------------------------------------------------------
+  // Phone layout (p90). Below `md` rows render as compact divider-separated
+  // lines (title + one status line + ⋯) and the toolbar collapses to search +
+  // one filters button. Desktop markup is unchanged. `false` opts out.
+  // ---------------------------------------------------------------------------
+
+  /** Phone rendering config, or `false` to keep the table on phones. */
+  mobile?: MobileListOption;
+
+  /**
+   * Primary call-to-action (e.g. "New agent"). Rendered at the end of the
+   * toolbar's right group on desktop, and kept visible in the toolbar row on
+   * phones (pass an icon + short label). Unset → desktop markup unchanged.
+   */
+  primaryAction?: React.ReactNode;
+
+  /**
+   * The standard list toolbar (p90): search with the filter menu INSIDE it,
+   * status chips (only with 2+ statuses), list/grid toggle (desktop, only when
+   * `view` is passed). When set it REPLACES the built-in toolbar, and the list
+   * also drops the column picker, refresh button, result count and the
+   * page-size select — so `search` / `statusFilter` / `onRefresh` /
+   * `resultLabel` / `rightContent` / `primaryAction` are ignored.
+   * `standardToolbar.search` falls back to the top-level `search`.
+   * Opt-in; unset → the list renders exactly as before.
+   */
+  standardToolbar?: StandardToolbarConfig;
 }
 
 // =============================================================================
@@ -196,7 +300,106 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     ChevronRightIcon,
     ChevronsLeftIcon,
     ChevronsRightIcon,
+    SortAscIcon,
+    SortDescIcon,
+    SortNeutralIcon,
   } = ui;
+
+  const StandardListToolbar = createStandardListToolbar({
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuCheckboxItem,
+    SearchIcon,
+  });
+
+  // =============================================================================
+  // AUTO-SORTABLE HEADER WRAPPER
+  // =============================================================================
+  //
+  // When a column is passed with `header: "Some String"`, TanStack will render
+  // it as a dead label even though sort state is wired. We detect that case in
+  // `normalizeColumns` below and swap the string for this render-fn component,
+  // which drives `column.toggleSorting()` on click. The original string is
+  // preserved as the visible label; visuals are unchanged until the user
+  // interacts with it.
+  //
+  // Columns that explicitly set `enableSorting: false` are left untouched.
+  // Columns with render-fn headers are respected as explicit opt-in/out.
+  // =============================================================================
+
+  const SORT_ICON_CLASS = 'h-3.5 w-3.5 ml-1 inline-block opacity-60';
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function AutoSortableHeader({ column, title }: { column: any; title: string }) {
+    // Bail out if the column runtime has opted out of sorting
+    if (!column.getCanSort || !column.getCanSort()) {
+      return <span className="font-medium">{title}</span>;
+    }
+
+    const sorted = column.getIsSorted() as false | 'asc' | 'desc';
+
+    const Indicator = () => {
+      if (sorted === 'asc') {
+        return SortAscIcon ? (
+          <SortAscIcon className={SORT_ICON_CLASS} />
+        ) : (
+          <span className={SORT_ICON_CLASS} aria-hidden>↑</span>
+        );
+      }
+      if (sorted === 'desc') {
+        return SortDescIcon ? (
+          <SortDescIcon className={SORT_ICON_CLASS} />
+        ) : (
+          <span className={SORT_ICON_CLASS} aria-hidden>↓</span>
+        );
+      }
+      return SortNeutralIcon ? (
+        <SortNeutralIcon className={cn(SORT_ICON_CLASS, 'opacity-40')} />
+      ) : (
+        <span className={cn(SORT_ICON_CLASS, 'opacity-40')} aria-hidden>↕</span>
+      );
+    };
+
+    return (
+      <button
+        type="button"
+        onClick={() => column.toggleSorting(sorted === 'asc')}
+        className="-ml-2 h-8 px-2 inline-flex items-center rounded font-medium hover:bg-accent transition-colors"
+      >
+        <span>{title}</span>
+        <Indicator />
+      </button>
+    );
+  }
+
+  /**
+   * Preprocess the columns array: replace plain-string `header` values with a
+   * render-fn that produces a clickable AutoSortableHeader. Leaves render-fn
+   * headers (explicit) and columns with `enableSorting: false` untouched.
+   */
+  function normalizeColumns<TData>(
+    cols: ColumnDef<TData, unknown>[]
+  ): ColumnDef<TData, unknown>[] {
+    return cols.map((col) => {
+      // Only auto-wrap when header is a plain string
+      if (typeof col.header !== 'string') return col;
+
+      // Respect explicit sorting opt-out from the column definition. Note
+      // this is the declarative value; AutoSortableHeader additionally checks
+      // the runtime `column.getCanSort()` as a final guard.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((col as any).enableSorting === false) return col;
+
+      const title = col.header;
+      return {
+        ...col,
+        header: ({ column }) => <AutoSortableHeader column={column} title={title} />,
+      } as ColumnDef<TData, unknown>;
+    });
+  }
 
   // =============================================================================
   // LIST TOOLBAR COMPONENT
@@ -211,13 +414,20 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     columnVisibilityControl,
     layout = 'single-row',
     SelectComponent,
+    primaryAction,
+    mobile,
   }: ListToolbarProps & {
     SelectComponent?: BaseListTableProps<unknown>['SelectComponent'];
+    primaryAction?: React.ReactNode;
+    /** Set on phones: renders the compact toolbar instead. */
+    mobile?: { rightContent: 'sheet' | 'inline' | 'hidden' };
   }) {
     const showClear = !!(search?.value || (statusFilter && statusFilter.value && statusFilter.value !== 'all'));
+    const [sheetOpen, setSheetOpen] = useState(false);
+    const closeSheet = React.useCallback(() => setSheetOpen(false), []);
 
     // Render status filter - use custom SelectComponent if provided, otherwise use native select
-    const renderStatusFilter = () => {
+    const renderStatusFilter = (widthClass = 'w-[140px]') => {
       if (!statusFilter) return null;
 
       if (SelectComponent) {
@@ -227,7 +437,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
             onValueChange={statusFilter.onChange}
             options={statusFilter.options}
             placeholder="Status"
-            className="w-[140px]"
+            className={widthClass}
           />
         );
       }
@@ -237,7 +447,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
         <select
           value={statusFilter.value}
           onChange={(e) => statusFilter.onChange(e.target.value)}
-          className="h-9 w-[140px] rounded-md border border-input bg-background px-3 text-sm"
+          className={`h-9 ${widthClass} rounded-md border border-input bg-background px-3 text-sm`}
         >
           {statusFilter.options.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -248,20 +458,79 @@ export function createBaseListTable(ui: DataTableUIComponents) {
       );
     };
 
+    // Phones (p90): one row — full-width search + one filters button (+ the
+    // primary CTA). Columns / view toggles / refresh / result count are not
+    // shown; filters live in a bottom sheet. No wrapper box.
+    if (mobile) {
+      const sheetRight = mobile.rightContent === 'sheet' ? rightContent : null;
+      const inlineRight = mobile.rightContent === 'inline' ? rightContent : null;
+      const hasSheet = Boolean(statusFilter || sheetRight);
+      const filtersActive = !!(statusFilter && statusFilter.value && statusFilter.value !== 'all');
+      return (
+        <div data-slot="list-toolbar-mobile" className="sticky top-0.5 z-10 flex items-center gap-2 pb-3 mb-1">
+          {search ? (
+            <div className="relative min-w-0 flex-1">
+              <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search.value}
+                onChange={(e) => search.onChange(e.target.value)}
+                placeholder={search.placeholder || 'Search...'}
+                className="pl-8 w-full bg-background border"
+              />
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          {hasSheet && (
+            <Button variant="outline" size="icon" className="relative h-9 w-9 shrink-0 p-0" onClick={() => setSheetOpen(true)}>
+              <FilterIcon className="h-4 w-4" />
+              <span className="sr-only">Filters</span>
+              {filtersActive && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary" />}
+            </Button>
+          )}
+          {inlineRight && <div className="flex shrink-0 items-center gap-2">{inlineRight}</div>}
+          {primaryAction && <div className="shrink-0">{primaryAction}</div>}
+          {hasSheet && (
+            <MobileSheet open={sheetOpen} onClose={closeSheet} title="Filters">
+              {statusFilter && <MobileSheetField label="Status">{renderStatusFilter('w-full')}</MobileSheetField>}
+              {sheetRight && <div className="flex flex-wrap items-center gap-2">{sheetRight}</div>}
+              <div className="flex items-center justify-end gap-2 pt-2">
+                {showClear && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      search?.onChange('');
+                      statusFilter?.onChange('all');
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+                <Button size="sm" onClick={closeSheet}>
+                  Done
+                </Button>
+              </div>
+            </MobileSheet>
+          )}
+        </div>
+      );
+    }
+
     if (layout === 'two-row') {
       return (
-        <div className="sticky top-0.5 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40 pb-3 mb-3 -mx-6 px-6 space-y-3">
+        <div className="sticky top-0.5 z-10 pb-3 mb-1 space-y-3">
           {/* Row 1: Filters */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
               {search && (
-                <div className="relative">
+                <div className="relative w-40 md:w-80">
                   <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={search.value}
                     onChange={(e) => search.onChange(e.target.value)}
                     placeholder={search.placeholder || 'Search...'}
-                    className="pl-8 w-80 bg-background border"
+                    className="pl-8 w-full bg-background border"
                   />
                 </div>
               )}
@@ -281,13 +550,18 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                 </Button>
               )}
             </div>
-            {rightContent && <div className="flex items-center gap-2">{rightContent}</div>}
+            {(rightContent || primaryAction) && (
+              <div className="flex flex-wrap items-center gap-2">
+                {rightContent}
+                {primaryAction}
+              </div>
+            )}
           </div>
 
           {/* Row 2: Actions */}
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             {resultLabel && <div className="text-sm text-muted-foreground">{resultLabel}</div>}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {columnVisibilityControl}
               {onRefresh && (
                 <Button variant="outline" size="sm" onClick={onRefresh} className="h-8 w-8 p-0">
@@ -300,18 +574,18 @@ export function createBaseListTable(ui: DataTableUIComponents) {
       );
     }
 
-    // Single-row layout (default)
+    // Single-row layout (default) — wraps to multiple rows on narrow screens
     return (
-      <div className="sticky top-0.5 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40 flex items-center justify-between pb-3 mb-3 -mx-6 px-6">
-        <div className="flex items-center gap-2">
+      <div className="sticky top-0.5 z-10 flex flex-wrap items-center justify-between gap-2 pb-3 mb-1">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           {search && (
-            <div className="relative">
+            <div className="relative w-40 md:w-80">
               <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 value={search.value}
                 onChange={(e) => search.onChange(e.target.value)}
                 placeholder={search.placeholder || 'Search...'}
-                className="pl-8 w-80 bg-background border"
+                className="pl-8 w-full bg-background border"
               />
             </div>
           )}
@@ -330,10 +604,10 @@ export function createBaseListTable(ui: DataTableUIComponents) {
               Clear
             </Button>
           )}
+          {resultLabel && <div className="text-sm text-muted-foreground hidden md:block">{resultLabel}</div>}
         </div>
 
-        <div className="flex items-center gap-2">
-          {resultLabel && <div className="text-sm text-muted-foreground hidden md:block">{resultLabel}</div>}
+        <div className="flex flex-wrap items-center gap-2">
           {columnVisibilityControl}
           {onRefresh && (
             <Button variant="outline" size="sm" onClick={onRefresh} className="h-8 w-8 p-0">
@@ -341,6 +615,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
             </Button>
           )}
           {rightContent}
+          {primaryAction}
         </div>
       </div>
     );
@@ -391,8 +666,30 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     getRowProps,
     toolbarLayout = 'single-row',
     enableStickyActions = true,
+    hideTable = false,
+    hideToolbar = false,
     SelectComponent,
+    renderRow,
+    renderExpanded,
+    getRowCanExpand,
+    getRowId,
+    // rowLayout is 'list'-only for p6; accepted for API parity, no branch needed.
+    rowLayout: _rowLayout = 'list',
+    mobile,
+    primaryAction,
+    standardToolbar,
   }: BaseListTableProps<TData>) {
+    // Phone layout (p90). Always false on the server and ≥ md, so desktop
+    // takes exactly the pre-p90 path below.
+    const isMobile = useIsMobileList(mobile !== false);
+    const mobileConfig = mobile || {};
+    // renderRow consumers own their row layout — only the toolbar goes compact.
+    const cardMode = isMobile && !renderRow;
+    const headerLabels = useMemo(
+      () => collectHeaderLabels(columns as Array<{ id?: string; header?: unknown; accessorKey?: unknown }>),
+      [columns],
+    );
+
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
       if (!defaultVisibleColumns) return {};
@@ -407,6 +704,10 @@ export function createBaseListTable(ui: DataTableUIComponents) {
       });
       return visibility;
     });
+
+    // Expand state — only used in renderRow mode. Keyed by getRowId(row) so it
+    // survives pagination/refetch (renderRow consumers MUST pass getRowId).
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
     // Horizontal scroll detection - use a simple ref approach
     const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -431,11 +732,15 @@ export function createBaseListTable(ui: DataTableUIComponents) {
         el.removeEventListener('scroll', updateScrollState);
         window.removeEventListener('resize', updateScrollState);
       };
-    }, [data]);
+    }, [data, cardMode]);
+
+    // Auto-wrap plain-string headers into sortable buttons. Memoized on the
+    // columns identity so TanStack doesn't re-detect columns every render.
+    const normalizedColumns = useMemo(() => normalizeColumns(columns), [columns]);
 
     const table = useReactTable({
       data,
-      columns,
+      columns: normalizedColumns,
       state: {
         sorting,
         columnVisibility,
@@ -454,12 +759,28 @@ export function createBaseListTable(ui: DataTableUIComponents) {
       getPaginationRowModel: pagination ? getPaginationRowModel() : undefined,
       manualPagination: pagination?.onPageChange !== undefined,
       pageCount: pagination?.totalCount ? Math.ceil(pagination.totalCount / pagination.pageSize) : undefined,
+      // GATED: only thread getRowId when renderRow is set, so the options object
+      // is byte-identical to before when the card/expand props are unused.
+      ...(renderRow && getRowId ? { getRowId } : {}),
     });
+
+    // renderRow mode helpers (inert when renderRow is unset).
+    const rowCanExpand = getRowCanExpand ?? (() => Boolean(renderExpanded));
+    const resolveRowId = (row: Row<TData>): string =>
+      getRowId ? getRowId(row.original) : row.id;
+    const toggleExpanded = (id: string) => {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
 
     const densityClasses = useMemo(() => {
       switch (density) {
         case 'compact':
-          return 'text-xs';
+          return 'text-xs !py-1.5 !px-3';
         case 'spacious':
           return 'text-base py-4';
         default:
@@ -503,20 +824,67 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     const lastColumnIndex = headerGroup ? headerGroup.headers.length - 1 : -1;
     const shouldUseStickyActions = enableStickyActions && lastColumnIndex >= 0;
 
+    const emptyContent = emptyState ? (
+      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+        {emptyState.icon}
+        <div className="font-medium text-foreground">{emptyState.title}</div>
+        {emptyState.subtitle && <div className="text-sm">{emptyState.subtitle}</div>}
+      </div>
+    ) : (
+      <div className="text-sm text-muted-foreground">No items found.</div>
+    );
+
+    // Nothing to page through: no rows at all on the first page. Hides the
+    // "Showing 0 to 0 of 0 · Page 1 of 0" pager under an empty state.
+    const hidePagination =
+      !!pagination &&
+      !isLoading &&
+      (pagination.totalCount === 0 || (data.length === 0 && pagination.pageIndex === 0));
+    const pageCount =
+      pagination?.totalCount !== undefined ? Math.ceil(pagination.totalCount / pagination.pageSize) : undefined;
+
     return (
       <div className="space-y-3">
-        <ListToolbar
-          search={search}
-          statusFilter={statusFilter}
-          onRefresh={onRefresh}
-          rightContent={rightContent}
-          resultLabel={resultLabel}
-          columnVisibilityControl={columnVisibilityDropdown}
-          layout={toolbarLayout}
-          SelectComponent={SelectComponent}
-        />
+        {!hideToolbar && standardToolbar && (
+          <StandardListToolbar {...standardToolbar} search={standardToolbar.search ?? search} />
+        )}
 
-        <div className="rounded-md border relative">
+        {!hideToolbar && !standardToolbar && (
+          <ListToolbar
+            search={search}
+            statusFilter={statusFilter}
+            onRefresh={onRefresh}
+            rightContent={rightContent}
+            resultLabel={resultLabel}
+            columnVisibilityControl={columnVisibilityDropdown}
+            layout={toolbarLayout}
+            SelectComponent={SelectComponent}
+            primaryAction={primaryAction}
+            mobile={isMobile ? { rightContent: mobileConfig.rightContent ?? 'sheet' } : undefined}
+          />
+        )}
+
+        {!hideTable && cardMode && (
+          isLoading ? (
+            <div data-slot="mobile-list-loading" className="divide-y divide-border">
+              {[...Array(Math.min(pagination?.pageSize || 5, 8))].map((_, i) => (
+                <div key={i} className="py-4">
+                  <div className="h-3 w-2/3 bg-muted animate-pulse rounded" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <MobileRowList
+              table={table}
+              config={mobileConfig}
+              headerLabels={headerLabels}
+              getRowProps={getRowProps}
+              empty={emptyContent}
+            />
+          )
+        )}
+
+        {!hideTable && !cardMode && <div className="rounded-md border relative">
           {/* Left scroll indicator */}
           {shouldUseStickyActions && scrollState.canScrollLeft && (
             <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent pointer-events-none z-10" />
@@ -529,37 +897,99 @@ export function createBaseListTable(ui: DataTableUIComponents) {
 
           <div ref={scrollRef} className="overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
             <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((hGroup) => (
-                  <TableRow key={hGroup.id}>
-                    {hGroup.headers.map((header, index) => {
-                      const isFirstColumn = shouldUseStickyActions && index === 0;
-                      const isLastColumn = shouldUseStickyActions && index === lastColumnIndex;
-                      return (
-                        <TableHead
-                          key={header.id}
-                          className={cn(
-                            densityClasses,
-                            isFirstColumn && 'sticky left-0 bg-background shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20',
-                            isLastColumn && 'sticky right-0 bg-background shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20'
-                          )}
-                        >
-                          {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                        </TableHead>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
+              {/* Header suppressed in renderRow mode (custom rows own their layout). */}
+              {!renderRow && (
+                <TableHeader>
+                  {table.getHeaderGroups().map((hGroup) => (
+                    <TableRow key={hGroup.id}>
+                      {hGroup.headers.map((header, index) => {
+                        const isFirstColumn = shouldUseStickyActions && index === 0;
+                        const isLastColumn = shouldUseStickyActions && index === lastColumnIndex;
+                        const alignClass = getAlignCellClass(header.column.columnDef.meta?.align);
+                        return (
+                          <TableHead
+                            key={header.id}
+                            className={cn(
+                              densityClasses,
+                              alignClass,
+                              isFirstColumn && 'sticky left-0 bg-background shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20',
+                              isLastColumn && 'sticky right-0 bg-background shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20'
+                            )}
+                          >
+                            {header.isPlaceholder ? null : (flexRender(header.column.columnDef.header, header.getContext()) as React.ReactNode)}
+                          </TableHead>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+              )}
               <TableBody>
                 {isLoading ? (
                   [...Array(pagination?.pageSize || 5)].map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={columns.length} className="h-12">
+                      <TableCell
+                        colSpan={renderRow ? (table.getVisibleLeafColumns().length || 1) : columns.length}
+                        className="h-12"
+                      >
                         <div className="h-3 w-full bg-muted animate-pulse rounded" />
                       </TableCell>
                     </TableRow>
                   ))
+                ) : renderRow ? (
+                  table.getRowModel().rows.length ? (
+                    table.getRowModel().rows.map((row, index) => {
+                      const rowId = resolveRowId(row);
+                      const canExpand = rowCanExpand(row.original);
+                      const isExpanded = canExpand && expandedIds.has(rowId);
+                      const visibleLeafCount = table.getVisibleLeafColumns().length || 1;
+                      const rowProps = getRowProps ? getRowProps(row.original) : {};
+                      return (
+                        <React.Fragment key={rowId}>
+                          <TableRow
+                            data-state={row.getIsSelected() ? 'selected' : undefined}
+                            className={densityClasses}
+                            {...rowProps}
+                          >
+                            <TableCell colSpan={visibleLeafCount} className="p-0">
+                              {renderRow(row.original, {
+                                row,
+                                index,
+                                isExpanded,
+                                toggleExpanded: () => {
+                                  if (canExpand) toggleExpanded(rowId);
+                                },
+                              }) as React.ReactNode}
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && renderExpanded && (
+                            <TableRow>
+                              <TableCell colSpan={visibleLeafCount} className="p-0">
+                                {renderExpanded(row.original) as React.ReactNode}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={table.getVisibleLeafColumns().length || 1}
+                        className="h-24 text-center"
+                      >
+                        {emptyState ? (
+                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                            {emptyState.icon}
+                            <div className="font-medium text-foreground">{emptyState.title}</div>
+                            {emptyState.subtitle && <div className="text-sm">{emptyState.subtitle}</div>}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">No items found.</div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
                 ) : table.getRowModel().rows.length ? (
                   table.getRowModel().rows.map((row) => {
                     const rowProps = getRowProps ? getRowProps(row.original) : {};
@@ -573,18 +1003,20 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                         {row.getVisibleCells().map((cell, index) => {
                           const isFirstColumn = shouldUseStickyActions && index === 0;
                           const isLastColumn = shouldUseStickyActions && index === lastColumnIndex;
+                          const alignClass = getAlignCellClass(cell.column.columnDef.meta?.align);
                           return (
                             <TableCell
                               key={cell.id}
                               className={cn(
                                 densityClasses,
+                                alignClass,
                                 isFirstColumn &&
                                   'sticky left-0 bg-background shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20',
                                 isLastColumn &&
                                   'sticky right-0 bg-background shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)] z-20'
                               )}
                             >
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              {flexRender(cell.column.columnDef.cell, cell.getContext()) as React.ReactNode}
                             </TableCell>
                           );
                         })}
@@ -609,12 +1041,43 @@ export function createBaseListTable(ui: DataTableUIComponents) {
               </TableBody>
             </Table>
           </div>
-        </div>
+        </div>}
 
-        {/* Pagination Controls */}
-        {pagination && (
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-2">
+        {/* Pagination Controls — phones: prev · Page x of y · next only. */}
+        {pagination && !hidePagination && isMobile && (
+          <div data-slot="mobile-pagination" className="flex items-center justify-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => pagination.onPageChange?.(pagination.pageIndex - 1)}
+              disabled={pagination.pageIndex === 0 || !pagination.onPageChange}
+              className="h-9 w-9 p-0"
+            >
+              <ChevronLeftIcon className="h-4 w-4" />
+              <span className="sr-only">Previous page</span>
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {pagination.pageIndex + 1}
+              {pageCount !== undefined && ` of ${pageCount}`}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => pagination.onPageChange?.(pagination.pageIndex + 1)}
+              disabled={
+                !pagination.onPageChange ||
+                (pageCount !== undefined && pagination.pageIndex >= pageCount - 1)
+              }
+              className="h-9 w-9 p-0"
+            >
+              <ChevronRightIcon className="h-4 w-4" />
+              <span className="sr-only">Next page</span>
+            </Button>
+          </div>
+        )}
+        {pagination && !hidePagination && !isMobile && (
+          <div className="flex flex-col gap-3 px-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm text-muted-foreground">
                 {pagination.totalCount !== undefined ? (
                   <>
@@ -626,7 +1089,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                   <>Page {pagination.pageIndex + 1}</>
                 )}
               </p>
-              {pagination.onPageSizeChange && (
+              {pagination.onPageSizeChange && !standardToolbar && (
                 <select
                   value={String(pagination.pageSize)}
                   onChange={(e) => pagination.onPageSizeChange!(Number(e.target.value))}
@@ -641,7 +1104,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-1 sm:gap-2">
               <Button
                 variant="outline"
                 size="sm"

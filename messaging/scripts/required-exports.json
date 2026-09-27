@@ -1,0 +1,26 @@
+{
+  "$comment": "Superset freeze manifest (org-attribution S0, scout N2). Every entry MUST match dist/index.d.ts or publish is blocked (prepublishOnly). The 0.3.x platform line and the 0.4.x webchat line diverged once; this file makes a non-superset publish mechanically impossible. Add entries when freezing new surface — never remove one without a major bump.",
+  "dtsFile": "dist/index.d.ts",
+  "required": [
+    { "symbol": "PlatformResource.conversations", "pattern": "readonly conversations: PlatformConversationsResource", "surface": "platform (0.3.x line)" },
+    { "symbol": "PlatformResource.realtime", "pattern": "readonly realtime: PlatformRealtimeResource", "surface": "platform (0.3.x line)" },
+    { "symbol": "platform.conversations.list", "pattern": "list\\(params\\?: ListPlatformConversationsParams\\)", "surface": "platform (0.3.x line)" },
+    { "symbol": "platform.realtime.createToken", "pattern": "createToken\\(", "surface": "platform (0.3.x line)" },
+    { "symbol": "platform.conversations.takeOver", "pattern": "takeOver\\(", "surface": "platform (0.3.x line)" },
+    { "symbol": "platform.conversations.releaseToAi", "pattern": "releaseToAi\\(", "surface": "platform (0.3.x line)" },
+    { "symbol": "platform.conversations.dismissEscalation", "pattern": "dismissEscalation\\(", "surface": "platform (0.3.x line)" },
+    { "symbol": "platform.conversations.sendMessage", "pattern": "sendMessage\\(", "surface": "platform (0.3.x line)" },
+    { "symbol": "PlatformConversation (named export)", "pattern": "interface PlatformConversation", "surface": "platform (0.3.x line)" },
+    { "symbol": "PlatformConversationsPage (named export)", "pattern": "interface PlatformConversationsPage", "surface": "platform (0.3.x line)" },
+    { "symbol": "channels.ingress", "pattern": "ingress\\(", "surface": "webchat (0.4.x line)" },
+    { "symbol": "WebchatIngressRequest", "pattern": "interface WebchatIngressRequest", "surface": "webchat (0.4.x line)" },
+    { "symbol": "signWebchatDelivery", "pattern": "signWebchatDelivery", "surface": "webchat (0.4.x line)" },
+    { "symbol": "verifyWebchatDelivery", "pattern": "verifyWebchatDelivery", "surface": "webchat (0.4.x line)" },
+    { "symbol": "MessagingClientConfig.serviceSecret", "pattern": "serviceSecret\\?", "surface": "webchat (0.4.x line)" },
+    { "symbol": "MessagingClientConfig.platformKey", "pattern": "platformKey\\?", "surface": "platform (both lines)" },
+    { "symbol": "WebchatIngressRequest.targetOrgId", "pattern": "targetOrgId\\?: number", "surface": "org-attribution §10 (S0 new)" },
+    { "symbol": "WebchatIngressRequest.targetOrgName", "pattern": "targetOrgName\\?: string", "surface": "org-attribution §10 (S0 new)" },
+    { "symbol": "PlatformConversation.target_org_id", "pattern": "target_org_id: number \\| null", "surface": "org-attribution §10 (S0 new, snake_case wire)" },
+    { "symbol": "PlatformConversation.target_org_name", "pattern": "target_org_name: string \\| null", "surface": "org-attribution §10 (S0 new, snake_case wire)" }
+  ]
+}

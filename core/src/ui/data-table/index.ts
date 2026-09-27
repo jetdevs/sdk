@@ -40,6 +40,30 @@ export { createBaseListTable } from './BaseListTable';
 export { createDataTableColumnHeader } from './DataTableColumnHeader';
 export { createDataTablePagination } from './DataTablePagination';
 export { createDataTableWithToolbar } from './DataTableWithToolbar';
+export { createStandardListToolbar, hasActiveFilter, shouldShowChips } from './standard-toolbar';
+export { StatusText, STATUS_TONE_CLASS } from './status-text';
+export type {
+    StandardToolbarChips,
+    StandardToolbarConfig,
+    StandardToolbarFilter,
+    StandardToolbarUIComponents,
+    StandardToolbarView,
+} from './standard-toolbar';
+export type { StatusTextProps, StatusTone } from './status-text';
+
+// Column meta — TanStack ColumnMeta augmentation (`label`, `align`) plus
+// helpers used by the table primitives. Importing this file from anywhere
+// in `@jetdevs/core/ui/data-table` registers the augmentation.
+export {
+  getAlignCellClass,
+  getAlignHeaderClass,
+} from './column-meta';
+export type { ColumnAlign } from './column-meta';
+
+// Phone layout (p90) — the media query + config types, for apps that want to
+// mirror the list's breakpoint (e.g. hide a page subtitle on phones).
+export { MOBILE_LIST_QUERY, useIsMobileList } from './mobile';
+export type { MobileListConfig, MobileListOption } from './mobile';
 
 // Type exports - UI component interfaces
 export type { DataTableUIComponents } from './BaseListTable';
@@ -59,6 +83,9 @@ export type { DataTablePaginationProps } from './DataTablePagination';
 // DataTableWithToolbar types
 export type {
     BulkAction,
-    DataTableWithToolbarConfig, DataTableWithToolbarFactoryConfig, DataTableWithToolbarProps, FilterColumnConfig, ToastInterface
+    DataTableWithToolbarConfig, DataTableWithToolbarFactoryConfig, DataTableWithToolbarProps, FilterColumnConfig,
+    // Server-side mode (opt-in) — see the props docs on DataTableWithToolbarProps.
+    ServerFilterConfig, ServerSearchConfig, ServerSortingConfig,
+    ToastInterface
 } from './DataTableWithToolbar';
 

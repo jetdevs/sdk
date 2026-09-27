@@ -1,7 +1,7 @@
 {
   "name": "@jetdevs/core",
-  "version": "0.1.12-dev",
-  "description": "Core SDK components, UI primitives, and utilities for Jetdevs Platform",
+  "version": "0.1.50-dev",
+  "description": "Core SDK components, UI primitives, and utilities for Core SaaS",
   "type": "module",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
@@ -38,6 +38,16 @@
       "types": "./dist/auth/providers/index.d.ts",
       "import": "./dist/auth/providers/index.js",
       "require": "./dist/auth/providers/index.js"
+    },
+    "./password-reset": {
+      "types": "./dist/password-reset/index.d.ts",
+      "import": "./dist/password-reset/index.js",
+      "require": "./dist/password-reset/index.js"
+    },
+    "./password-reset/policy": {
+      "types": "./dist/password-reset/policy.d.ts",
+      "import": "./dist/password-reset/policy.js",
+      "require": "./dist/password-reset/policy.js"
     },
     "./trpc": {
       "types": "./dist/trpc/index.d.ts",
@@ -99,6 +109,16 @@
       "import": "./dist/ui/display/index.js",
       "require": "./dist/ui/display/index.js"
     },
+    "./ui/forms": {
+      "types": "./dist/ui/forms/index.d.ts",
+      "import": "./dist/ui/forms/index.js",
+      "require": "./dist/ui/forms/index.js"
+    },
+    "./media": {
+      "types": "./dist/media/index.d.ts",
+      "import": "./dist/media/index.js",
+      "require": "./dist/media/index.js"
+    },
     "./ui/skeletons": {
       "types": "./dist/ui/skeletons/index.d.ts",
       "import": "./dist/ui/skeletons/index.js",
@@ -113,6 +133,21 @@
       "types": "./dist/ui/admin/index.d.ts",
       "import": "./dist/ui/admin/index.js",
       "require": "./dist/ui/admin/index.js"
+    },
+    "./ui/auth-pages": {
+      "types": "./dist/ui/auth-pages/index.d.ts",
+      "import": "./dist/ui/auth-pages/index.js",
+      "require": "./dist/ui/auth-pages/index.js"
+    },
+    "./ui/app-header": {
+      "types": "./dist/ui/app-header/index.d.ts",
+      "import": "./dist/ui/app-header/index.js",
+      "require": "./dist/ui/app-header/index.js"
+    },
+    "./ui/select": {
+      "types": "./dist/ui/select/index.d.ts",
+      "import": "./dist/ui/select/index.js",
+      "require": "./dist/ui/select/index.js"
     },
     "./hooks": {
       "types": "./dist/hooks/index.d.ts",
@@ -179,6 +214,11 @@
       "import": "./dist/user-org/index.js",
       "require": "./dist/user-org/index.js"
     },
+    "./org-membership": {
+      "types": "./dist/org-membership/index.d.ts",
+      "import": "./dist/org-membership/index.js",
+      "require": "./dist/org-membership/index.js"
+    },
     "./middleware": {
       "types": "./dist/middleware/index.d.ts",
       "import": "./dist/middleware/index.js",
@@ -188,6 +228,91 @@
       "types": "./dist/db/drivers/index.d.ts",
       "import": "./dist/db/drivers/index.js",
       "require": "./dist/db/drivers/index.js"
+    },
+    "./features": {
+      "types": "./dist/features/index.d.ts",
+      "import": "./dist/features/index.js",
+      "require": "./dist/features/index.js"
+    },
+    "./features/users": {
+      "types": "./dist/features/users/index.d.ts",
+      "import": "./dist/features/users/index.js",
+      "require": "./dist/features/users/index.js"
+    },
+    "./features/users/ui": {
+      "types": "./dist/features/users/ui/index.d.ts",
+      "import": "./dist/features/users/ui/index.js",
+      "require": "./dist/features/users/ui/index.js"
+    },
+    "./features/users/backend": {
+      "types": "./dist/features/users/backend/index.d.ts",
+      "import": "./dist/features/users/backend/index.js",
+      "require": "./dist/features/users/backend/index.js"
+    },
+    "./features/organizations": {
+      "types": "./dist/features/organizations/index.d.ts",
+      "import": "./dist/features/organizations/index.js",
+      "require": "./dist/features/organizations/index.js"
+    },
+    "./features/organizations/ui": {
+      "types": "./dist/features/organizations/ui/index.d.ts",
+      "import": "./dist/features/organizations/ui/index.js",
+      "require": "./dist/features/organizations/ui/index.js"
+    },
+    "./features/organizations/backend": {
+      "types": "./dist/features/organizations/backend/index.d.ts",
+      "import": "./dist/features/organizations/backend/index.js",
+      "require": "./dist/features/organizations/backend/index.js"
+    },
+    "./features/themes": {
+      "types": "./dist/features/themes/index.d.ts",
+      "import": "./dist/features/themes/index.js",
+      "require": "./dist/features/themes/index.js"
+    },
+    "./features/themes/ui": {
+      "types": "./dist/features/themes/ui/index.d.ts",
+      "import": "./dist/features/themes/ui/index.js",
+      "require": "./dist/features/themes/ui/index.js"
+    },
+    "./features/themes/backend": {
+      "types": "./dist/features/themes/backend/index.d.ts",
+      "import": "./dist/features/themes/backend/index.js",
+      "require": "./dist/features/themes/backend/index.js"
+    },
+    "./features/api-keys": {
+      "types": "./dist/features/api-keys/index.d.ts",
+      "import": "./dist/features/api-keys/index.js",
+      "require": "./dist/features/api-keys/index.js"
+    },
+    "./features/api-keys/ui": {
+      "types": "./dist/features/api-keys/ui/index.d.ts",
+      "import": "./dist/features/api-keys/ui/index.js",
+      "require": "./dist/features/api-keys/ui/index.js"
+    },
+    "./features/api-keys/backend": {
+      "types": "./dist/features/api-keys/backend/index.d.ts",
+      "import": "./dist/features/api-keys/backend/index.js",
+      "require": "./dist/features/api-keys/backend/index.js"
+    },
+    "./features/rbac": {
+      "types": "./dist/features/rbac/index.d.ts",
+      "import": "./dist/features/rbac/index.js",
+      "require": "./dist/features/rbac/index.js"
+    },
+    "./features/rbac/ui": {
+      "types": "./dist/features/rbac/ui/index.d.ts",
+      "import": "./dist/features/rbac/ui/index.js",
+      "require": "./dist/features/rbac/ui/index.js"
+    },
+    "./features/rbac/backend": {
+      "types": "./dist/features/rbac/backend/index.d.ts",
+      "import": "./dist/features/rbac/backend/index.js",
+      "require": "./dist/features/rbac/backend/index.js"
+    },
+    "./features/shared": {
+      "types": "./dist/features/shared/index.d.ts",
+      "import": "./dist/features/shared/index.js",
+      "require": "./dist/features/shared/index.js"
     }
   },
   "scripts": {
@@ -203,6 +328,7 @@
     "zod": "^3.22.4"
   },
   "peerDependencies": {
+    "@jetdevs/framework": "^0.2.4-dev",
     "@neondatabase/serverless": "^0.9.0 || ^0.10.0",
     "@planetscale/database": "^1.16.0",
     "@radix-ui/react-checkbox": "^1.0.0",
@@ -217,7 +343,7 @@
     "@tanstack/react-table": "^8.0.0",
     "@trpc/client": "^11.0.0",
     "@trpc/server": "^11.0.0",
-    "@jetdevs/framework": "^0.2.4-dev",
+    "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.0",
     "drizzle-orm": "^0.30.0 || ^0.44.0",
     "immer": "^10.0.0",
@@ -307,6 +433,9 @@
     },
     "mysql2": {
       "optional": true
+    },
+    "browser-image-compression": {
+      "optional": true
     }
   },
   "files": [
@@ -314,6 +443,7 @@
     "README.md"
   ],
   "devDependencies": {
+    "@jetdevs/framework": "workspace:*",
     "@radix-ui/react-checkbox": "^1.0.4",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-dropdown-menu": "^2.0.6",
@@ -324,20 +454,25 @@
     "@radix-ui/react-tooltip": "^1.0.7",
     "@tanstack/react-query": "^5.0.0",
     "@tanstack/react-table": "^8.20.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@trpc/client": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "@types/node": "^20.0.0",
     "@types/pg": "^8.16.0",
     "@types/react": "^19.0.0",
-    "@jetdevs/framework": "workspace:*",
+    "@types/react-dom": "^19.2.3",
+    "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.0",
     "drizzle-orm": "^0.44.7",
+    "happy-dom": "^14.12.3",
     "immer": "^10.0.0",
     "libphonenumber-js": "^1.11.0",
     "lucide-react": "^0.475.0",
     "next-auth": "^4.24.0",
     "postgres": "^3.4.0",
     "react": "^19.0.1",
+    "react-dom": "^19.2.4",
     "react-hook-form": "^7.49.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",

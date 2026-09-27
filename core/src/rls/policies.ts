@@ -86,6 +86,50 @@ export function generatePublicPolicies(tableName: string): PolicyTemplate[] {
 export function generateOrgPolicies(tableName: string, config: RlsTableConfig): PolicyTemplate[] {
   const condition = generatePolicyCondition(config);
 
+  const internalPolicy: PolicyTemplate = {
+    name: `${tableName}_internal_policy`,
+    cmd: 'ALL',
+    role: 'internal_api_user',
+    using: undefined,
+  };
+
+  // Per-command split (p85 S0 / CAD-190): one policy per command for app_user.
+  // Only the clauses Postgres accepts for each command are set:
+  //   SELECT/DELETE -> USING only, INSERT -> WITH CHECK only, UPDATE -> both.
+  if (config.policies) {
+    const expr = (key: keyof NonNullable<RlsTableConfig['policies']>): string =>
+      (config.policies?.[key] ?? condition).trim();
+
+    return [
+      {
+        name: `${tableName}_select`,
+        cmd: 'SELECT',
+        role: 'app_user',
+        using: expr('select'),
+      },
+      {
+        name: `${tableName}_insert`,
+        cmd: 'INSERT',
+        role: 'app_user',
+        withCheck: expr('insert'),
+      },
+      {
+        name: `${tableName}_update`,
+        cmd: 'UPDATE',
+        role: 'app_user',
+        using: expr('update'),
+        withCheck: expr('update'),
+      },
+      {
+        name: `${tableName}_delete`,
+        cmd: 'DELETE',
+        role: 'app_user',
+        using: expr('delete'),
+      },
+      internalPolicy,
+    ];
+  }
+
   return [
     {
       name: `${tableName}_org_policy`,
@@ -94,12 +138,7 @@ export function generateOrgPolicies(tableName: string, config: RlsTableConfig): 
       using: condition,
       withCheck: condition,
     },
-    {
-      name: `${tableName}_internal_policy`,
-      cmd: 'ALL',
-      role: 'internal_api_user',
-      using: undefined,
-    }
+    internalPolicy,
   ];
 }
 
@@ -325,10 +364,14 @@ export const RLS_CONTEXT_FUNCTIONS = {
 CREATE OR REPLACE FUNCTION set_org_context(org_id integer)
 RETURNS void AS $$
 BEGIN
-    PERFORM set_config('rls.current_org_id', org_id::text, false);
+    -- Use true (transaction-scoped) to prevent context leaking across
+    -- pooled connections on serverless platforms (Vercel, AWS Lambda).
+    -- Session-scoped (false) would persist on the connection after the
+    -- transaction ends, potentially leaking org context to other requests.
+    PERFORM set_config('rls.current_org_id', org_id::text, true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;`,
-    comment: 'Sets the current organization context for RLS policies',
+    comment: 'Sets the current organization context for RLS policies (transaction-scoped)',
     paramType: 'integer'
   },
 
@@ -337,7 +380,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;`,
 CREATE OR REPLACE FUNCTION clear_org_context()
 RETURNS void AS $$
 BEGIN
-    PERFORM set_config('rls.current_org_id', '', false);
+    PERFORM set_config('rls.current_org_id', '', true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;`,
     comment: 'Clears the current organization context',
@@ -366,10 +409,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;`,
 CREATE OR REPLACE FUNCTION set_workspace_context(workspace_id integer)
 RETURNS void AS $$
 BEGIN
-    PERFORM set_config('app.current_workspace_id', workspace_id::text, false);
+    PERFORM set_config('app.current_workspace_id', workspace_id::text, true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;`,
-    comment: 'Sets the current workspace context for RLS policies',
+    comment: 'Sets the current workspace context for RLS policies (transaction-scoped)',
     paramType: 'integer'
   },
 
@@ -378,7 +421,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;`,
 CREATE OR REPLACE FUNCTION clear_workspace_context()
 RETURNS void AS $$
 BEGIN
-    PERFORM set_config('app.current_workspace_id', '', false);
+    PERFORM set_config('app.current_workspace_id', '', true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;`,
     comment: 'Clears the current workspace context',

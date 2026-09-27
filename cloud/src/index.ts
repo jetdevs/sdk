@@ -20,3 +20,9 @@ export {
     type UploadResult
 } from './s3';
 
+
+// Presigned direct-to-S3 uploads. Also available at `@jetdevs/cloud/storage`;
+// surfaced here too because every consumer that hand-rolled this was importing
+// from the package root.
+export { presignUpload, PresignValidationError } from './storage/presign';
+export type { PresignUploadInput, PresignedUpload } from './storage/presign';

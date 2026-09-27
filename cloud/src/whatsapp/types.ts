@@ -116,27 +116,77 @@ export interface DeleteTemplateOptions extends WabaConfig {
 }
 
 /**
+ * Runtime button parameters for approved WhatsApp templates.
+ * URL parameters fill dynamic URL placeholders such as {{1}}.
+ */
+export type WhatsAppTemplateButtonParameter =
+  | {
+      type: 'url';
+      index: number;
+      text: string;
+    }
+  | {
+      type: 'quick_reply';
+      index: number;
+      payload: string;
+    };
+
+/**
  * Send template message request
  */
 export interface SendTemplateMessageRequest extends WabaConfig {
   templateId: string;
   phoneNumber: string;
+  /**
+   * Media resource for the header: can be a URL or a pre-uploaded media_id.
+   * - URL: starts with http:// or https:// (sent as `link`)
+   * - media_id: any other value (sent as `id`)
+   */
+  media?: string;
+  /** @deprecated Use `media` instead. Kept for backwards compatibility. */
   imageUrl?: string;
   metadata?: Record<string, unknown>;
   bodyParameters?: string[];
-  /** Type of media in header (image or video), defaults to 'image' */
-  mediaType?: 'image' | 'video';
+  /** Type of media in header (image, video, or document), defaults to 'image' */
+  mediaType?: 'image' | 'video' | 'document';
+  /** Buttons for the message (URL and Quick Reply) */
+  buttons?: Array<{
+    type: 'url' | 'quickReply';
+    text: string;
+    url?: string;
+    order: number;
+  }>;
+  /**
+   * Runtime button parameters for approved templates. Omit this field to
+   * preserve legacy send behavior.
+   */
+  buttonParameters?: WhatsAppTemplateButtonParameter[];
+  /** Document filename (required when mediaType is 'document') */
+  documentFilename?: string;
 }
 
 /**
  * Carousel card for carousel messages
  */
 export interface CarouselCard {
-  /** Media URL (image or video) */
-  imageUrl: string;
+  /**
+   * Media resource (image or video): URL or pre-uploaded media_id.
+   * - URL: starts with http:// or https:// (sent as `link`)
+   * - media_id: any other value (sent as `id`)
+   */
+  media?: string;
+  /** @deprecated Use `media` instead. Kept for backwards compatibility. */
+  imageUrl?: string;
   /** Type of media (image or video), defaults to 'image' */
   mediaType?: 'image' | 'video';
   bodyParameters?: string[];
+  /** Buttons for this carousel card (max 2) */
+  buttons?: Array<{
+    type: 'url' | 'quickReply';
+    text: string;
+    url?: string;
+    order: number;
+  }>;
 }
 
 /**

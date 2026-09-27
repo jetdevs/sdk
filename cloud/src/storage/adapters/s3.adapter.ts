@@ -59,6 +59,10 @@ export class S3Adapter implements StorageAdapter {
         ...(credentials.sessionToken && { sessionToken: credentials.sessionToken }),
       },
       ...(credentials.endpoint && { endpoint: credentials.endpoint }),
+      // Disable automatic CRC32 checksums - MinIO stores these as metadata
+      // and can hit MetadataTooLarge errors when serving objects
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
     });
 
     log.info('S3 client initialized', { bucket: this.bucket, region: this.region });

@@ -46,8 +46,10 @@ export const createApiKeySchema = z.object({
    */
   permissionMode: z.enum(['cached', 'fresh']).default('cached'),
   rateLimit: z.number().int().positive().default(1000).optional(),
-  expiresAt: z.date().optional(),
+  expiresAt: z.date().nullable().optional(),
   environment: z.enum(['live', 'test']).default('live'),
+  /** Target org ID for cross-org creation (backoffice/system users only) */
+  targetOrgId: z.number().int().positive().optional(),
 });
 
 /**

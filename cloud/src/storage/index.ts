@@ -28,3 +28,8 @@ export {
   resetStorageClient,
   storage,
 } from './factory';
+
+// Presigned direct-to-S3 uploads (default AWS provider chain — no Credentials
+// Service required). See ./presign for why this sits beside StorageClient.
+export { presignUpload, PresignValidationError } from './presign';
+export type { PresignUploadInput, PresignedUpload } from './presign';

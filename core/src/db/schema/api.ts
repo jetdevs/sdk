@@ -54,6 +54,18 @@ export const apiKeys = pgTable(
     // SHA-256 hash of full key (64 hex chars)
     keyHash: varchar("key_hash", { length: 64 }).notNull(),
 
+    // Optional encrypted form of the full raw key.
+    //
+    // Set ONLY for system-managed keys where the application needs to recover
+    // the raw value across requests / process restarts (e.g., playground auto
+    // keys, public-share keys). Customer-created keys MUST leave this null —
+    // the raw key is shown once at creation and never recoverable, by design.
+    //
+    // Encryption: AES-256-GCM via the consuming app's credential-encryption
+    // helper (in cadra-web: lib/encryption.ts using CREDENTIAL_ENCRYPTION_KEY).
+    // Format: "v1:<base64(iv)>:<base64(ciphertext)>:<base64(tag)>".
+    keyEncrypted: text("key_encrypted"),
+
     // Role-based permissions: API keys derive permissions from this role
     // When roleId is set, permissions are fetched from role_permissions at runtime
     // The permissions array is kept as a cache/override for backward compatibility

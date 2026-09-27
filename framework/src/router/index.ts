@@ -46,4 +46,8 @@ export type {
     RouteConfig, ServiceContext
 } from './with-actor';
 
+// Re-export zod to ensure all consumers use the same instance
+// This prevents type mismatches when different packages have different zod versions
+export { z } from 'zod';
+
 // Internal procedure creation logic is NOT exported

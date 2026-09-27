@@ -127,6 +127,35 @@ export function createApiKeysRepository(
     },
 
     /**
+     * List all API keys across all organizations (for system admins)
+     */
+    async listAll(includeRevoked: boolean = false): Promise<(ApiKeyListItem & { orgId: number })[]> {
+      // Build query based on includeRevoked flag
+      const query = db
+        .select({
+          id: table.id,
+          orgId: table.orgId,
+          name: table.name,
+          keyPrefix: table.keyPrefix,
+          roleId: table.roleId,
+          permissions: table.permissions,
+          rateLimit: table.rateLimit,
+          expiresAt: table.expiresAt,
+          lastUsedAt: table.lastUsedAt,
+          createdAt: table.createdAt,
+          revokedAt: table.revokedAt,
+        })
+        .from(table);
+
+      // Only add where clause if filtering out revoked keys
+      const keys = includeRevoked
+        ? await query.orderBy(desc(table.createdAt))
+        : await query.where(isNull(table.revokedAt)).orderBy(desc(table.createdAt));
+
+      return keys as unknown as (ApiKeyListItem & { orgId: number })[];
+    },
+
+    /**
      * Get API key by ID
      */
     async findById(id: number, orgId: number): Promise<ApiKeyListItem | null> {
@@ -176,6 +205,26 @@ export function createApiKeysRepository(
         .where(and(
           eq(table.id, id),
           eq(table.orgId, orgId),
+          isNull(table.revokedAt)
+        ))
+        .returning({ id: table.id });
+
+      return !!revokedKey;
+    },
+
+    /**
+     * Revoke API key by ID only (for system users / cross-org access)
+     * Does not require orgId - use with caution
+     */
+    async revokeById(id: number): Promise<boolean> {
+      const [revokedKey] = await db
+        .update(table)
+        .set({
+          revokedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(table.id, id),
           isNull(table.revokedAt)
         ))
         .returning({ id: table.id });
@@ -280,6 +329,10 @@ export class SDKApiKeysRepository {
     return this.repo.listByOrgId(orgId, includeRevoked);
   }
 
+  async listAll(includeRevoked: boolean = false): Promise<(ApiKeyListItem & { orgId: number })[]> {
+    return this.repo.listAll(includeRevoked);
+  }
+
   async findById(id: number, orgId: number): Promise<ApiKeyListItem | null> {
     return this.repo.findById(id, orgId);
   }
@@ -290,6 +343,10 @@ export class SDKApiKeysRepository {
 
   async revoke(id: number, orgId: number): Promise<boolean> {
     return this.repo.revoke(id, orgId);
+  }
+
+  async revokeById(id: number): Promise<boolean> {
+    return this.repo.revokeById(id);
   }
 
   async update(id: number, orgId: number, data: ApiKeyUpdateData): Promise<ApiKeyListItem | null> {

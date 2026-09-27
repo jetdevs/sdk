@@ -19,6 +19,10 @@ export const userFiltersSchema = z.object({
   isActive: z.boolean().optional(),
   roleId: z.number().optional(),
   orgId: z.number().optional(),
+  /** Filter by membership status. When undefined, 'removed' users are excluded by default in system-wide queries. */
+  membershipStatus: z.enum(['active', 'invited', 'suspended', 'removed']).optional(),
+  /** Include removed users (users with no active org memberships). Defaults to false. */
+  includeRemoved: z.boolean().optional().default(false),
 });
 
 export type UserFiltersInput = z.infer<typeof userFiltersSchema>;
@@ -28,7 +32,7 @@ export type UserFiltersInput = z.infer<typeof userFiltersSchema>;
 // =============================================================================
 
 export const userCreateSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   email: z.string().email(),
@@ -38,6 +42,15 @@ export const userCreateSchema = z.object({
   isActive: z.boolean().default(true),
   roleId: z.number().optional(),
   orgId: z.number().optional(),
+}).transform((data) => {
+  // If name is not provided but firstName/lastName are, derive name from them
+  if (!data.name && (data.firstName || data.lastName)) {
+    return {
+      ...data,
+      name: [data.firstName, data.lastName].filter(Boolean).join(' ').trim() || undefined,
+    };
+  }
+  return data;
 });
 
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
@@ -96,7 +109,7 @@ export const changePasswordSchema = z.object({
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 export const updateSessionPreferenceSchema = z.object({
-  sessionTimeoutMinutes: z.number().min(5).max(480),
+  sessionTimeoutMinutes: z.number().min(5).max(10080),
 });
 
 export type UpdateSessionPreferenceInput = z.infer<typeof updateSessionPreferenceSchema>;

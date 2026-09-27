@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { auditLog, type AuditAction } from '../audit';
 import type { Actor } from '../auth/actor';
+import { withRLSContext } from '../rls';
 import { withTelemetry } from '../telemetry';
 
 // =============================================================================
@@ -89,6 +90,20 @@ export interface ServiceContext<TDb = any> {
  * Handler context with all necessary dependencies
  * This is what handlers receive - no more manual setup!
  */
+/**
+ * A callback registered via `afterCommit(...)` inside a route handler.
+ * It runs AFTER the wrapping `dbFunction` transaction has committed
+ * successfully, OUTSIDE the pinned DB connection. Use for post-commit
+ * side effects (e.g. enqueueing work, firing an HTTP POST) that must not
+ * hold a pooled connection for their duration.
+ *
+ * Callbacks only run on commit success — if the handler throws (rollback),
+ * registered callbacks are discarded. A callback that throws is caught and
+ * logged; it never fails the already-committed request. Callbacks run
+ * sequentially in registration order.
+ */
+export type AfterCommitCallback = () => void | Promise<void>;
+
 export interface HandlerContext<TInput = any, TDb = any, TRepo = any> {
   /** Validated input from the request */
   input: TInput;
@@ -112,6 +127,14 @@ export interface HandlerContext<TInput = any, TDb = any, TRepo = any> {
 
   /** Raw tRPC context (for advanced use cases) */
   ctx: any;
+
+  /**
+   * Register a callback to run AFTER the route's transaction commits,
+   * OUTSIDE the pinned DB connection. Opt-in: handlers that never call
+   * this behave exactly as before. Also exposed as `ctx.afterCommit`.
+   * See {@link AfterCommitCallback}.
+   */
+  afterCommit: (cb: AfterCommitCallback) => void;
 }
 
 /**
@@ -525,7 +548,15 @@ export function createRouterWithActor<TDb = any>(
           sessionExpiry: new Date(0).toISOString(),
         };
 
-        return withTelemetry(telemetryName, async () => {
+        // Public routes have no wrapping transaction; run any registered
+        // after-commit callbacks once the handler resolves.
+        const publicAfterCommit: AfterCommitCallback[] = [];
+        const afterCommit = (cb: AfterCommitCallback) => {
+          publicAfterCommit.push(cb);
+        };
+        (ctx as any).afterCommit = afterCommit;
+
+        const publicResult = await withTelemetry(telemetryName, async () => {
           let result = await route.handler({
             input,
             service: { db: ctx.db, orgId: 0, userId: '', actor: emptyActor },
@@ -533,10 +564,21 @@ export function createRouterWithActor<TDb = any>(
             db: ctx.db,
             repo,
             ctx,
+            afterCommit,
           });
 
           return result;
         });
+
+        for (const cb of publicAfterCommit) {
+          try {
+            await cb();
+          } catch (err) {
+            console.error(`[withActor:afterCommit] public callback failed for ${name}:`, err);
+          }
+        }
+
+        return publicResult;
       }
 
       // This is the boilerplate we're eliminating:
@@ -556,7 +598,9 @@ export function createRouterWithActor<TDb = any>(
       // The crossOrg flag already handles RLS bypass appropriately.
       // =======================================================================
       const lockedOrgId = (ctx as any).lockedOrgId as number | undefined;
-      let targetOrgId = input?.orgId;
+      // Support both input.orgId and input.targetOrgId for flexibility
+      // targetOrgId is commonly used in backoffice operations to specify the target org
+      let targetOrgId = input?.orgId ?? input?.targetOrgId;
 
       // Handle lockedOrgId enforcement based on route type
       if (lockedOrgId !== undefined) {
@@ -596,25 +640,64 @@ export function createRouterWithActor<TDb = any>(
         }
       }
 
+      // =======================================================================
+      // SUPERUSER CROSS-ORG ACCESS
+      //
+      // When a superuser/system user provides a targetOrgId that differs from
+      // their session org (actor.orgId), they need cross-org access to operate
+      // on behalf of that target organization. This is the backoffice use case.
+      //
+      // We enable crossOrgAccess when:
+      // 1. User is a system user (superuser/admin)
+      // 2. A targetOrgId was provided in the input
+      // 3. The targetOrgId differs from the actor's session org
+      //
+      // This allows superusers to create/modify resources in any org without
+      // being blocked by RLS policies that would otherwise restrict them to
+      // their session org.
+      // =======================================================================
+      const needsCrossOrgAccess = actor.isSystemUser &&
+        targetOrgId !== undefined &&
+        targetOrgId !== actor.orgId;
+
       const { dbFunction, effectiveOrgId } = adapter.getDbContext(ctx, actor, {
-        crossOrgAccess: route.crossOrg,
+        crossOrgAccess: route.crossOrg || needsCrossOrgAccess,
         targetOrgId,
       });
 
-      // Execute within RLS context
-      return dbFunction(async (db: TDb) => {
-        const serviceContext = adapter.createServiceContext(db, actor, effectiveOrgId);
+      // Build RLS context for AsyncLocalStorage
+      // This ensures telemetry and other utilities can access org/user context
+      const rlsContext = {
+        orgId: effectiveOrgId ?? 0,
+        userId: actor.userId,
+      };
 
-        // Add userId to service context
-        serviceContext.userId = ctx.session?.user?.id || actor.userId;
+      // After-commit hook (opt-in). Callbacks registered via `afterCommit(...)`
+      // inside the handler run AFTER `dbFunction` resolves/commits, OUTSIDE the
+      // pinned DB connection. Handlers that never register a callback keep the
+      // exact previous behavior (empty list → the post-commit loop is a no-op).
+      const afterCommitCallbacks: AfterCommitCallback[] = [];
+      const afterCommit = (cb: AfterCommitCallback) => {
+        afterCommitCallbacks.push(cb);
+      };
+      // Also expose on the raw ctx for the `ctx.afterCommit(...)` convention.
+      (ctx as any).afterCommit = afterCommit;
 
-        // Auto-instantiate repository if specified
-        const repo = route.repository ? new route.repository(db) : undefined;
+      // Execute within RLS context (both AsyncLocalStorage and database session)
+      const result = await withRLSContext(rlsContext, async () => {
+        return dbFunction(async (db: TDb) => {
+          const serviceContext = adapter.createServiceContext(db, actor, effectiveOrgId);
 
-        // Add automatic telemetry
-        const telemetryName = route.description || `${name}.${route.permission || 'access'}`;
+          // Add userId to service context
+          serviceContext.userId = ctx.session?.user?.id || actor.userId;
 
-        return withTelemetry(telemetryName, async () => {
+          // Auto-instantiate repository if specified
+          const repo = route.repository ? new route.repository(db) : undefined;
+
+          // Add automatic telemetry
+          const telemetryName = route.description || `${name}.${route.permission || 'access'}`;
+
+          return withTelemetry(telemetryName, async () => {
           let result = await route.handler({
             input,
             service: serviceContext,
@@ -622,6 +705,7 @@ export function createRouterWithActor<TDb = any>(
             db,
             repo,
             ctx,
+            afterCommit,
           });
 
           // Validate result if ensureResult is enabled
@@ -655,7 +739,24 @@ export function createRouterWithActor<TDb = any>(
 
           return result;
         });
+        });
       });
+
+      // Transaction has committed (dbFunction resolved) and the pooled DB
+      // connection is released. Run any registered after-commit callbacks now,
+      // outside the pinned connection. A failing callback is caught + logged so
+      // it never fails the already-committed request.
+      if (afterCommitCallbacks.length > 0) {
+        for (const cb of afterCommitCallbacks) {
+          try {
+            await cb();
+          } catch (err) {
+            console.error(`[withActor:afterCommit] callback failed for ${name}:`, err);
+          }
+        }
+      }
+
+      return result;
     };
 
     // 6. Attach as query or mutation

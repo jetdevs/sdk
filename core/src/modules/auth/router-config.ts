@@ -11,6 +11,22 @@
 import { z } from 'zod';
 import type { IAuthRepository } from './repository';
 import { registerSchema, updateProfileSchema } from './schemas';
+import type { LocalCredentialWriteGuard } from './local-credential-policy';
+import {
+  askCredentialOwner,
+  CredentialOwnedElsewhereError,
+  frozenCredentialMessage,
+  selectCredentialOwnerResolver,
+  type ResolveCredentialOwner,
+} from './credential-owner';
+import {
+  announceCredentialWritten,
+  type OnCredentialWritten,
+} from './credential-written';
+import {
+  withCredentialWrite,
+  type CredentialWriteGate,
+} from './credential-write';
 
 // =============================================================================
 // TYPES
@@ -55,6 +71,46 @@ export interface AuthRouterDeps {
    * Defaults to checking NEXT_PUBLIC_ENABLE_PUBLIC_REGISTRATION env var
    */
   isRegistrationEnabled?: () => boolean;
+
+  /**
+   * Optional resolver consulted before `register` allocates a user with a
+   * local verifier. Answers WHERE the credential for that email lives:
+   * `local` or `none` → the user is created; `external` → refused with
+   * `CredentialOwnedElsewhereError` (`code: 'OWNED_ELSEWHERE'`, carrying the
+   * owner's `accountUrl`); `frozen` → `AuthRouterError('FORBIDDEN', reason)`.
+   * Nothing is written on a refusal. Absent, `canWriteLocalCredential` is
+   * adapted if given, else every credential is local (today's behaviour).
+   */
+  resolveCredentialOwner?: ResolveCredentialOwner;
+
+  /**
+   * Legacy yes/no guard, kept for one minor. Ignored when
+   * `resolveCredentialOwner` is given; otherwise adapted onto it with the same
+   * outcomes as before: allow → write, refuse →
+   * `AuthRouterError('FORBIDDEN', reason)` and nothing written.
+   */
+  canWriteLocalCredential?: LocalCredentialWriteGuard;
+
+  /**
+   * Optional hook fired ONCE after `register` has successfully stored a local
+   * verifier, with `operation: 'register'` and `firstSet: true`. It is never
+   * fired on a refusal (`external` or `frozen` owner), on a disabled
+   * registration, or on a duplicate email — nothing was written in those
+   * cases. `register` has no transaction, so it fires immediately after the
+   * row is created, on the same `db` handle; errors propagate to the caller.
+   *
+   * p77: `register` now writes inside `withCredentialWrite`'s transaction, so
+   * the hook fires INSIDE it, on the transaction handle.
+   */
+  onCredentialWritten?: OnCredentialWritten;
+
+  /**
+   * p77 credential-write seam (D26). Asked by `register` AFTER the
+   * credential-owner resolver and BEFORE the hash. A throw refuses: nothing
+   * hashed or written, and a `CredentialWriteRefusedError` reaches tRPC as
+   * `SERVICE_UNAVAILABLE`. Absent, every write is admitted.
+   */
+  credentialWriteGate?: CredentialWriteGate;
 }
 
 /**
@@ -139,6 +195,7 @@ export class AuthRouterError extends Error {
 export function createAuthRouterConfig(deps: AuthRouterDeps) {
   const isRegistrationEnabled = deps.isRegistrationEnabled ||
     (() => process.env.NEXT_PUBLIC_ENABLE_PUBLIC_REGISTRATION === 'true');
+  const resolveOwner = selectCredentialOwnerResolver(deps);
 
   return {
     // -------------------------------------------------------------------------
@@ -181,7 +238,7 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
       public: true,
       input: registerSchema,
       repository: deps.Repository,
-      handler: async ({ input, repo }: AuthHandlerContext<z.infer<typeof registerSchema>>) => {
+      handler: async ({ input, repo, db }: AuthHandlerContext<z.infer<typeof registerSchema>>) => {
         // Check if public registration is enabled
         if (!isRegistrationEnabled()) {
           throw new AuthRouterError('FORBIDDEN', 'Public registration is disabled');
@@ -193,12 +250,41 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
           throw new AuthRouterError('CONFLICT', 'User already exists');
         }
 
-        const hashedPassword = await deps.hashPassword(input.password, 12);
-
-        const newUser = await repo.createUser({
+        // Server-side closure: ask WHERE this email's credential lives before
+        // allocating a local verifier. `local` and `none` both allocate.
+        const owner = await askCredentialOwner(resolveOwner, {
+          db,
+          operation: 'register',
+          user: null,
           email: input.email,
-          password: hashedPassword,
-          name: input.name || input.email.split('@')[0],
+        });
+        if (owner.kind === 'external') {
+          throw new CredentialOwnedElsewhereError(owner, 'register');
+        }
+        if (owner.kind === 'frozen') {
+          throw new AuthRouterError('FORBIDDEN', frozenCredentialMessage(owner));
+        }
+
+        // p77 seam: gate, then hash + insert + announcement in one bounded
+        // transaction. The auth repository is bound to a handle at
+        // construction, so the write goes through one bound to the tx.
+        const newUser = await withCredentialWrite(deps, { operation: 'register', db }, async (tx) => {
+          const hashedPassword = await deps.hashPassword(input.password, 12);
+
+          const created = await new deps.Repository(tx).createUser({
+            email: input.email,
+            password: hashedPassword,
+            name: input.name || input.email.split('@')[0],
+          });
+
+          await announceCredentialWritten(deps.onCredentialWritten, {
+            db: tx,
+            userId: created.id,
+            operation: 'register',
+            firstSet: true,
+            at: new Date(),
+          });
+          return created;
         });
 
         return {
@@ -333,41 +419,25 @@ export function createAuthRouterConfig(deps: AuthRouterDeps) {
           });
         }
 
-        // Determine which roles to return based on user's access
-        let roleWhereClause;
+        // Always return system roles (org_id IS NULL or -1) + current org roles.
+        // Previous logic had branching that could miss roles or return nothing.
+        const roleWhereConditions = [
+          eq(userRoles.userId, numericUserId),
+          eq(userRoles.isActive, true)
+        ];
 
-        if (systemRoles.length > 0 && orgRoles.length === 0) {
-          // User has ONLY system roles
-          roleWhereClause = and(
-            eq(userRoles.userId, numericUserId),
-            isNull(userRoles.orgId),
-            eq(userRoles.isActive, true)
-          );
-        } else if (systemRoles.length > 0 && !hasAccessToCurrentOrg) {
-          // User has system roles but no access to current org
-          roleWhereClause = and(
-            eq(userRoles.userId, numericUserId),
-            isNull(userRoles.orgId),
-            eq(userRoles.isActive, true)
-          );
-        } else if (hasAccessToCurrentOrg) {
-          // User has access to current org - return both org and system roles
-          roleWhereClause = and(
-            eq(userRoles.userId, numericUserId),
-            or(
-              eq(userRoles.orgId, user.currentOrgId!),
-              isNull(userRoles.orgId)
-            ),
-            eq(userRoles.isActive, true)
-          );
-        } else {
-          // Edge case: User has org roles but not for current org, and no system roles
-          roleWhereClause = and(
-            eq(userRoles.userId, numericUserId),
-            eq(userRoles.orgId, -9999), // Will return nothing
-            eq(userRoles.isActive, true)
-          );
+        const orgConditions = [
+          isNull(userRoles.orgId),      // system roles (NULL)
+          eq(userRoles.orgId, -1)       // legacy system role sentinel
+        ];
+        if (user.currentOrgId) {
+          orgConditions.push(eq(userRoles.orgId, user.currentOrgId));
         }
+
+        const roleWhereClause = and(
+          ...roleWhereConditions,
+          or(...orgConditions)
+        );
 
         // Get role assignments with permissions (bypasses RLS)
         const userRoleAssignments = await privilegedDb.query.userRoles.findMany({

@@ -80,6 +80,23 @@ export interface CreateApiKeysRouterConfigOptions {
   defaultRoleName?: string;
 
   /**
+   * Permissions to assign when an API key is created without an explicit roleId
+   * or permissions AND the default-role lookup yields nothing.
+   *
+   * This is a safety net: without it, such keys are persisted with an empty
+   * permission array and every downstream `hasPermission` check fails
+   * ("No permissions"). For apps whose default role is a system role that the
+   * tenant-scoped role lookup cannot resolve (e.g. cadra-web's 'API Key' role),
+   * set this to `['*']` so created keys carry full org-scoped access — keys are
+   * always bound to a single org via their `orgId`, so `['*']` is org-admin
+   * access, not cross-org/platform access.
+   *
+   * Leave undefined to preserve the prior behavior (empty permissions on a
+   * failed role lookup).
+   */
+  defaultPermissions?: string[];
+
+  /**
    * Get privileged database client for looking up system roles.
    * This is needed because system roles (like "API Key") have org_id = NULL,
    * which is blocked by RLS policies. If not provided, the system role
@@ -228,6 +245,7 @@ export function createApiKeysRouterConfig(
     Repository = SDKApiKeysRepository,
     // P2-SR-007: Changed default from 'API Key' to 'Full API Access'
     defaultRoleName = 'Full API Access',
+    defaultPermissions,
     getPrivilegedDb,
   } = options;
 
@@ -254,6 +272,7 @@ export function createApiKeysRouterConfig(
         service,
         repo,
         db,
+        actor,
       }: HandlerContext<{
         name: string;
         serviceRoleId?: number;
@@ -263,8 +282,16 @@ export function createApiKeysRouterConfig(
         rateLimit?: number;
         expiresAt?: Date;
         environment: ApiKeyEnvironment;
-      }>) => {
-        if (!service.orgId) {
+        targetOrgId?: number;
+      }> & { actor?: { isSystemUser?: boolean; isSuperUser?: boolean } }) => {
+        // Determine effective org: use targetOrgId ONLY for platform super users, otherwise service.orgId
+        // SECURITY: actor.isSystemUser is too broad (any admin:* permission) —
+        // cross-org key creation requires platform super user (admin:full_access / isSystemRole)
+        const effectiveOrgId = (actor?.isSuperUser && input.targetOrgId)
+          ? input.targetOrgId
+          : service.orgId;
+
+        if (!effectiveOrgId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'No active organization found',
@@ -285,17 +312,25 @@ export function createApiKeysRouterConfig(
         if (db) {
           if (roleId) {
             // Explicit role provided - get permissions from that role
-            permissions = await getRolePermissions(db, roleId, service.orgId);
+            permissions = await getRolePermissions(db, roleId, effectiveOrgId);
           } else if (permissions.length === 0) {
             // No role and no explicit permissions - try to use the default service role
             // Pass privilegedDb to allow finding system roles that have org_id = NULL
             const privilegedDb = getPrivilegedDb?.();
-            const defaultRole = await findRoleByName(db, service.orgId, defaultRoleName, privilegedDb);
+            const defaultRole = await findRoleByName(db, effectiveOrgId, defaultRoleName, privilegedDb);
             if (defaultRole) {
               roleId = defaultRole.id;
               permissions = defaultRole.permissions;
             }
           }
+        }
+
+        // Safety net: never persist a key with zero permissions when the app
+        // has configured a default. The default-role lookup is tenant-scoped and
+        // cannot resolve system roles (e.g. cadra-web's 'API Key' role), which
+        // would otherwise leave the key with `[]` -> "No permissions" downstream.
+        if (permissions.length === 0 && defaultPermissions && defaultPermissions.length > 0) {
+          permissions = defaultPermissions;
         }
 
         // Generate API key
@@ -306,7 +341,7 @@ export function createApiKeysRouterConfig(
 
         // Create the API key record
         const apiKey = await repository.create({
-          orgId: service.orgId,
+          orgId: effectiveOrgId,
           name: input.name,
           keyPrefix: generatedPrefix,
           keyHash,
@@ -328,7 +363,7 @@ export function createApiKeysRouterConfig(
     },
 
     /**
-     * List API keys for the organization
+     * List API keys for the current organization
      */
     list: {
       type: 'query' as const,
@@ -340,6 +375,8 @@ export function createApiKeysRouterConfig(
         service,
         repo,
       }: HandlerContext<{ includeRevoked: boolean }>) => {
+        const repository = repo!;
+
         if (!service.orgId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -347,7 +384,6 @@ export function createApiKeysRouterConfig(
           });
         }
 
-        const repository = repo!;
         return repository.listByOrgId(service.orgId, input.includeRevoked);
       },
     },
@@ -387,7 +423,7 @@ export function createApiKeysRouterConfig(
     },
 
     /**
-     * Revoke API key
+     * Revoke API key (org-scoped)
      */
     revoke: {
       permission,
@@ -400,6 +436,8 @@ export function createApiKeysRouterConfig(
         service,
         repo,
       }: HandlerContext<{ id: number }>) => {
+        const repository = repo!;
+
         if (!service.orgId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -407,7 +445,6 @@ export function createApiKeysRouterConfig(
           });
         }
 
-        const repository = repo!;
         const revoked = await repository.revoke(input.id, service.orgId);
 
         if (!revoked) {

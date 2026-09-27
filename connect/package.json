@@ -1,0 +1,92 @@
+{
+  "name": "@jetdevs/connect",
+  "version": "0.3.0-dev",
+  "description": "OIDC Relying-Party client SDK for any Connect-compatible identity provider",
+  "type": "module",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.js",
+      "default": "./dist/types/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
+    },
+    "./server/revocation": {
+      "types": "./dist/server/revocation/index.d.ts",
+      "import": "./dist/server/revocation/index.js",
+      "default": "./dist/server/revocation/index.js"
+    },
+    "./server/handoff": {
+      "types": "./dist/server/handoff/index.d.ts",
+      "import": "./dist/server/handoff/index.js",
+      "default": "./dist/server/handoff/index.js"
+    },
+    "./server/owner": {
+      "types": "./dist/server/owner/index.d.ts",
+      "import": "./dist/server/owner/index.js",
+      "default": "./dist/server/owner/index.js"
+    },
+    "./next-auth": {
+      "types": "./dist/next-auth/index.d.ts",
+      "import": "./dist/next-auth/index.js",
+      "default": "./dist/next-auth/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser/index.d.ts",
+      "import": "./dist/browser/index.js",
+      "default": "./dist/browser/index.js"
+    },
+    "./adapter": {
+      "types": "./dist/adapter/index.d.ts",
+      "import": "./dist/adapter/index.js",
+      "default": "./dist/adapter/index.js"
+    },
+    "./cutover": {
+      "types": "./dist/cutover/index.d.ts",
+      "import": "./dist/cutover/index.js",
+      "default": "./dist/cutover/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jose": "^6.0.0"
+  },
+  "peerDependencies": {
+    "next-auth": "^4.24.0"
+  },
+  "peerDependenciesMeta": {
+    "next-auth": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "next-auth": "^4.24.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  }
+}

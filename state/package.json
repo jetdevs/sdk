@@ -1,0 +1,44 @@
+{
+  "name": "@jetdevs/state",
+  "version": "0.1.0-dev",
+  "description": "Generic, code-defined finite state machine engine for Jetdevs Platform",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "test": "vitest",
+    "typecheck": "tsc -p tsconfig.types.json --noEmit",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "jetdevs",
+    "state-machine",
+    "fsm",
+    "typescript"
+  ],
+  "author": "Jetdevs",
+  "license": "PRIVATE",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsup": "^8.0.1",
+    "typescript": "^5",
+    "vitest": "^3.2.3"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}
