@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PaginationConfig } from './BaseListTable';
 import { getAlignCellClass } from './column-meta';
 import {
+    collectHeaderLabels,
     FilterIcon,
     MobileRowList,
     MobileSheet,
@@ -28,6 +29,7 @@ import {
 } from './mobile';
 import {
     createStandardListToolbar,
+    getToolbarColumns,
     type StandardToolbarConfig,
     type StandardToolbarFilter,
 } from './standard-toolbar';
@@ -383,13 +385,16 @@ export interface DataTableWithToolbarProps<TData> {
 
   /**
    * The standard list toolbar (p90): search with the filter menu INSIDE it,
-   * status chips, list/grid toggle. When set it REPLACES the built-in toolbar
-   * and also drops export, the View (columns/density) menu, refresh, the result
-   * count and the "Rows per page" select. Every field is optional:
+   * status chips, a Columns menu, list/grid toggle. When set it REPLACES the
+   * built-in toolbar and drops export, the density menu, refresh and the
+   * result count; the footer "Rows per page" select stays. Every field is
+   * optional:
    *   - `search` defaults to the table's own search (server `search` if set,
    *     else the client-side global filter);
    *   - `filters` defaults to `serverFilters` + the config's `filterColumns`,
-   *     moved into the search box's filter menu.
+   *     moved into the search box's filter menu;
+   *   - `columns` defaults to the table's hideable columns (off when the
+   *     config's `enableColumnVisibility` is false; pass `false` to hide it).
    * Opt-in; unset → the table renders exactly as before.
    */
   standardToolbar?: Partial<StandardToolbarConfig>;
@@ -1047,6 +1052,12 @@ export function createDataTableWithToolbar<TData>(
             ),
           ]
         }
+        columns={
+          standardToolbar.columns ??
+          (enableColumnVisibility
+            ? getToolbarColumns(table, collectHeaderLabels(columns as Array<{ id?: string; header?: unknown; accessorKey?: unknown }>))
+            : false)
+        }
       />
     ) : null;
 
@@ -1463,7 +1474,7 @@ export function createDataTableWithToolbar<TData>(
         )}
         {!hidePagination && !isMobile && (
         <div className="flex items-center justify-between space-x-2 py-4">
-          <div className={standardToolbar ? 'hidden' : 'flex items-center space-x-2'}>
+          <div className="flex items-center space-x-2">
             <p className="text-sm font-medium">Rows per page</p>
             <Select
               value={`${table.getState().pagination.pageSize}`}
