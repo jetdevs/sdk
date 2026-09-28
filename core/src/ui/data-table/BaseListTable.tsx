@@ -16,6 +16,7 @@ import * as React from 'react';
 import { useMemo, useState } from 'react';
 import { cn } from '../../lib';
 import { getAlignCellClass } from './column-meta';
+import { useCoreLabels } from '../labels';
 import {
     collectHeaderLabels,
     FilterIcon,
@@ -423,6 +424,8 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     /** Set on phones: renders the compact toolbar instead. */
     mobile?: { rightContent: 'sheet' | 'inline' | 'hidden' };
   }) {
+    const labels = useCoreLabels();
+    const searchPlaceholder = search?.placeholder || labels.listTable.searchPlaceholder;
     const showClear = !!(search?.value || (statusFilter && statusFilter.value && statusFilter.value !== 'all'));
     const [sheetOpen, setSheetOpen] = useState(false);
     const closeSheet = React.useCallback(() => setSheetOpen(false), []);
@@ -437,7 +440,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
             value={statusFilter.value}
             onValueChange={statusFilter.onChange}
             options={statusFilter.options}
-            placeholder="Status"
+            placeholder={labels.common.status}
             className={widthClass}
           />
         );
@@ -475,7 +478,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
               <Input
                 value={search.value}
                 onChange={(e) => search.onChange(e.target.value)}
-                placeholder={search.placeholder || 'Search...'}
+                placeholder={searchPlaceholder}
                 className="pl-8 w-full bg-background border"
               />
             </div>
@@ -485,15 +488,15 @@ export function createBaseListTable(ui: DataTableUIComponents) {
           {hasSheet && (
             <Button variant="outline" size="icon" className="relative h-9 w-9 shrink-0 p-0" onClick={() => setSheetOpen(true)}>
               <FilterIcon className="h-4 w-4" />
-              <span className="sr-only">Filters</span>
+              <span className="sr-only">{labels.common.filters}</span>
               {filtersActive && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary" />}
             </Button>
           )}
           {inlineRight && <div className="flex shrink-0 items-center gap-2">{inlineRight}</div>}
           {primaryAction && <div className="shrink-0">{primaryAction}</div>}
           {hasSheet && (
-            <MobileSheet open={sheetOpen} onClose={closeSheet} title="Filters">
-              {statusFilter && <MobileSheetField label="Status">{renderStatusFilter('w-full')}</MobileSheetField>}
+            <MobileSheet open={sheetOpen} onClose={closeSheet} title={labels.common.filters}>
+              {statusFilter && <MobileSheetField label={labels.common.status}>{renderStatusFilter('w-full')}</MobileSheetField>}
               {sheetRight && <div className="flex flex-wrap items-center gap-2">{sheetRight}</div>}
               <div className="flex items-center justify-end gap-2 pt-2">
                 {showClear && (
@@ -505,11 +508,11 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                       statusFilter?.onChange('all');
                     }}
                   >
-                    Clear
+                    {labels.common.clear}
                   </Button>
                 )}
                 <Button size="sm" onClick={closeSheet}>
-                  Done
+                  {labels.common.done}
                 </Button>
               </div>
             </MobileSheet>
@@ -530,7 +533,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                   <Input
                     value={search.value}
                     onChange={(e) => search.onChange(e.target.value)}
-                    placeholder={search.placeholder || 'Search...'}
+                    placeholder={searchPlaceholder}
                     className="pl-8 w-full bg-background border"
                   />
                 </div>
@@ -547,7 +550,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                   className="h-8 px-2"
                 >
                   <ClearIcon className="h-4 w-4 mr-1" />
-                  Clear
+                  {labels.common.clear}
                 </Button>
               )}
             </div>
@@ -585,7 +588,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
               <Input
                 value={search.value}
                 onChange={(e) => search.onChange(e.target.value)}
-                placeholder={search.placeholder || 'Search...'}
+                placeholder={searchPlaceholder}
                 className="pl-8 w-full bg-background border"
               />
             </div>
@@ -602,7 +605,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
               className="h-8 px-2"
             >
               <ClearIcon className="h-4 w-4 mr-1" />
-              Clear
+              {labels.common.clear}
             </Button>
           )}
           {resultLabel && <div className="text-sm text-muted-foreground hidden md:block">{resultLabel}</div>}
@@ -680,6 +683,8 @@ export function createBaseListTable(ui: DataTableUIComponents) {
     primaryAction,
     standardToolbar,
   }: BaseListTableProps<TData>) {
+    const labels = useCoreLabels();
+    const tp = labels.pagination;
     // Phone layout (p90). Always false on the server and ≥ md, so desktop
     // takes exactly the pre-p90 path below.
     const isMobile = useIsMobileList(mobile !== false);
@@ -795,11 +800,11 @@ export function createBaseListTable(ui: DataTableUIComponents) {
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="h-8">
             <ColumnsIcon className="h-4 w-4 mr-2" />
-            Columns
+            {labels.common.columns}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-[180px]">
-          <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+          <DropdownMenuLabel>{labels.listTable.toggleColumns}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {table
             .getAllColumns()
@@ -832,7 +837,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
         {emptyState.subtitle && <div className="text-sm">{emptyState.subtitle}</div>}
       </div>
     ) : (
-      <div className="text-sm text-muted-foreground">No items found.</div>
+      <div className="text-sm text-muted-foreground">{labels.listTable.noItems}</div>
     );
 
     // Nothing to page through: no rows at all on the first page. Hides the
@@ -993,7 +998,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                             {emptyState.subtitle && <div className="text-sm">{emptyState.subtitle}</div>}
                           </div>
                         ) : (
-                          <div className="text-sm text-muted-foreground">No items found.</div>
+                          <div className="text-sm text-muted-foreground">{labels.listTable.noItems}</div>
                         )}
                       </TableCell>
                     </TableRow>
@@ -1041,7 +1046,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                           {emptyState.subtitle && <div className="text-sm">{emptyState.subtitle}</div>}
                         </div>
                       ) : (
-                        <div className="text-sm text-muted-foreground">No items found.</div>
+                        <div className="text-sm text-muted-foreground">{labels.listTable.noItems}</div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -1062,11 +1067,12 @@ export function createBaseListTable(ui: DataTableUIComponents) {
               className="h-9 w-9 p-0"
             >
               <ChevronLeftIcon className="h-4 w-4" />
-              <span className="sr-only">Previous page</span>
+              <span className="sr-only">{tp.previousPageShort}</span>
             </Button>
             <span className="text-sm text-muted-foreground">
-              Page {pagination.pageIndex + 1}
-              {pageCount !== undefined && ` of ${pageCount}`}
+              {pageCount !== undefined
+                ? tp.pageOf(pagination.pageIndex + 1, pageCount)
+                : tp.page(pagination.pageIndex + 1)}
             </span>
             <Button
               variant="outline"
@@ -1079,7 +1085,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
               className="h-9 w-9 p-0"
             >
               <ChevronRightIcon className="h-4 w-4" />
-              <span className="sr-only">Next page</span>
+              <span className="sr-only">{tp.nextPageShort}</span>
             </Button>
           </div>
         )}
@@ -1088,13 +1094,13 @@ export function createBaseListTable(ui: DataTableUIComponents) {
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm text-muted-foreground">
                 {pagination.totalCount !== undefined ? (
-                  <>
-                    Showing {Math.min(pagination.pageIndex * pagination.pageSize + 1, pagination.totalCount)} to{' '}
-                    {Math.min((pagination.pageIndex + 1) * pagination.pageSize, pagination.totalCount)} of{' '}
-                    {pagination.totalCount} results
-                  </>
+                  tp.showing(
+                    Math.min(pagination.pageIndex * pagination.pageSize + 1, pagination.totalCount),
+                    Math.min((pagination.pageIndex + 1) * pagination.pageSize, pagination.totalCount),
+                    pagination.totalCount,
+                  )
                 ) : (
-                  <>Page {pagination.pageIndex + 1}</>
+                  tp.page(pagination.pageIndex + 1)
                 )}
               </p>
               {pagination.onPageSizeChange && (
@@ -1105,7 +1111,7 @@ export function createBaseListTable(ui: DataTableUIComponents) {
                 >
                   {(pagination.pageSizeOptions || [10, 20, 50, 100]).map((size) => (
                     <option key={size} value={String(size)}>
-                      {size} rows
+                      {tp.pageSizeOption(size)}
                     </option>
                   ))}
                 </select>
@@ -1134,8 +1140,9 @@ export function createBaseListTable(ui: DataTableUIComponents) {
 
               <div className="flex items-center gap-1">
                 <span className="text-sm">
-                  Page {pagination.pageIndex + 1}
-                  {pagination.totalCount !== undefined && ` of ${Math.ceil(pagination.totalCount / pagination.pageSize)}`}
+                  {pagination.totalCount !== undefined
+                    ? tp.pageOf(pagination.pageIndex + 1, Math.ceil(pagination.totalCount / pagination.pageSize))
+                    : tp.page(pagination.pageIndex + 1)}
                 </span>
               </div>
 
