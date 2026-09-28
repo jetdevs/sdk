@@ -26,6 +26,7 @@ import * as React from 'react';
 import { cn } from '../../lib';
 import type { Column, Table } from '@tanstack/react-table';
 import { FilterIcon, getColumnLabel } from './mobile';
+import { useCoreLabels } from '../labels';
 import type { StatusOption } from './BaseListTable';
 
 // =============================================================================
@@ -207,13 +208,16 @@ export function createStandardListToolbar(ui: StandardToolbarUIComponents) {
   function StandardListToolbar({
     search,
     filters,
-    filterLabel = 'Filters',
+    filterLabel: filterLabelProp,
     chips,
     view,
     columns,
-    columnsLabel = 'Columns',
+    columnsLabel: columnsLabelProp,
     testId,
   }: StandardToolbarConfig) {
+    const labels = useCoreLabels();
+    const filterLabel = filterLabelProp ?? labels.common.filters;
+    const columnsLabel = columnsLabelProp ?? labels.common.columns;
     const hasFilters = !!filters && filters.some((f) => f.options.length > 0);
     const filterOn = hasActiveFilter(filters);
     const showChips = shouldShowChips(chips);
@@ -254,8 +258,8 @@ export function createStandardListToolbar(ui: StandardToolbarUIComponents) {
           type="search"
           value={search.value}
           onChange={(e) => search.onChange(e.target.value)}
-          placeholder={search.placeholder ?? 'Search…'}
-          aria-label={search.placeholder ?? 'Search'}
+          placeholder={search.placeholder ?? labels.standardToolbar.searchPlaceholder}
+          aria-label={search.placeholder ?? labels.standardToolbar.searchLabel}
           className={cn(
             'h-9 w-full rounded-lg bg-muted pl-9 text-sm text-foreground placeholder:text-muted-foreground',
             'focus-visible:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -332,8 +336,8 @@ export function createStandardListToolbar(ui: StandardToolbarUIComponents) {
       <div className="hidden shrink-0 rounded-md bg-muted p-0.5 md:flex" data-testid="list-view-toggle">
         {(
           [
-            ['list', view.listLabel ?? 'List view', ListIcon],
-            ['grid', view.gridLabel ?? 'Grid view', GridIcon],
+            ['list', view.listLabel ?? labels.standardToolbar.listView, ListIcon],
+            ['grid', view.gridLabel ?? labels.standardToolbar.gridView, GridIcon],
           ] as const
         ).map(([mode, label, Icon]) => (
           <button

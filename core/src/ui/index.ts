@@ -288,3 +288,16 @@ export type {
   ManagePermissionsDialogProps,
   ManagePermissionsDialogFactoryConfig,
 } from './admin';
+
+// =============================================================================
+// LABELS (i18n) — translate the words core components render
+// =============================================================================
+
+export {
+  CoreLabelsProvider,
+  useCoreLabels,
+  mergeCoreLabels,
+  defaultCoreLabels,
+} from './labels';
+
+export type { CoreLabels, CoreLabelsOverrides, CoreLabelsProviderProps } from './labels';
