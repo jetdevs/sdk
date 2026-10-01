@@ -106,7 +106,8 @@ describe('users router — canWriteLocalCredential', () => {
     const cfg: any = createUserRouterConfig({ Repository: Repo, hashPassword, comparePassword, canWriteLocalCredential: refuse });
 
     const result = await cfg.invite.handler(userCtx({ input: { email: owned.email, password: 'Ignored!Pass1' } }, Repo));
-    expect(result).toBe(owned);
+    // An org-level caller gets the id and the email it sent, never the stored row (YMS-296).
+    expect(result).toEqual({ id: owned.id, email: owned.email });
     expect(writes).toHaveLength(0);
     expect(refuse).not.toHaveBeenCalled();
   });

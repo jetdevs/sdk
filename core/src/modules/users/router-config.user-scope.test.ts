@@ -12,29 +12,26 @@ import { createUserRouterConfig, type UserRouterDeps } from './router-config';
 
 const ORG = 1;
 const SELF = 7;
-const MEMBER = 50; // org_members: active
-const SUSPENDED = 51; // org_members: suspended
-const REMOVED = 52; // org_members: removed, but an active role row lingers
-const LEGACY = 53; // no org_members row, active role in the org
-const STAFF = 54; // no org_members row, only an org-less (system) role
+const MEMBER = 50; // in the org's user list
+const SUSPENDED = 51; // in the org's user list (suspended members are listed)
+const REMOVED = 52; // removed from the org; a role row may linger, the list does not show it
+const ROLE_ONLY = 53; // has a role row in the org but is not in its user list: the caller can write that row itself
+const STAFF = 54; // platform user, not in the org's user list
 const OUTSIDER = 60; // nothing in this org
 
 function build() {
   const writes: string[] = [];
+  const listQueries: Array<number | undefined> = [];
   class Repo {
     constructor(public db: any) {}
-    async getMembershipStatuses(_db: any, ids: number[]) {
-      const all = new Map<number, string>([[MEMBER, 'active'], [SUSPENDED, 'suspended'], [REMOVED, 'removed']]);
-      return new Map(ids.filter((id) => all.has(id)).map((id) => [id, all.get(id)!]));
+    /** The org's user list: what the Users page of this org shows. */
+    async findAll(_db: any, options: any) {
+      listQueries.push(options.filters.orgId);
+      return options.filters.orgId === ORG ? [{ id: SELF }, { id: MEMBER }, { id: SUSPENDED }] : [];
     }
-    async getUserRolesBatch(_db: any, ids: number[]) {
-      const all = new Map<number, any[]>([
-        [REMOVED, [{ orgId: ORG, isActive: true }]],
-        [LEGACY, [{ orgId: ORG, isActive: true }]],
-        [STAFF, [{ orgId: null, isActive: true }]],
-      ]);
-      return new Map(ids.filter((id) => all.has(id)).map((id) => [id, all.get(id)!]));
-    }
+    async count() { return 3; }
+    async getUserRolesBatch() { return new Map(); }
+    async getMembershipStatuses() { return new Map(); }
     async findById(_db: any, id: number) { return { id, email: `u${id}@example.com` }; }
     async getUserRoles() { return []; }
     async update(_db: any, id: number) { writes.push(`update:${id}`); return { id }; }
@@ -49,7 +46,7 @@ function build() {
     hashPassword: async (p: string) => `hashed:${p}`,
     comparePassword: async () => true,
   });
-  return { cfg, writes, Repo };
+  return { cfg, writes, listQueries, Repo };
 }
 
 function ctx(Repo: any, input: any, actor: Record<string, unknown> = {}, db: any = {}) {
@@ -74,7 +71,12 @@ function roleDb(roleRow: unknown, platformRows: unknown[] = []) {
 }
 
 describe('users router — target user must be in the caller’s org (YMS-296)', () => {
-  for (const [who, id] of [['a user of another org', OUTSIDER], ['a removed member', REMOVED], ['a platform user with only an org-less role', STAFF]] as const) {
+  for (const [who, id] of [
+    ['a user of another org', OUTSIDER],
+    ['a removed member', REMOVED],
+    ['a user the caller only gave a role to', ROLE_ONLY],
+    ['a platform user', STAFF],
+  ] as const) {
     it(`getById reads ${who} as not found`, async () => {
       const { cfg, Repo } = build();
       await expect(cfg.getById.handler(ctx(Repo, id))).rejects.toMatchObject({ code: 'NOT_FOUND' });
@@ -104,17 +106,37 @@ describe('users router — target user must be in the caller’s org (YMS-296)',
     expect(writes).toEqual([]);
   });
 
-  it('works for members: active, suspended, and a legacy member known only by its role', async () => {
-    const { cfg, writes, Repo } = build();
-    for (const id of [MEMBER, SUSPENDED, LEGACY]) {
+  it('works for the users the org’s own user list shows, and asks that list for the org the request runs in', async () => {
+    const { cfg, writes, listQueries, Repo } = build();
+    for (const id of [MEMBER, SUSPENDED]) {
       await expect(cfg.getById.handler(ctx(Repo, id))).resolves.toMatchObject({ id });
       await cfg.update.handler(ctx(Repo, { id, name: 'x' }));
     }
     await cfg.delete.handler(ctx(Repo, MEMBER));
-    await cfg.bulkUpdate.handler(ctx(Repo, { userIds: [MEMBER, LEGACY], isActive: false }));
+    await cfg.bulkUpdate.handler(ctx(Repo, { userIds: [MEMBER, SUSPENDED], isActive: false }));
     expect(writes).toEqual([
-      `update:${MEMBER}`, `update:${SUSPENDED}`, `update:${LEGACY}`, `softDelete:${MEMBER}`, `bulkUpdate:${MEMBER},${LEGACY}`,
+      `update:${MEMBER}`, `update:${SUSPENDED}`, `softDelete:${MEMBER}`, `bulkUpdate:${MEMBER},${SUSPENDED}`,
     ]);
+    expect(new Set(listQueries)).toEqual(new Set([ORG]));
+  });
+
+  it('refuses everyone but the caller itself when the request has no org', async () => {
+    const { cfg, writes, Repo } = build();
+    const c = ctx(Repo, { id: MEMBER, name: 'x' });
+    c.service.orgId = null;
+    await expect(cfg.update.handler(c)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(cfg.getAll.handler(c)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(cfg.getAllWithStats.handler({ ...c, input: { limit: 20, offset: 0 } })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(writes).toEqual([]);
+  });
+
+  it('invite tells an org-level caller nothing about an existing person beyond what it sent', async () => {
+    const { cfg, Repo } = build();
+    (Repo.prototype as any).findByEmail = async () => ({ id: OUTSIDER, email: 'x@example.com', name: 'Other Org Person', phone: '+100', password: 'hash' });
+    const result = await cfg.invite.handler(ctx(Repo, { email: 'x@example.com' }));
+    expect(result).toEqual({ id: OUTSIDER, email: 'x@example.com' });
   });
 
   it('update: a user edits itself without user:update', async () => {

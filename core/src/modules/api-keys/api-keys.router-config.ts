@@ -14,6 +14,7 @@
 
 import { TRPCError } from '@trpc/server';
 import { SDKRoleRepository } from '../rbac/role.repository';
+import { isPlatformPermission, mayGrantPlatformPermissions } from '../rbac/assignable-role';
 import { SDKApiKeysRepository, type ApiKeysRepository } from './api-keys.repository';
 import { generateApiKey } from './key-generation';
 import {
@@ -117,6 +118,27 @@ export interface CreateApiKeysRouterConfigOptions {
 /**
  * Helper function to get permissions from a role
  */
+/**
+ * A key acts with the permissions stored on it, so a key that carries a
+ * platform permission is platform staff. Only a caller with full platform
+ * access may mint one, whether it lists the permission or picks a role that
+ * holds it. `*` counts: it matches every permission.
+ */
+function assertKeyPermissionsAllowed(
+  actor: { isSuperUser?: boolean; permissions?: string[] | null } | undefined,
+  chosenPermissions: string[]
+): void {
+  if (mayGrantPlatformPermissions(actor)) {
+    return;
+  }
+  if (chosenPermissions.some((p) => p === '*' || isPlatformPermission(p))) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Platform permissions can only be put on an API key by platform staff',
+    });
+  }
+}
+
 async function getRolePermissions(
   db: any,
   roleId: number,
@@ -308,11 +330,16 @@ export function createApiKeysRouterConfig(
         let permissions = input.permissions;
         const permissionMode = input.permissionMode ?? 'cached';
 
+        // What the caller listed itself. The app's own defaults further down
+        // are not the caller's choice and are not checked here.
+        assertKeyPermissionsAllowed(actor, permissions);
+
         // If we have a database connection, derive permissions from role
         if (db) {
           if (roleId) {
             // Explicit role provided - get permissions from that role
             permissions = await getRolePermissions(db, roleId, effectiveOrgId);
+            assertKeyPermissionsAllowed(actor, permissions);
           } else if (permissions.length === 0) {
             // No role and no explicit permissions - try to use the default service role
             // Pass privilegedDb to allow finding system roles that have org_id = NULL
@@ -476,6 +503,7 @@ export function createApiKeysRouterConfig(
         service,
         repo,
         db,
+        actor,
       }: HandlerContext<{
         id: number;
         name?: string;
@@ -483,7 +511,7 @@ export function createApiKeysRouterConfig(
         permissions?: string[];
         rateLimit?: number;
         expiresAt?: Date | null;
-      }>) => {
+      }> & { actor?: { isSuperUser?: boolean; permissions?: string[] | null } }) => {
         if (!service.orgId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -494,9 +522,12 @@ export function createApiKeysRouterConfig(
         const repository = repo!;
         const { id, roleId, ...updateData } = input;
 
+        assertKeyPermissionsAllowed(actor, updateData.permissions ?? []);
+
         // If roleId is being changed to a new role, derive permissions from that role
         if (db && roleId !== undefined && roleId !== null) {
           const permissions = await getRolePermissions(db, roleId, service.orgId);
+          assertKeyPermissionsAllowed(actor, permissions);
           (updateData as any).roleId = roleId;
           (updateData as any).permissions = permissions;
         } else if (roleId === null) {
