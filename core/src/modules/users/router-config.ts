@@ -11,6 +11,7 @@
 import { and, ilike, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { IUserRepository } from './repository';
+import { namesForeignOrg } from '../organizations/org-scope';
 import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
 import {
   askCredentialOwner,
@@ -227,7 +228,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       permission: 'user:read',
       input: userFiltersSchema,
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userFiltersSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userFiltersSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         const effectiveOrgId = input.orgId ?? (service.orgId ?? undefined);
 
         const users = await repo.findAll(db, {
@@ -398,7 +403,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users'],
       entityType: 'user',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userCreateSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userCreateSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         /**
          * Find the global "Standard User" role.
          *
@@ -909,7 +918,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users', 'roles'],
       entityType: 'user_role',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof assignRoleSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof assignRoleSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         const orgId = input.orgId || service.orgId;
 
         if (!orgId) {
@@ -942,7 +955,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users', 'roles'],
       entityType: 'user_role',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof removeRoleSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof removeRoleSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         const orgId = input.orgId || service.orgId;
 
         if (!orgId) {
@@ -968,7 +985,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users', 'roles'],
       entityType: 'user_role',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof removeFromOrgSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof removeFromOrgSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         const orgId = input.orgId || service.orgId;
 
         if (!orgId) {
