@@ -11,6 +11,7 @@
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { RoleRepository } from "./role.repository";
+import { isPlatformPermission, mayGrantPlatformPermissions } from "./assignable-role";
 import type {
     Actor,
     RbacServiceContext,
@@ -505,6 +506,18 @@ export class RoleService {
         "Cannot modify permissions for system roles",
         "FORBIDDEN"
       );
+    }
+
+    // A platform permission makes its holder platform staff. Only a caller
+    // with full platform access may put one on a role.
+    if (!mayGrantPlatformPermissions(ctx.actor)) {
+      const slugs = await repo.getPermissionSlugs(permissionIds);
+      if (slugs.some(isPlatformPermission)) {
+        throw new RbacError(
+          "Platform permissions can only be assigned by platform staff",
+          "FORBIDDEN"
+        );
+      }
     }
 
     try {
