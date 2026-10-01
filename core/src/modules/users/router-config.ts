@@ -559,7 +559,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users'],
       entityType: 'user',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userCreateSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userCreateSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         // Check if user with email already exists
         const existing = await repo.findByEmail(db, input.email);
         if (existing) {

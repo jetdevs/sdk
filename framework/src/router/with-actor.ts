@@ -169,6 +169,19 @@ export interface RouteConfig<TInput = any, TOutput = any, TDb = any> {
   /** Allow cross-org access */
   crossOrg?: boolean;
 
+  /**
+   * The handler itself decides whether the caller may act in the org named in
+   * the input (`orgId` / `targetOrgId`), so the router runs the request in
+   * that org without a membership check.
+   *
+   * Set it only on a route whose handler verifies the caller's right to that
+   * org before it reads or writes anything, for example accepting an
+   * invitation into an org the caller is not yet a member of. Without it, a
+   * caller that is not a platform system user is refused when it names an org
+   * other than its own.
+   */
+  inputOrgCheckedByHandler?: boolean;
+
   /** Auto-audit mutations (default: true for mutations) */
   audit?: boolean;
 
@@ -696,10 +709,13 @@ export function createRouterWithActor<TDb = any>(
       // `targetOrgId` at this point is either the org the server locked the
       // request to, or a value the client named. Permissions are loaded for
       // the session org, so a caller that is not a platform system user may
-      // name only the org the server already put it in. The one exception is
-      // a cross-org route that checks no permission (org switch, membership
-      // check): there the named org is used when the caller is an active
-      // member of it, and the session org otherwise.
+      // name only the org the server already put it in. Exceptions:
+      //  - a route whose author took over the check: `inputOrgCheckedByHandler`,
+      //    or a cross-org route gated by a permission (an explicit grant to
+      //    act across orgs; the handler must contain it);
+      //  - a cross-org route that checks no permission (org switch, membership
+      //    check): the named org is used when the caller is an active member
+      //    of it, and the session org otherwise.
       // =======================================================================
       const serverOrgId = lockedOrgId ?? actor.orgId ?? null;
       let targetOrgVerified = false;
@@ -708,13 +724,14 @@ export function createRouterWithActor<TDb = any>(
         if (Number(targetOrgId) === serverOrgId) {
           // An org locked by the server may differ from the session org.
           targetOrgVerified = serverOrgId !== actor.orgId;
+        } else if (route.inputOrgCheckedByHandler || (route.crossOrg && route.permission)) {
+          targetOrgVerified = true;
         } else if (
           route.crossOrg &&
-          !route.permission &&
           (await isActiveOrgMember(adapter, ctx, actor, Number(targetOrgId)))
         ) {
           targetOrgVerified = true;
-        } else if (route.crossOrg && !route.permission && serverOrgId != null) {
+        } else if (route.crossOrg && serverOrgId != null) {
           targetOrgId = serverOrgId;
           targetOrgVerified = serverOrgId !== actor.orgId;
         } else {

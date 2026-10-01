@@ -134,12 +134,33 @@ describe('createRouterWithActor — org scope (YMS-292)', () => {
       expect(h.dbContextCalls[0].targetOrgId).toBeUndefined();
     });
 
-    it('refuses a foreign org on a cross-org route that checks a permission', async () => {
+    it('refuses a foreign org on a route that only checks a permission', async () => {
       const h = configure();
       await expect(
-        router(h, { crossOrg: true, permission: 'user:assign_roles' }).run({ ctx: {}, input: { orgId: FOREIGN_ORG } }),
+        router(h, { permission: 'user:read' }).run({ ctx: {}, input: { orgId: FOREIGN_ORG } }),
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
       expect(h.handlerOrgs).toEqual([]);
+      expect(h.dbContextCalls).toEqual([]);
+    });
+  });
+
+  describe('routes whose author took over the org check', () => {
+    it('runs a cross-org route gated by a permission in the named org, without a membership lookup', async () => {
+      const isOrgMember = vi.fn().mockResolvedValue(false);
+      const h = configure({}, { isOrgMember });
+      await expect(
+        router(h, { crossOrg: true, permission: 'inbox:cross-org' }).run({ ctx: {}, input: { targetOrgId: FOREIGN_ORG } }),
+      ).resolves.toEqual({ orgId: FOREIGN_ORG });
+      expect(isOrgMember).not.toHaveBeenCalled();
+      expect(h.dbContextCalls.at(-1)).toMatchObject({ targetOrgId: FOREIGN_ORG, targetOrgVerified: true });
+    });
+
+    it('runs a route marked inputOrgCheckedByHandler in the named org', async () => {
+      const h = configure();
+      await expect(
+        router(h, { inputOrgCheckedByHandler: true }).run({ ctx: {}, input: { orgId: FOREIGN_ORG } }),
+      ).resolves.toEqual({ orgId: FOREIGN_ORG });
+      expect(h.dbContextCalls.at(-1)).toMatchObject({ targetOrgId: FOREIGN_ORG, targetOrgVerified: true });
     });
   });
 
@@ -177,11 +198,60 @@ describe('createRouterWithActor — org scope (YMS-292)', () => {
       });
     });
 
-    it('with no membership check configured, reads user_roles in the named org and fails closed', async () => {
+    it('with no membership check configured, fails closed when the database cannot be asked', async () => {
       // The mock database has no `execute`, so the built-in lookup cannot confirm membership.
       const h = configure();
       await expect(router(h, { crossOrg: true }).run({ ctx: {}, input: { orgId: FOREIGN_ORG } })).resolves.toEqual({
         orgId: SESSION_ORG,
+      });
+    });
+
+    describe('built-in membership lookup (no isOrgMember on the adapter)', () => {
+      /** An adapter whose database answers the lookup with `result`, and records where it ran. */
+      function withLookup(result: unknown) {
+        const lookups: Array<{ targetOrgId?: number | null; targetOrgVerified?: boolean }> = [];
+        const execute = vi.fn().mockResolvedValue(result);
+        const h = configure(
+          {},
+          {
+            getDbContext: (_ctx: any, a: any, options: any = {}) => {
+              h.dbContextCalls.push({ ...options });
+              const effectiveOrgId = options.targetOrgId !== undefined ? options.targetOrgId : a.orgId;
+              return {
+                effectiveOrgId: effectiveOrgId ?? null,
+                dbFunction: async (cb: (db: any) => Promise<any>) => {
+                  lookups.push({ ...options });
+                  return cb({ execute });
+                },
+              };
+            },
+          },
+        );
+        return { h, execute, lookups };
+      }
+
+      it('accepts a row returned as an array (postgres-js)', async () => {
+        const { h, execute, lookups } = withLookup([{ '?column?': 1 }]);
+        await expect(router(h, { crossOrg: true }).run({ ctx: {}, input: { orgId: FOREIGN_ORG } })).resolves.toEqual({
+          orgId: FOREIGN_ORG,
+        });
+        expect(execute).toHaveBeenCalledTimes(1);
+        // The lookup itself ran inside the named org, where the caller's own row is visible.
+        expect(lookups[0]).toMatchObject({ targetOrgId: FOREIGN_ORG, targetOrgVerified: true, crossOrgAccess: false });
+      });
+
+      it('accepts a row returned as { rows } (node-postgres, neon)', async () => {
+        const { h } = withLookup({ rows: [{ '?column?': 1 }] });
+        await expect(router(h, { crossOrg: true }).run({ ctx: {}, input: { orgId: FOREIGN_ORG } })).resolves.toEqual({
+          orgId: FOREIGN_ORG,
+        });
+      });
+
+      it('treats an empty result as "not a member"', async () => {
+        const { h } = withLookup([]);
+        await expect(router(h, { crossOrg: true }).run({ ctx: {}, input: { orgId: FOREIGN_ORG } })).resolves.toEqual({
+          orgId: SESSION_ORG,
+        });
       });
     });
   });
