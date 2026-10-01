@@ -475,6 +475,20 @@ export class RoleRepository {
   }
 
   /**
+   * Slugs of the given permission ids (unknown ids are left out).
+   */
+  async getPermissionSlugs(permissionIds: number[]): Promise<string[]> {
+    if (permissionIds.length === 0) return [];
+
+    const rows = await this.db
+      .select({ slug: this.permissions.slug })
+      .from(this.permissions)
+      .where(inArray(this.permissions.id, permissionIds));
+
+    return rows.map((r: any) => r.slug);
+  }
+
+  /**
    * Remove specific permissions from a role
    */
   async removePermissions(

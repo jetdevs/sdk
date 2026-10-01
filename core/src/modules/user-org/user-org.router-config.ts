@@ -48,6 +48,7 @@ import {
 } from './schemas';
 import { createUserOrgRepository } from './user-org.repository';
 import { namesForeignOrg } from '../organizations/org-scope';
+import { findRoleAssignmentRefusal } from '../rbac/assignable-role';
 
 /**
  * TRPCError-like constructor interface
@@ -239,6 +240,13 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
             code: 'FORBIDDEN',
             message: 'Access denied to this organization',
           });
+        }
+
+        // An org-level caller may not hand out a system role or a role that
+        // carries a platform permission.
+        const refusal = await findRoleAssignmentRefusal(context.db, actor, input.orgId, input.roleId);
+        if (refusal) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: refusal });
         }
 
         // P2-SR-005: Validate role is not a service role
