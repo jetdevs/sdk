@@ -32,6 +32,7 @@ import {
 } from './schemas';
 import type { IOrgService } from './service';
 import { namesForeignOrg } from './org-scope';
+import { loadRoleAssignability, roleAssignmentRefusal } from '../rbac/assignable-role';
 
 // =============================================================================
 // TYPES
@@ -961,8 +962,13 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
 
           // The role is picked by name and shared roles are in reach, so a
           // system role can match. Only platform staff may hand one out.
-          if (role.isSystemRole === true && actor?.isSystemUser !== true) {
-            throw new OrgRouterError('FORBIDDEN', 'This role can only be assigned by platform staff');
+          const roleRefusal = roleAssignmentRefusal(
+            actor,
+            input.orgId,
+            actor?.isSystemUser === true ? null : await loadRoleAssignability(targetDb, role.id),
+          );
+          if (roleRefusal) {
+            throw new OrgRouterError('FORBIDDEN', roleRefusal);
           }
 
           // Check if user already has this role in this org
@@ -1141,8 +1147,13 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
 
           const newRole = roleResult[0];
 
-          if (newRole.isSystemRole === true && actor?.isSystemUser !== true) {
-            throw new OrgRouterError('FORBIDDEN', 'This role can only be assigned by platform staff');
+          const roleRefusal = roleAssignmentRefusal(
+            actor,
+            input.orgId,
+            actor?.isSystemUser === true ? null : await loadRoleAssignability(targetDb, newRole.id),
+          );
+          if (roleRefusal) {
+            throw new OrgRouterError('FORBIDDEN', roleRefusal);
           }
 
           // First, deactivate all existing role assignments for this user in this org
