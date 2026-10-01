@@ -20,6 +20,7 @@ import {
   reinviteSchema,
 } from './schemas';
 import type { OrgMembershipHooks } from './types';
+import { findRoleAssignmentRefusal } from '../rbac/assignable-role';
 
 // =============================================================================
 // TYPES
@@ -114,9 +115,16 @@ export function createOrgMembershipRouterConfig(deps: OrgMembershipRouterDeps) {
       invalidates: ['orgMembership', 'users'],
       entityType: 'org_member',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: HandlerContext<z.infer<typeof inviteByEmailSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: HandlerContext<z.infer<typeof inviteByEmailSchema>>) => {
         if (!service.orgId) {
           throw new OrgMembershipRouterError('BAD_REQUEST', 'Organization context required');
+        }
+
+        if (input.roleId) {
+          const refusal = await findRoleAssignmentRefusal(db, actor, service.orgId, input.roleId);
+          if (refusal) {
+            throw new OrgMembershipRouterError('FORBIDDEN', refusal);
+          }
         }
 
         if (!deps.findOrCreateUserByEmail) {
@@ -150,9 +158,16 @@ export function createOrgMembershipRouterConfig(deps: OrgMembershipRouterDeps) {
       invalidates: ['orgMembership', 'users'],
       entityType: 'org_member',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: HandlerContext<z.infer<typeof inviteExistingUserSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: HandlerContext<z.infer<typeof inviteExistingUserSchema>>) => {
         if (!service.orgId) {
           throw new OrgMembershipRouterError('BAD_REQUEST', 'Organization context required');
+        }
+
+        if (input.roleId) {
+          const refusal = await findRoleAssignmentRefusal(db, actor, service.orgId, input.roleId);
+          if (refusal) {
+            throw new OrgMembershipRouterError('FORBIDDEN', refusal);
+          }
         }
 
         const invitedBy = parseInt(service.userId);
@@ -284,9 +299,16 @@ export function createOrgMembershipRouterConfig(deps: OrgMembershipRouterDeps) {
       invalidates: ['orgMembership', 'users'],
       entityType: 'org_member',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: HandlerContext<z.infer<typeof reinviteSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: HandlerContext<z.infer<typeof reinviteSchema>>) => {
         if (!service.orgId) {
           throw new OrgMembershipRouterError('BAD_REQUEST', 'Organization context required');
+        }
+
+        if (input.roleId) {
+          const refusal = await findRoleAssignmentRefusal(db, actor, service.orgId, input.roleId);
+          if (refusal) {
+            throw new OrgMembershipRouterError('FORBIDDEN', refusal);
+          }
         }
 
         const invitedBy = parseInt(service.userId);

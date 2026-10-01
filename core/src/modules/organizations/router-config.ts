@@ -959,6 +959,12 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
 
           const role = roleResult[0];
 
+          // The role is picked by name and shared roles are in reach, so a
+          // system role can match. Only platform staff may hand one out.
+          if (role.isSystemRole === true && actor?.isSystemUser !== true) {
+            throw new OrgRouterError('FORBIDDEN', 'This role can only be assigned by platform staff');
+          }
+
           // Check if user already has this role in this org
           const existingAssignment = await targetDb
             .select()
@@ -1134,6 +1140,10 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
           }
 
           const newRole = roleResult[0];
+
+          if (newRole.isSystemRole === true && actor?.isSystemUser !== true) {
+            throw new OrgRouterError('FORBIDDEN', 'This role can only be assigned by platform staff');
+          }
 
           // First, deactivate all existing role assignments for this user in this org
           await targetDb
