@@ -38,12 +38,22 @@ function build() {
   return { cfg, calls, Repo };
 }
 
+/** A database that answers the role lookup done before a role is assigned: an ordinary own-org role. */
+function ownRoleDb() {
+  let call = 0;
+  const chain = (rows: unknown[]) => {
+    const c: any = { from: () => c, innerJoin: () => c, where: () => c, limit: async () => rows };
+    return c;
+  };
+  return { select: () => chain(call++ === 0 ? [{ id: 3, orgId: OWN_ORG, isSystemRole: false }] : []) };
+}
+
 function ctx(Repo: any, input: any, actor: Record<string, unknown>, serviceOrgId: number) {
   return {
     input,
     service: { db: {}, orgId: serviceOrgId, userId: '7' },
     actor: { userId: 7, orgId: OWN_ORG, isSystemUser: false, ...actor },
-    db: {},
+    db: ownRoleDb(),
     repo: new Repo({}),
     ctx: {},
   } as any;
