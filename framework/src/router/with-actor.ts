@@ -712,14 +712,14 @@ export function createRouterWithActor<TDb = any>(
       // caller. A caller that is not a platform system user must be an active
       // member of it, whatever its session org is: an app may already have
       // moved the session org to the locked org, so equal ids prove nothing.
-      // Not checked: a route whose handler took over the org check and that
-      // names its org in the input (accepting an invitation into the locked
-      // org). Public routes never get here.
+      // Not checked: a route whose handler took over the org check and whose
+      // input names the locked org itself (accepting an invitation into the
+      // locked org). Public routes never get here.
       // =======================================================================
       if (
-        lockedOrgId !== undefined &&
+        lockedOrgId != null &&
         !mayAccessForeignOrg(actor) &&
-        !(route.inputOrgCheckedByHandler && (input?.orgId ?? input?.targetOrgId) != null) &&
+        !(route.inputOrgCheckedByHandler && Number(input?.orgId ?? input?.targetOrgId) === lockedOrgId) &&
         !(await isActiveOrgMember(adapter, ctx, actor, lockedOrgId))
       ) {
         console.error('[SECURITY] Refused a caller that is not a member of the locked organization:', {

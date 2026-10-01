@@ -254,6 +254,24 @@ describe('createRouterWithActor — membership in a locked org (YMS-298)', () =>
       expect(isOrgMember).not.toHaveBeenCalled();
     });
 
+    it('a route whose handler took over the org check is still checked when its input names no org', async () => {
+      const h = configure({}, { isOrgMember: vi.fn().mockResolvedValue(false) });
+      await expect(
+        router(h, { crossOrg: true, inputOrgCheckedByHandler: true }).run({ ctx: lockedCtx, input: {} }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(h.handlerOrgs).toEqual([]);
+    });
+
+    it('a route whose handler took over the org check is still checked when its input names another org', async () => {
+      const h = configure({}, { isOrgMember: vi.fn().mockResolvedValue(false) });
+      for (const orgId of [0, 3]) {
+        await expect(
+          router(h, { crossOrg: true, inputOrgCheckedByHandler: true }).run({ ctx: lockedCtx, input: { orgId } }),
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      }
+      expect(h.handlerOrgs).toEqual([]);
+    });
+
     it('a public route is not checked', async () => {
       const isOrgMember = vi.fn().mockResolvedValue(false);
       configure({}, { isOrgMember });
