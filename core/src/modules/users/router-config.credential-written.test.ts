@@ -66,7 +66,9 @@ function userCtx(overrides: Partial<{ input: any; userId: string; orgId: number 
   return {
     input: overrides.input,
     service: { db: {}, orgId: overrides.orgId ?? 1, userId: overrides.userId ?? '7' },
-    actor: {},
+    // Some cases edit another user. A platform system user may; who else may
+    // is covered in router-config.user-scope.test.ts.
+    actor: { isSystemUser: true },
     db: transactionalStub({ handle: 'the-db' }),
     repo: new Repo({}),
     ctx: {},
