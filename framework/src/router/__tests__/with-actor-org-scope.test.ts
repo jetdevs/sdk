@@ -145,22 +145,45 @@ describe('createRouterWithActor — org scope (YMS-292)', () => {
   });
 
   describe('routes whose author took over the org check', () => {
-    it('runs a cross-org route gated by a permission in the named org, without a membership lookup', async () => {
+    it('refuses a foreign org on a cross-org route gated by a permission, member or not', async () => {
+      // The permission was granted in the session org; it says nothing about the named org.
+      const isOrgMember = vi.fn().mockResolvedValue(true);
+      const h = configure({}, { isOrgMember });
+      await expect(
+        router(h, { crossOrg: true, permission: 'credentials:create' }).run({ ctx: {}, input: { targetOrgId: FOREIGN_ORG } }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(isOrgMember).not.toHaveBeenCalled();
+      expect(h.handlerOrgs).toEqual([]);
+      expect(h.dbContextCalls).toEqual([]);
+    });
+
+    it('runs a route marked inputOrgCheckedByHandler in the named org, without a membership lookup', async () => {
       const isOrgMember = vi.fn().mockResolvedValue(false);
       const h = configure({}, { isOrgMember });
       await expect(
-        router(h, { crossOrg: true, permission: 'inbox:cross-org' }).run({ ctx: {}, input: { targetOrgId: FOREIGN_ORG } }),
+        router(h, { crossOrg: true, permission: 'inbox:cross-org', inputOrgCheckedByHandler: true }).run({
+          ctx: {},
+          input: { targetOrgId: FOREIGN_ORG },
+        }),
       ).resolves.toEqual({ orgId: FOREIGN_ORG });
       expect(isOrgMember).not.toHaveBeenCalled();
       expect(h.dbContextCalls.at(-1)).toMatchObject({ targetOrgId: FOREIGN_ORG, targetOrgVerified: true });
     });
 
-    it('runs a route marked inputOrgCheckedByHandler in the named org', async () => {
+    it('passes a non-numeric org id through unchanged on a route that took over the check', async () => {
       const h = configure();
-      await expect(
-        router(h, { inputOrgCheckedByHandler: true }).run({ ctx: {}, input: { orgId: FOREIGN_ORG } }),
-      ).resolves.toEqual({ orgId: FOREIGN_ORG });
-      expect(h.dbContextCalls.at(-1)).toMatchObject({ targetOrgId: FOREIGN_ORG, targetOrgVerified: true });
+      const merchant = '0b0e7c3a-0000-4000-8000-000000000002';
+      const r: any = createRouterWithActor({
+        run: {
+          type: 'query',
+          permission: 'inbox:cross-org',
+          crossOrg: true,
+          inputOrgCheckedByHandler: true,
+          input: z.object({ orgId: z.string() }),
+          handler: async ({ service }: any) => ({ orgId: service.orgId }),
+        } as any,
+      });
+      await expect(r.run({ ctx: {}, input: { orgId: merchant } })).resolves.toEqual({ orgId: merchant });
     });
   });
 
