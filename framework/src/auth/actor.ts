@@ -93,8 +93,15 @@ export interface DbAccessOptions {
   // Whether to bypass RLS entirely (dangerous - only for system operations)
   bypassRLS?: boolean;
 
-  // The specific org context to use (defaults to actor's orgId)
+  // The specific org context to use (defaults to actor's orgId).
+  // Honoured for a platform system user, or when `targetOrgVerified` is set;
+  // any other actor stays in its own session org.
   targetOrgId?: number;
+
+  // Set ONLY by server code that has itself established the actor may run in
+  // `targetOrgId` (an org locked by a custom domain, a verified membership).
+  // Never derive it from request input.
+  targetOrgVerified?: boolean;
 
   // Whether to allow null org context (for system users in backoffice)
   allowNullOrgContext?: boolean;
@@ -283,6 +290,20 @@ export function requirePermission(actor: Actor, permission: string): void {
   if (!hasPermission(actor, permission)) {
     throw new AuthError('FORBIDDEN', `Permission required: ${permission}`);
   }
+}
+
+/**
+ * Whether an actor may run in an org other than its own session org.
+ *
+ * True only for a platform system user. The `org:cross_org_access` permission
+ * is deliberately not consulted: a permission can be granted to an org-level
+ * role by mistake, and this rule decides which tenant's rows a request reads
+ * and writes.
+ *
+ * @param actor - The actor to check
+ */
+export function mayAccessForeignOrg(actor: Pick<Actor, 'isSystemUser'>): boolean {
+  return actor.isSystemUser === true;
 }
 
 /**

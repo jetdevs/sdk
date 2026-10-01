@@ -174,6 +174,10 @@ export function createOrgMembershipRouterConfig(deps: OrgMembershipRouterDeps) {
     // -------------------------------------------------------------------------
     accept: {
       input: acceptSchema,
+      // The caller is not a member of `input.orgId` yet. The handler acts only
+      // on the caller's own invitation row in that org and stops when there is
+      // none.
+      inputOrgCheckedByHandler: true,
       invalidates: ['orgMembership', 'users'],
       entityType: 'org_member',
       repository: deps.Repository,

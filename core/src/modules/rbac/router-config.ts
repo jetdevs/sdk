@@ -10,7 +10,8 @@
 import { z } from "zod";
 import { SDKRoleRepository } from "./role.repository";
 import type { RoleService } from "./role.service";
-import { SDKRoleService } from "./role.service";
+import { RbacError, SDKRoleService } from "./role.service";
+import { namesForeignOrg } from "../organizations/org-scope";
 import {
     assignPermissionsSchema,
     bulkDeleteRolesSchema,
@@ -107,6 +108,17 @@ export const defaultCreateServiceContext: CreateServiceContext = (
   permissions: actor.permissions || [],
   isSystemUser: actor.permissions?.some((p) => p.startsWith("admin:")) || false,
 });
+
+/**
+ * These routes are `crossOrg` so platform staff can reach system roles and
+ * other orgs' roles. A caller that is not a platform system user may name
+ * only its own org.
+ */
+function assertOwnOrg(inputOrgId: number | null | undefined, actor: Actor): void {
+  if (namesForeignOrg(inputOrgId, actor)) {
+    throw new RbacError("Access denied to this organization", "FORBIDDEN");
+  }
+}
 
 // =============================================================================
 // ROUTER CONFIG FACTORY
@@ -268,6 +280,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
         crossOrgAccess?: boolean;
         orgId?: number;
       }>) => {
+        assertOwnOrg(input.orgId, actor);
         const effectiveOrgId = input.crossOrgAccess
           ? input.orgId ?? null
           : service.orgId;
@@ -303,6 +316,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
         crossOrgAccess?: boolean;
         orgId?: number;
       }>) => {
+        assertOwnOrg(input.orgId, actor);
         const effectiveOrgId = input.crossOrgAccess
           ? (input.orgId ?? null)
           : service.orgId;
@@ -431,6 +445,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
         crossOrgAccess?: boolean;
         orgId?: number;
       }>) => {
+        assertOwnOrg(input.orgId, actor);
         const effectiveOrgId = input.crossOrgAccess
           ? (input.orgId ?? null)
           : service.orgId;
@@ -467,6 +482,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
         crossOrgAccess?: boolean;
         orgId?: number;
       }>) => {
+        assertOwnOrg(input.orgId, actor);
         const effectiveOrgId = input.crossOrgAccess
           ? (input.orgId ?? null)
           : service.orgId;
@@ -571,6 +587,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
         targetOrgId: number;
         newName?: string;
       }>) => {
+        assertOwnOrg(input.targetOrgId, actor);
         const serviceCtx = createServiceContext(db, actor, input.targetOrgId);
 
         return Service.copyRole(

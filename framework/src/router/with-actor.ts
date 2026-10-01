@@ -22,9 +22,10 @@
  */
 
 import { z } from 'zod';
+import { sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { auditLog, type AuditAction } from '../audit';
-import type { Actor } from '../auth/actor';
+import { mayAccessForeignOrg, type Actor } from '../auth/actor';
 import { withRLSContext } from '../rls';
 import { withTelemetry } from '../telemetry';
 
@@ -168,6 +169,20 @@ export interface RouteConfig<TInput = any, TOutput = any, TDb = any> {
   /** Allow cross-org access */
   crossOrg?: boolean;
 
+  /**
+   * The handler itself decides whether the caller may act in the org named in
+   * the input (`orgId` / `targetOrgId`), so the router runs the request in
+   * that org without a membership check.
+   *
+   * Set it only on a route whose handler verifies the caller's right to that
+   * org before it reads or writes anything, for example accepting an
+   * invitation into an org the caller is not yet a member of, or an
+   * all-orgs console that is itself confined to one owner org. Without it, a
+   * caller that is not a platform system user is refused when it names an org
+   * other than its own, on `crossOrg` routes gated by a permission too.
+   */
+  inputOrgCheckedByHandler?: boolean;
+
   /** Auto-audit mutations (default: true for mutations) */
   audit?: boolean;
 
@@ -220,11 +235,20 @@ export interface ActorContextAdapter<TDb = any, TRouterFn = (procedures: Record<
   getDbContext: (
     ctx: any,
     actor: Actor,
-    options?: { crossOrgAccess?: boolean; targetOrgId?: number | null }
+    options?: { crossOrgAccess?: boolean; targetOrgId?: number | null; targetOrgVerified?: boolean }
   ) => {
     dbFunction: (callback: (db: TDb) => Promise<any>) => Promise<any>;
     effectiveOrgId: number | null;
   };
+
+  /**
+   * Whether the actor is an active member of `orgId`.
+   *
+   * Optional. Asked only when a caller that is not a system user names an org
+   * other than its own on a cross-org route. Without it the framework reads
+   * the actor's own active `user_roles` row in that org.
+   */
+  isOrgMember?: (ctx: any, actor: Actor, orgId: number) => Promise<boolean>;
 
   /**
    * Create service context
@@ -308,6 +332,46 @@ function getActorAdapter(): ActorContextAdapter {
     );
   }
   return globalActorAdapter;
+}
+
+/**
+ * Whether the actor is an active member of `orgId`.
+ *
+ * Uses the adapter's `isOrgMember` when the app provides one. Otherwise reads
+ * the actor's own active role assignment inside that org's RLS context; the
+ * only row it can return is the caller's own. Any failure counts as "not a
+ * member".
+ */
+async function isActiveOrgMember(
+  adapter: ActorContextAdapter,
+  ctx: any,
+  actor: Actor,
+  orgId: number
+): Promise<boolean> {
+  try {
+    if (adapter.isOrgMember) {
+      return (await adapter.isOrgMember(ctx, actor, orgId)) === true;
+    }
+
+    const { dbFunction } = adapter.getDbContext(ctx, actor, {
+      crossOrgAccess: false,
+      targetOrgId: orgId,
+      targetOrgVerified: true,
+    });
+    return await dbFunction(async (db: any) => {
+      if (typeof db?.execute !== 'function') {
+        return false;
+      }
+      const result = await db.execute(
+        sql`SELECT 1 FROM user_roles WHERE user_id = ${actor.userId} AND org_id = ${orgId} AND is_active = true LIMIT 1`
+      );
+      const rows = Array.isArray(result) ? result : result?.rows;
+      return Array.isArray(rows) && rows.length > 0;
+    });
+  } catch (err) {
+    console.error('[withActor] org membership check failed:', err);
+    return false;
+  }
 }
 
 /**
@@ -641,6 +705,58 @@ export function createRouterWithActor<TDb = any>(
       }
 
       // =======================================================================
+      // SECURITY: the org comes from the server, not from the input (YMS-292)
+      //
+      // `targetOrgId` at this point is either the org the server locked the
+      // request to, or a value the client named. Permissions are loaded for
+      // the session org, so a caller that is not a platform system user may
+      // name only the org the server already put it in. Exceptions:
+      //  - a route whose author took over the check: `inputOrgCheckedByHandler`;
+      //  - a cross-org route that checks no permission (org switch, membership
+      //    check): the named org is used when the caller is an active member
+      //    of it, and the session org otherwise.
+      // `crossOrg` together with a permission is NOT an exception: the
+      // permission was granted in the caller's own org, so it says nothing
+      // about any other org.
+      // =======================================================================
+      const serverOrgId = lockedOrgId ?? actor.orgId ?? null;
+      let targetOrgVerified = false;
+
+      if (targetOrgId != null && !mayAccessForeignOrg(actor)) {
+        if (Number(targetOrgId) === serverOrgId) {
+          // An org locked by the server may differ from the session org.
+          targetOrgVerified = serverOrgId !== actor.orgId;
+        } else if (route.inputOrgCheckedByHandler) {
+          targetOrgVerified = true;
+        } else if (
+          route.crossOrg &&
+          !route.permission &&
+          (await isActiveOrgMember(adapter, ctx, actor, Number(targetOrgId)))
+        ) {
+          targetOrgVerified = true;
+        } else if (route.crossOrg && !route.permission && serverOrgId != null) {
+          targetOrgId = serverOrgId;
+          targetOrgVerified = serverOrgId !== actor.orgId;
+        } else {
+          console.error('[SECURITY] Refused a request naming a foreign organization:', {
+            inputOrgId: targetOrgId,
+            serverOrgId,
+            procedureName: name,
+            userId: actor.userId,
+          });
+
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Access denied to this organization',
+            cause: {
+              type: 'FOREIGN_ORG_VIOLATION',
+              inputOrgId: targetOrgId,
+            }
+          });
+        }
+      }
+
+      // =======================================================================
       // SUPERUSER CROSS-ORG ACCESS
       //
       // When a superuser/system user provides a targetOrgId that differs from
@@ -663,6 +779,7 @@ export function createRouterWithActor<TDb = any>(
       const { dbFunction, effectiveOrgId } = adapter.getDbContext(ctx, actor, {
         crossOrgAccess: route.crossOrg || needsCrossOrgAccess,
         targetOrgId,
+        ...(targetOrgVerified ? { targetOrgVerified: true } : {}),
       });
 
       // Build RLS context for AsyncLocalStorage
