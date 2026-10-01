@@ -1,7 +1,7 @@
 /**
  * Users router — a caller acts only in its own org (YMS-292).
  *
- * invite, assignRole, removeRole, removeFromOrg and getAllWithStats accept an
+ * invite, create, assignRole, removeRole, removeFromOrg and getAllWithStats accept an
  * `orgId` in the input. Only a platform system user may name an org other
  * than its own; everyone else is refused before anything is read or written.
  *
@@ -51,6 +51,7 @@ function ctx(Repo: any, input: any, actor: Record<string, unknown>, serviceOrgId
 
 const procedures: Array<[string, Record<string, unknown>]> = [
   ['invite', { email: 'x@example.com', roleId: 3 }],
+  ['create', { email: 'x@example.com', roleId: 3 }],
   ['assignRole', { userId: 50, roleId: 3 }],
   ['removeRole', { userId: 50, roleId: 3 }],
   ['removeFromOrg', { userId: 50 }],
