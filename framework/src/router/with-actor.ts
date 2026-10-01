@@ -245,8 +245,9 @@ export interface ActorContextAdapter<TDb = any, TRouterFn = (procedures: Record<
    * Whether the actor is an active member of `orgId`.
    *
    * Optional. Asked only when a caller that is not a system user names an org
-   * other than its own on a cross-org route. Without it the framework reads
-   * the actor's own active `user_roles` row in that org.
+   * other than its own on a cross-org route, or when the server locked the
+   * request to an org (custom domain). Without it the framework reads the
+   * actor's own active `user_roles` row in that org.
    */
   isOrgMember?: (ctx: any, actor: Actor, orgId: number) => Promise<boolean>;
 
@@ -702,6 +703,39 @@ export function createRouterWithActor<TDb = any>(
             targetOrgId = lockedOrgId;
           }
         }
+      }
+
+      // =======================================================================
+      // SECURITY: a locked org is served only to its members (YMS-298)
+      //
+      // The locked org comes from the host name, so it says nothing about the
+      // caller. A caller that is not a platform system user must be an active
+      // member of it, whatever its session org is: an app may already have
+      // moved the session org to the locked org, so equal ids prove nothing.
+      // Not checked: a route whose handler took over the org check and whose
+      // input names the locked org itself (accepting an invitation into the
+      // locked org). Public routes never get here.
+      // =======================================================================
+      if (
+        lockedOrgId != null &&
+        !mayAccessForeignOrg(actor) &&
+        !(route.inputOrgCheckedByHandler && Number(input?.orgId ?? input?.targetOrgId) === lockedOrgId) &&
+        !(await isActiveOrgMember(adapter, ctx, actor, lockedOrgId))
+      ) {
+        console.error('[SECURITY] Refused a caller that is not a member of the locked organization:', {
+          lockedOrgId,
+          procedureName: name,
+          userId: actor.userId,
+        });
+
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Access denied to this organization',
+          cause: {
+            type: 'LOCKED_ORG_MEMBERSHIP_REQUIRED',
+            lockedOrgId,
+          }
+        });
       }
 
       // =======================================================================

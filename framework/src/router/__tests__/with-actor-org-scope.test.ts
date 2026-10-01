@@ -291,8 +291,9 @@ describe('createRouterWithActor — org scope (YMS-292)', () => {
   });
 
   describe('org locked by the server (custom domain)', () => {
-    it('keeps running in the locked org, which the server chose', async () => {
-      const h = configure();
+    it('keeps running in the locked org, which the server chose, for a member of it', async () => {
+      // Membership in a locked org: with-actor-locked-org-membership.test.ts (YMS-298).
+      const h = configure({}, { isOrgMember: vi.fn().mockResolvedValue(true) });
       await expect(router(h).run({ ctx: { lockedOrgId: FOREIGN_ORG }, input: {} })).resolves.toEqual({
         orgId: FOREIGN_ORG,
       });
