@@ -158,16 +158,21 @@ export class UserRouterError extends Error {
   }
 }
 
-/** Membership states that make a user part of an org (the states the user list shows). */
-const MEMBER_STATUSES = ['active', 'suspended'];
+/** Most users one org's user list is read for when checking a target. */
+const ORG_USER_LIST_LIMIT = 5000;
 
 /**
  * The users among `userIds` that the caller may NOT act on.
  *
  * The users table has no row security: a user id alone says nothing about
  * which org the user belongs to. A caller that is not a platform system user
- * may act on itself and on members of the org the request runs in. Membership
- * is the org_members status when there is one, else an active role in the org.
+ * may act on itself and on the users its own org's user list shows, read
+ * through the same repository call the list uses, so an app that widens or
+ * narrows its list (a hierarchy of orgs, invited members) widens or narrows
+ * this check with it.
+ *
+ * A role assignment alone does not make a user a member: the caller can write
+ * one itself. In the SDK repository the list is the org_members table.
  */
 async function usersOutsideCallerOrg(
   { service, actor, repo, db }: Pick<UserHandlerContext, 'service' | 'actor' | 'repo' | 'db'>,
@@ -186,20 +191,14 @@ async function usersOutsideCallerOrg(
     return others;
   }
 
-  const statuses = await repo.getMembershipStatuses(db, others, orgId);
-  const withoutStatus = others.filter((id) => !statuses.has(id));
-  const rolesByUser = withoutStatus.length > 0
-    ? await repo.getUserRolesBatch(db, withoutStatus, orgId)
-    : new Map<number, any[]>();
-
-  return others.filter((id) => {
-    const status = statuses.get(id);
-    if (status !== undefined) {
-      return !MEMBER_STATUSES.includes(status);
-    }
-    const roles = rolesByUser.get(id) ?? [];
-    return !roles.some((r: any) => r.orgId === orgId && r.isActive !== false);
+  const listed = await repo.findAll(db, {
+    limit: ORG_USER_LIST_LIMIT,
+    offset: 0,
+    filters: { orgId },
   });
+  const inOrg = new Set(listed.map((u: any) => u.id));
+
+  return others.filter((id) => !inOrg.has(id));
 }
 
 /**
@@ -263,6 +262,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
 
         const effectiveOrgId = input.orgId ?? (service.orgId ?? undefined);
 
+        // With no org to filter by, the list would be every user.
+        if (!effectiveOrgId && actor?.isSystemUser !== true) {
+          throw new UserRouterError('BAD_REQUEST', 'Organization context required');
+        }
+
         const users = await repo.findAll(db, {
           limit: input.limit,
           offset: input.offset,
@@ -323,7 +327,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       type: 'query' as const,
       permission: 'user:read',
       repository: deps.Repository,
-      handler: async ({ service, repo, db }: UserHandlerContext) => {
+      handler: async ({ service, actor, repo, db }: UserHandlerContext) => {
+        if (!service.orgId && actor?.isSystemUser !== true) {
+          throw new UserRouterError('BAD_REQUEST', 'Organization context required');
+        }
+
         return repo.findAll(db, {
           limit: 100,
           offset: 0,
@@ -515,7 +523,13 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             }
           }
           await deps.onUserInvited?.({ user: existing, orgId: service.orgId ?? null, db });
-          return existing;
+
+          // The person was found by email and may belong to another org. The
+          // caller gets back what it sent, not that person's stored record.
+          if (actor?.isSystemUser === true) {
+            return existing;
+          }
+          return { id: existing.id, email: existing.email } as typeof existing;
         }
 
         // Server-side closure: a new user is a new identity, and may carry a
