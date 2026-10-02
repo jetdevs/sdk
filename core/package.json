@@ -194,6 +194,11 @@
       "import": "./dist/api-keys/index.js",
       "require": "./dist/api-keys/index.js"
     },
+    "./access": {
+      "types": "./dist/access/index.d.ts",
+      "import": "./dist/access/index.js",
+      "require": "./dist/access/index.js"
+    },
     "./system-config": {
       "types": "./dist/system-config/index.d.ts",
       "import": "./dist/system-config/index.js",
