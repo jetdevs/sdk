@@ -647,11 +647,13 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
           eq(userRoles.isActive, true)
         ));
 
-      // Filter roles based on org context
+      // Filter roles based on org context. A global role (Owner, Admin) has no
+      // org on the ROLE row; the ASSIGNMENT's org decides — Owner of another
+      // org grants nothing here.
       const relevantRoles = userRolesList.filter((ur: any) => {
         if (orgId && ur.orgId === orgId) return true;
         if (ur.isSystemRole && (ur.roleOrgId === null || ur.roleOrgId === -1)) return true;
-        if (ur.isGlobalRole && ur.roleOrgId === null) return true;
+        if (ur.isGlobalRole && (ur.orgId === null || ur.orgId === -1)) return true;
         return false;
       });
 
