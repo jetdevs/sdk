@@ -1,9 +1,10 @@
 /**
  * Who may hand out which role and permission (YMS-297).
  *
- * A user becomes platform staff by holding a system role or a platform
- * permission. Both can travel through org-level procedures, so those
- * procedures ask here first. Only platform staff may hand either out.
+ * Platform staff = a role flagged isSystemRole. Platform permissions confer no
+ * status but still gate platform features. Both can travel through org-level
+ * procedures, so those procedures ask here first. Only platform staff may
+ * hand either out.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -117,7 +118,7 @@ describe('RoleService.assignPermissions — platform permissions', () => {
   });
 
   it('refuses a caller that is "system" only through a lesser admin permission', async () => {
-    // admin:role_management makes a caller a system user, but not one that may mint platform access.
+    // An actor flagged system but not super (an app-level wrapper) may not mint platform access.
     const lesser = { isSystemUser: true, isSuperUser: false, permissions: ['admin:role_management', 'role:assign_permissions'] };
     expect(mayGrantPlatformPermissions(lesser)).toBe(false);
     const { service, write } = setup(['admin:full_access']);
