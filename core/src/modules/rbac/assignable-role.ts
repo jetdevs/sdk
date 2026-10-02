@@ -1,11 +1,12 @@
 /**
  * Which roles and permissions an org-level caller may hand out.
  *
- * "Platform system user" is decided from what a user holds: a role flagged
- * `isSystemRole`, or any permission in the platform namespace. Both can reach
- * a user through ordinary org-level procedures (invite with a role id, assign
- * a role, put a permission on a role). So every such procedure checks here
- * first: only platform staff may hand out a platform role or permission.
+ * "Platform system user" is decided by one thing: a role flagged
+ * `isSystemRole`. Platform permissions (`admin:*`, `org:cross_org_access`)
+ * confer no status, but they still gate platform features, so neither a
+ * system role nor a platform permission may reach a user through ordinary
+ * org-level procedures (invite with a role id, assign a role, put a permission
+ * on a role). Every such procedure checks here first.
  */
 import { and, eq, inArray, like, or } from 'drizzle-orm';
 
@@ -33,9 +34,12 @@ export function isPlatformStaff(actor: AssigningActor | null | undefined): boole
   return actor?.isSystemUser === true;
 }
 
-/** May put a platform permission on a role: full platform access only. */
+/**
+ * May put a platform permission on a role: platform super user only. Holding
+ * `admin:full_access` is not enough — the global Owner/Admin template carries it.
+ */
 export function mayGrantPlatformPermissions(actor: AssigningActor | null | undefined): boolean {
-  return actor?.isSuperUser === true || actor?.permissions?.includes('admin:full_access') === true;
+  return actor?.isSuperUser === true;
 }
 
 export interface RoleAssignability {

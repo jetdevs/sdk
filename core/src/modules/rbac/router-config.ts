@@ -62,7 +62,7 @@ interface RoleHandlerContext<TInput = any> {
 export interface CreateRoleRouterConfigOptions {
   /**
    * RoleService instance to use for operations
-   * @default SDKRoleService (uses "admin:full_access" for system role checks)
+   * @default SDKRoleService (system roles: platform system user only)
    */
   Service?: RoleService;
 
@@ -106,7 +106,9 @@ export const defaultCreateServiceContext: CreateServiceContext = (
   orgId,
   userId: actor.userId,
   permissions: actor.permissions || [],
-  isSystemUser: actor.permissions?.some((p) => p.startsWith("admin:")) || false,
+  // Platform staff only (a role flagged isSystemRole, set on the actor). Not
+  // admin:* — the global Owner/Admin template every org assigns carries it.
+  isSystemUser: actor.isSystemUser === true,
 });
 
 /**
@@ -609,7 +611,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
  * Pre-built role router configuration using SDK defaults.
  *
  * Uses:
- * - SDKRoleService (checks for "admin:full_access" permission)
+ * - SDKRoleService (system roles: platform system user only)
  * - SDKRoleRepository (uses SDK schema tables)
  * - defaultCreateServiceContext
  *

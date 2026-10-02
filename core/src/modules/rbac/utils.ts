@@ -87,16 +87,14 @@ export function getRoleCategory(role: { roleCategory?: RoleCategory | string }):
 // =============================================================================
 
 /**
- * Check if a user has system-level access based on their permissions
+ * Check if a user holds any admin:* permission.
+ *
+ * An ordinary org-scoped permission check: the global Owner/Admin role
+ * template carries admin:*. It is NOT platform/system status — use
+ * hasPlatformSystemRole() for that.
+ *
  * @param permissions Array of permission slugs the user has
  * @returns true if user has any admin:* permissions
- *
- * @example
- * ```typescript
- * if (hasSystemAccess(user.permissions)) {
- *   // User has admin access
- * }
- * ```
  */
 export function hasSystemAccess(permissions: string[]): boolean {
   return permissions.some((perm) => perm.startsWith("admin:"));
@@ -171,12 +169,13 @@ export function hasPlatformSystemRole(
 }
 
 /**
- * Check if user should have backoffice access
- * Based on either:
- * 1. Having admin:* permissions
- * 2. Having a role with isSystemRole: true
+ * Check if user should have backoffice access: a role with isSystemRole: true.
  *
- * @param permissions Array of permission slugs
+ * Permissions are not consulted. The global Owner/Admin role template every
+ * org assigns carries admin:*, so admin:* would open the backoffice to every
+ * org Owner/Admin. The parameter is kept for signature compatibility.
+ *
+ * @param _permissions Ignored
  * @param roles Array of role objects
  * @returns true if user should have backoffice access
  *
@@ -188,10 +187,10 @@ export function hasPlatformSystemRole(
  * ```
  */
 export function hasBackofficeAccess(
-  permissions: string[],
+  _permissions: string[],
   roles: Array<{ isSystemRole?: boolean }>
 ): boolean {
-  return hasSystemAccess(permissions) || hasPlatformSystemRole(roles);
+  return hasPlatformSystemRole(roles);
 }
 
 /**

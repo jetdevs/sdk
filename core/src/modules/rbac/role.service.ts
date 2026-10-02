@@ -81,13 +81,13 @@ export interface RoleServiceHooks {
 
   /**
    * Called to check if actor can manage system roles
-   * Default: checks for "admin:full_access" permission
+   * Default: platform system user only (actor.isSystemUser)
    */
   canManageSystemRoles?: (actor: Actor) => boolean;
 
   /**
    * Called to check if actor can view system roles
-   * Default: uses canManageSystemRoles (requires admin:full_access)
+   * Default: uses canManageSystemRoles (platform system user only)
    */
   canViewSystemRoles?: (actor: Actor) => boolean;
 }
@@ -136,18 +136,32 @@ export class RoleService {
 
   /**
    * Check if actor can manage system roles
-   * Default: uses actor.isSystemUser which checks for any admin:* permission
-   * or isSystemRole flag on roles (aligned with framework actor creation)
+   * Default: platform system user only (actor.isSystemUser, set from a role
+   * flagged isSystemRole). Not admin:full_access — the global Owner/Admin
+   * role template every org assigns carries it.
    */
   private canManageSystemRoles(actor: Actor): boolean {
     if (this.hooks.canManageSystemRoles) {
       return this.hooks.canManageSystemRoles(actor);
     }
-    // Use actor.isSystemUser which is computed from:
-    // - Any admin:* permission, OR
-    // - Having a role with isSystemRole flag
-    // This aligns with how the framework determines system user status
-    return actor.isSystemUser || actor.permissions?.includes(ADMIN_FULL_ACCESS_PERMISSION) || false;
+    return actor.isSystemUser === true;
+  }
+
+  /**
+   * A role with no org (a global role template such as Owner/Admin, or a
+   * system role) is one row shared by every org, and its org-less permissions
+   * apply in every org. Only a platform system user may change it.
+   */
+  private assertMayChangeSharedRole(
+    role: { orgId?: number | null } | null | undefined,
+    actor: Actor
+  ): void {
+    if (role && role.orgId == null && actor?.isSystemUser !== true) {
+      throw new RbacError(
+        "Global roles can only be changed by platform staff",
+        "FORBIDDEN"
+      );
+    }
   }
 
   /**
@@ -395,6 +409,7 @@ export class RoleService {
     if (existingRole.isSystemRole && !this.canManageSystemRoles(ctx.actor)) {
       throw new RbacError("Cannot modify system roles", "FORBIDDEN");
     }
+    this.assertMayChangeSharedRole(existingRole, ctx.actor);
 
     // Check name uniqueness if name is being updated
     if (name && name !== existingRole.name) {
@@ -448,6 +463,7 @@ export class RoleService {
     if (existingRole.isSystemRole) {
       throw new RbacError("Cannot delete system roles", "FORBIDDEN");
     }
+    this.assertMayChangeSharedRole(existingRole, ctx.actor);
 
     // Check if role has active users
     const hasUsers = await repo.hasActiveUsers(id, ctx.orgId);
@@ -507,6 +523,7 @@ export class RoleService {
         "FORBIDDEN"
       );
     }
+    this.assertMayChangeSharedRole(role, ctx.actor);
 
     // A platform permission makes its holder platform staff. Only a caller
     // with full platform access may put one on a role.
@@ -586,6 +603,7 @@ export class RoleService {
         "FORBIDDEN"
       );
     }
+    this.assertMayChangeSharedRole(role, ctx.actor);
 
     try {
       const targetOrgId = role.orgId ?? null;
@@ -635,6 +653,7 @@ export class RoleService {
         "FORBIDDEN"
       );
     }
+    rolesData.forEach((r) => this.assertMayChangeSharedRole(r, ctx.actor));
 
     const isActive = action === "activate";
 
@@ -679,6 +698,7 @@ export class RoleService {
         "FORBIDDEN"
       );
     }
+    rolesData.forEach((r) => this.assertMayChangeSharedRole(r, ctx.actor));
 
     try {
       // Hard delete all roles - permanently removes from database
@@ -836,8 +856,8 @@ export const sdkRbacSchema: RoleServiceSchema = {
  * Pre-built RoleService that uses SDK schema tables with sensible defaults.
  *
  * Default behavior:
- * - `canManageSystemRoles`: Requires "admin:full_access" permission
- * - `canViewSystemRoles`: Requires "admin:full_access" permission
+ * - `canManageSystemRoles`: Platform system user only (actor.isSystemUser)
+ * - `canViewSystemRoles`: Platform system user only (actor.isSystemUser)
  * - `onPermissionsChanged`: No-op (does nothing)
  *
  * Use this for zero-boilerplate role management. For apps that need
@@ -845,7 +865,7 @@ export const sdkRbacSchema: RoleServiceSchema = {
  *
  * @example
  * ```typescript
- * // Zero-boilerplate usage - uses default "admin:full_access" check
+ * // Zero-boilerplate usage - system roles reachable by platform staff only
  * import { SDKRoleService } from '@jetdevs/core/rbac';
  *
  * const roles = await SDKRoleService.list({}, ctx);
@@ -876,8 +896,7 @@ export const SDKRoleService = new RoleService(sdkRbacSchema);
  * import { createSDKRoleService } from '@jetdevs/core/rbac';
  *
  * const roleService = createSDKRoleService({
- *   canManageSystemRoles: (actor) =>
- *     actor.permissions?.includes('admin:full_access'),
+ *   canManageSystemRoles: (actor) => actor.isSystemUser === true,
  *   onPermissionsChanged: async (roleId, userIds) => {
  *     await broadcastPermissionUpdate(userIds);
  *   }
