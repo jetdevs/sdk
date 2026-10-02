@@ -215,31 +215,20 @@ export function createActor(ctx: ActorContext): Actor {
   // Debug logging to see what we're working with
   console.log('🔍 [Framework SDK] createActor - Session Roles:', JSON.stringify(sessionRoles, null, 2));
 
-  // Check for system user status
-  // BEST PRACTICE: Use permissions as source of truth, not database flags
-  // Users with any admin:* permissions get system-level access
   const permissions: string[] = user.permissions || [];
-  const hasAdminPermissions = permissions.some(p => p.startsWith('admin:'));
 
-  // Fallback: Check isSystemRole flag for backward compatibility
-  const hasSystemRoleFlag = sessionRoles.some((role: any) => {
-    if (typeof role === 'object') {
-      return role?.isSystemRole === true;
-    }
-    return false;
-  });
+  // Platform staff only: an active role flagged `isSystemRole`. Never a
+  // permission or a role name — the global Owner/Admin role template every
+  // org assigns carries `admin:full_access` and all of `admin:*`, so reading
+  // status off permissions made every org Owner/Admin platform staff.
+  const hasSystemRoleFlag = sessionRoles.some((role: any) =>
+    typeof role === 'object' && role?.isSystemRole === true && role?.isActive !== false
+  );
 
-  const isSystemUser = hasAdminPermissions || hasSystemRoleFlag;
+  const isSystemUser = hasSystemRoleFlag;
+  const isSuperUser = hasSystemRoleFlag;
 
-  console.log('🔍 [Framework SDK] createActor result:', {
-    isSystemUser,
-    hasAdminPermissions,
-    hasSystemRoleFlag,
-    adminPermissions: permissions.filter(p => p.startsWith('admin:'))
-  });
-
-  // Super user check: admin:full_access permission
-  const isSuperUser = permissions.includes('admin:full_access') || hasSystemRoleFlag;
+  console.log('🔍 [Framework SDK] createActor result:', { isSystemUser });
 
   return {
     userId,
@@ -314,17 +303,12 @@ export function mayAccessForeignOrg(actor: Pick<Actor, 'isSystemUser'>): boolean
  * @returns Boolean indicating if access is allowed
  */
 export function canAccessOrg(actor: Actor, targetOrgId: number): boolean {
-  // System users can access any org
-  if (actor.isSystemUser) {
+  // Only platform system users reach other orgs; see mayAccessForeignOrg for
+  // why `org:cross_org_access` is not consulted.
+  if (mayAccessForeignOrg(actor)) {
     return true;
   }
 
-  // Users with cross-org permission can access any org
-  if (actor.permissions.includes("org:cross_org_access")) {
-    return true;
-  }
-
-  // Otherwise, can only access their own org
   return actor.orgId === targetOrgId;
 }
 

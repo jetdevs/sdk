@@ -307,8 +307,8 @@ export function createApiKeysRouterConfig(
         targetOrgId?: number;
       }> & { actor?: { isSystemUser?: boolean; isSuperUser?: boolean } }) => {
         // Determine effective org: use targetOrgId ONLY for platform super users, otherwise service.orgId
-        // SECURITY: actor.isSystemUser is too broad (any admin:* permission) —
-        // cross-org key creation requires platform super user (admin:full_access / isSystemRole)
+        // SECURITY: cross-org key creation requires a platform super user
+        // (a role flagged isSystemRole), never an admin:* permission
         const effectiveOrgId = (actor?.isSuperUser && input.targetOrgId)
           ? input.targetOrgId
           : service.orgId;

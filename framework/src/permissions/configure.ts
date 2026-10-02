@@ -171,14 +171,7 @@ export async function internalIsSuperUser(ctx: any): Promise<boolean> {
     return await permissionConfig.isSuperUser(ctx);
   }
 
-  // Fallback: check for common super user indicators
-  if (ctx.user?.isSuperUser === true) {
-    return true;
-  }
-
-  if (ctx.user?.role === 'super_admin' || ctx.user?.role === 'superuser') {
-    return true;
-  }
-
-  return false;
+  // Fallback: the flag the actor sets from an `isSystemRole` role. Never a
+  // role name — any org can name a role 'super_admin'.
+  return ctx.user?.isSuperUser === true;
 }
