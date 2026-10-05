@@ -503,18 +503,27 @@ export function createAccessService(options: CreateAccessServiceOptions) {
   }
 
   /**
-   * Count one use and record the redemption. Run INSIDE the account tx.
-   * 0 rows (revoked, expired, or the last use went to a concurrent tx) → throws
-   * `AccessCodeExhaustedError`, which must roll the account tx back.
+   * Count one use of a code — the last-use lock, with no redemption row. Run INSIDE
+   * the caller's tx. 0 rows (revoked, expired, or the last use went to a concurrent
+   * tx) → throws `AccessCodeExhaustedError`, which must roll that tx back.
+   *
+   * `redeem()` is this plus the `access_redemptions` insert. Exported for an app
+   * that records the redemption in its own table (an RP account with no Connect user).
+   * Run the tx at READ COMMITTED (the default): under REPEATABLE READ/SERIALIZABLE the
+   * losing caller gets a serialization failure (40001), not `AccessCodeExhaustedError`.
    */
-  async function redeem(tx: AccessDb, input: RedeemInput) {
-    const t = now();
+  async function claimUse(tx: AccessDb, codeId: number): Promise<{ id: number; uses: number }> {
+    return claimUseAt(tx, codeId, now());
+  }
+
+  /** `t` is also the expiry reference — server clock only, never a caller-supplied time. */
+  async function claimUseAt(tx: AccessDb, codeId: number, t: Date): Promise<{ id: number; uses: number }> {
     const updated = await tx
       .update(accessCodes)
       .set({ uses: sql`${accessCodes.uses} + 1`, updatedAt: t })
       .where(
         and(
-          eq(accessCodes.id, input.codeId),
+          eq(accessCodes.id, codeId),
           eq(accessCodes.app, app),
           eq(accessCodes.status, 'active'),
           or(isNull(accessCodes.maxUses), lt(accessCodes.uses, accessCodes.maxUses)),
@@ -522,7 +531,18 @@ export function createAccessService(options: CreateAccessServiceOptions) {
         ),
       )
       .returning({ id: accessCodes.id, uses: accessCodes.uses });
-    if (updated.length === 0) throw new AccessCodeExhaustedError(input.codeId);
+    if (updated.length === 0) throw new AccessCodeExhaustedError(codeId);
+    return updated[0]!;
+  }
+
+  /**
+   * Count one use and record the redemption. Run INSIDE the account tx.
+   * 0 rows (revoked, expired, or the last use went to a concurrent tx) → throws
+   * `AccessCodeExhaustedError`, which must roll the account tx back.
+   */
+  async function redeem(tx: AccessDb, input: RedeemInput) {
+    const t = now();
+    await claimUseAt(tx, input.codeId, t);
     const [redemption] = await tx
       .insert(accessRedemptions)
       .values({
@@ -713,6 +733,7 @@ export function createAccessService(options: CreateAccessServiceOptions) {
     findBoundInvite,
     // gate
     decide,
+    claimUse,
     redeem,
     // waitlist
     submit,

@@ -148,6 +148,37 @@ describe.skipIf(!admin)('p107 access module — real local Postgres', () => {
     expect(await redemptionCount(code.id)).toBe(5);
   });
 
+  it('claimUse: 20 rounds of two connections on max_uses=1 → exactly one claim, no redemption row', async () => {
+    const a = await open();
+    const b = await open();
+    for (let round = 0; round < 20; round++) {
+      const code = await svc.createCode(h.db, { kind: 'campaign', maxUses: 1 });
+      const results = await Promise.allSettled([
+        a.db.transaction((tx) => svc.claimUse(tx, code.id)),
+        b.db.transaction((tx) => svc.claimUse(tx, code.id)),
+      ]);
+      const ok = results.filter((r): r is PromiseFulfilledResult<{ id: number; uses: number }> => r.status === 'fulfilled');
+      const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      expect(ok).toHaveLength(1);
+      expect(ok[0]!.value).toEqual({ id: code.id, uses: 1 });
+      expect(failed).toHaveLength(1);
+      expect(failed[0]!.reason).toBeInstanceOf(AccessCodeExhaustedError);
+      expect((await codeRow(code.id)).uses).toBe(1);
+      expect(await redemptionCount(code.id)).toBe(0);
+    }
+  });
+
+  it('claimUse refuses a revoked or expired code, and a code of another app', async () => {
+    const revoked = await svc.createCode(h.db, { kind: 'campaign' });
+    await svc.revokeCode(h.db, revoked.id);
+    const expired = await svc.createCode(h.db, { kind: 'campaign', expiresAt: new Date(Date.now() - 60_000) });
+    const other = await createAccessService({ app: 'yobo' }).createCode(h.db, { kind: 'campaign' });
+    for (const id of [revoked.id, expired.id, other.id]) {
+      await expect(h.db.transaction((tx) => svc.claimUse(tx, id))).rejects.toBeInstanceOf(AccessCodeExhaustedError);
+      expect((await codeRow(id)).uses).toBe(0);
+    }
+  });
+
   // ---- AC 2 ---------------------------------------------------------------
   it('expired and revoked fail with distinct reasons', async () => {
     const expired = await svc.createCode(h.db, { kind: 'campaign', expiresAt: new Date(Date.now() - 60_000) });
