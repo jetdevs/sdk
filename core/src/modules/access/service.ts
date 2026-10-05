@@ -509,8 +509,15 @@ export function createAccessService(options: CreateAccessServiceOptions) {
    *
    * `redeem()` is this plus the `access_redemptions` insert. Exported for an app
    * that records the redemption in its own table (an RP account with no Connect user).
+   * Run the tx at READ COMMITTED (the default): under REPEATABLE READ/SERIALIZABLE the
+   * losing caller gets a serialization failure (40001), not `AccessCodeExhaustedError`.
    */
-  async function claimUse(tx: AccessDb, codeId: number, t: Date = now()): Promise<{ id: number; uses: number }> {
+  async function claimUse(tx: AccessDb, codeId: number): Promise<{ id: number; uses: number }> {
+    return claimUseAt(tx, codeId, now());
+  }
+
+  /** `t` is also the expiry reference — server clock only, never a caller-supplied time. */
+  async function claimUseAt(tx: AccessDb, codeId: number, t: Date): Promise<{ id: number; uses: number }> {
     const updated = await tx
       .update(accessCodes)
       .set({ uses: sql`${accessCodes.uses} + 1`, updatedAt: t })
@@ -535,7 +542,7 @@ export function createAccessService(options: CreateAccessServiceOptions) {
    */
   async function redeem(tx: AccessDb, input: RedeemInput) {
     const t = now();
-    await claimUse(tx, input.codeId, t);
+    await claimUseAt(tx, input.codeId, t);
     const [redemption] = await tx
       .insert(accessRedemptions)
       .values({
