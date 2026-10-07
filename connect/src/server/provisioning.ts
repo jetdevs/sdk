@@ -240,6 +240,13 @@ export class ConnectProvisioningClient {
   }
 
   /**
+   * @deprecated p131 (Connect-owned invites): creating a user + an ACTIVE
+   * membership at invite time violates I2 ("an invite creates no account").
+   * Use `InvitesClient` (below) against the Connect invites API
+   * (`@jetdevs/core/invites`); the account is created only on accept, on
+   * Connect. Spec: `_context/cadra/_specs/p131-connect-invites/`
+   * (implementation.md P19). Kept for existing callers only.
+   *
    * C2: invite-time provisioning is user → org → membership(status='active')
    * ONLY. The per-client org binding is NOT written here — it is set at
    * acceptance / first login (Task 20) once the membership is `active`, so a
@@ -269,5 +276,156 @@ export class ConnectProvisioningClient {
     })
     // NO setClientOrgBinding here (C2) — the binding is set at first login.
     return { sub: user.sub, canonicalOrgId: org.orgId }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// p131 — Connect-owned invites, RP side.
+// ---------------------------------------------------------------------------
+
+/** What the RP sends to create an invite (P5/P6/P7). No password field, ever (I1). */
+export interface CreateConnectInviteArgs {
+  email: string
+  /** The RP's role id, stored opaque on Connect (P6). */
+  roleRef: string
+  roleName: string
+  sourceOrgRef: string
+  orgName: string
+  invitedBySub: string
+  invitedByName?: string | null
+  /** Where Connect sends the person after accept; origin must be a registered redirect origin (P7). */
+  appUrl: string
+}
+
+export interface CreateConnectInviteResult {
+  id: number
+  status: ConnectInviteStatus
+  expiresAt: string
+  connectOrgId: number
+  emailSent: boolean
+  superseded: boolean
+}
+
+export type ConnectInviteStatus = 'pending' | 'accepted' | 'cancelled' | 'expired'
+
+export interface ConnectInvite {
+  id: number
+  email: string
+  roleRef: string
+  roleName: string
+  status: ConnectInviteStatus
+  invitedBySub: string
+  invitedByName: string | null
+  expiresAt: string
+  createdAt: string
+  acceptedAt: string | null
+  cancelledAt: string | null
+  provisionState: 'none' | 'pending' | 'done' | 'refused'
+}
+
+/** A non-2xx answer from the Connect invites API. `code` is the route's `error` string. */
+export class ConnectInvitesError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+  ) {
+    super(`[connect-invites] ${status} ${code}`)
+    this.name = 'ConnectInvitesError'
+  }
+}
+
+export interface InvitesClientConfig {
+  baseUrl: string
+  /** Per-RP internal API key (sent as `X-Internal-API-Key`; needs scope `invites:write`). */
+  internalApiKey: string
+  fetchImpl?: typeof fetch
+  /** Per-request budget, ms (default 10 000). */
+  timeoutMs?: number
+}
+
+/**
+ * Calls Connect's invites API (`@jetdevs/core/invites` handlers mounted at
+ * `/api/internal/invites`). The caller (client id + source system) is derived
+ * by Connect from the key — never sent. I1: no method accepts or sends a
+ * password; request bodies are built from an explicit field list, so a stray
+ * `password` on the args object is dropped.
+ */
+export class InvitesClient {
+  private readonly baseUrl: string
+  private readonly key: string
+  private readonly fetchImpl: typeof fetch
+  private readonly timeoutMs: number
+
+  constructor(config: InvitesClientConfig) {
+    this.baseUrl = config.baseUrl.replace(/\/$/, '')
+    this.key = config.internalApiKey
+    this.fetchImpl = config.fetchImpl ?? fetch
+    this.timeoutMs = config.timeoutMs ?? 10_000
+  }
+
+  private async call<T>(method: 'GET' | 'POST', path: string, body?: Record<string, unknown>): Promise<T> {
+    let res: Response
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method,
+        headers: {
+          Accept: 'application/json',
+          'X-Internal-API-Key': this.key,
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      })
+    } catch (err) {
+      throw new ConnectInvitesError(0, err instanceof Error && err.name === 'TimeoutError' ? 'timeout' : 'unreachable')
+    }
+    let json: unknown = null
+    try {
+      json = await res.json()
+    } catch {
+      json = null
+    }
+    if (!res.ok) {
+      const code = json && typeof (json as { error?: unknown }).error === 'string' ? (json as { error: string }).error : 'unexpected'
+      throw new ConnectInvitesError(res.status, code)
+    }
+    if (json === null || typeof json !== 'object') throw new ConnectInvitesError(res.status, 'unexpected')
+    return json as T
+  }
+
+  create(args: CreateConnectInviteArgs): Promise<CreateConnectInviteResult> {
+    return this.call('POST', '/api/internal/invites', {
+      email: args.email,
+      roleRef: args.roleRef,
+      roleName: args.roleName,
+      sourceOrgRef: args.sourceOrgRef,
+      orgName: args.orgName,
+      invitedBySub: args.invitedBySub,
+      invitedByName: args.invitedByName ?? null,
+      appUrl: args.appUrl,
+    })
+  }
+
+  async list(sourceOrgRef: string): Promise<ConnectInvite[]> {
+    const r = await this.call<{ invites?: ConnectInvite[] }>(
+      'GET',
+      `/api/internal/invites?orgRef=${encodeURIComponent(sourceOrgRef)}`,
+    )
+    return Array.isArray(r.invites) ? r.invites : []
+  }
+
+  resend(id: number): Promise<{ id: number; status: ConnectInviteStatus; expiresAt: string; emailSent: boolean }> {
+    return this.call('POST', `/api/internal/invites/${encodeURIComponent(String(id))}/resend`, {})
+  }
+
+  cancel(id: number): Promise<{ id: number; status: ConnectInviteStatus }> {
+    return this.call('POST', `/api/internal/invites/${encodeURIComponent(String(id))}/cancel`, {})
+  }
+
+  cancelByEmail(args: { sourceOrgRef: string; email: string }): Promise<{ cancelled: number }> {
+    return this.call('POST', '/api/internal/invites/cancel-by-email', {
+      sourceOrgRef: args.sourceOrgRef,
+      email: args.email,
+    })
   }
 }
