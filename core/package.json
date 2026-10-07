@@ -199,6 +199,16 @@
       "import": "./dist/access/index.js",
       "require": "./dist/access/index.js"
     },
+    "./invites": {
+      "types": "./dist/invites/index.d.ts",
+      "import": "./dist/invites/index.js",
+      "require": "./dist/invites/index.js"
+    },
+    "./invites/ui": {
+      "types": "./dist/invites/ui/index.d.ts",
+      "import": "./dist/invites/ui/index.js",
+      "require": "./dist/invites/ui/index.js"
+    },
     "./system-config": {
       "types": "./dist/system-config/index.d.ts",
       "import": "./dist/system-config/index.js",

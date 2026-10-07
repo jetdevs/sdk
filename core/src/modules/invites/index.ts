@@ -12,5 +12,13 @@ export { createDrizzleInviteStore } from './store';
 export type { InviteDb, InviteStore, NewInviteRow, RotatePatch } from './store';
 export { createInviteService, InviteError, inviteAccessTag, toPublicInvite } from './service';
 export type { CreateInviteServiceOptions, InviteService } from './service';
+export { createInviteHandlers, toInviteWire } from './handlers';
+export type {
+  CreateInviteHandlersOptions,
+  InviteAuthorize,
+  InviteHandlers,
+  InviteRouteContext,
+  InviteWire,
+} from './handlers';
 export * from './schemas';
 export * from './types';
