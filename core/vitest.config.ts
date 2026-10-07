@@ -22,6 +22,8 @@ export default defineConfig({
       ['src/ui/app-header/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
       // p90: THE searchable dropdown.
       ['src/ui/select/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
+      // p131 INV-002: the invite accept page.
+      ['src/modules/invites/ui/*.dom.test.{ts,tsx}', 'happy-dom'],
     ],
     globals: true,
   },
