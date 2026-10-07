@@ -79,6 +79,11 @@
       "import": "./dist/ui/index.js",
       "require": "./dist/ui/index.js"
     },
+    "./ui/labels": {
+      "types": "./dist/ui/labels/index.d.ts",
+      "import": "./dist/ui/labels/index.js",
+      "require": "./dist/ui/labels/index.js"
+    },
     "./ui/primitives": {
       "types": "./dist/ui/primitives/index.d.ts",
       "import": "./dist/ui/primitives/index.js",

@@ -31,6 +31,7 @@
  */
 
 import * as React from "react";
+import { useCoreLabels } from "../../../../ui/labels";
 import {
   useDeleteUserLogic,
   type DeleteUserData,
@@ -289,6 +290,8 @@ export function createDeleteUserDialogFactory(
     onSuccess,
     user,
   }: DeleteUserDialogProps) {
+    const labels = useCoreLabels();
+    const t = labels.deleteUser;
     // API mutation
     const deleteUserMutation = api.user.delete.useMutation();
     const utils = api.useUtils();
@@ -307,7 +310,7 @@ export function createDeleteUserDialogFactory(
         if (utils.user.list) {
           await utils.user.list.invalidate();
         }
-        toast.success(`User "${logic.userName}" has been deleted successfully`);
+        toast.success(t.deleted(logic.userName));
         onSuccess?.();
       },
       onError: (error) => {
@@ -324,43 +327,40 @@ export function createDeleteUserDialogFactory(
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangleIcon />
-              Delete User
+              {t.title}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-4">
-                <p>
-                  This action cannot be undone. This will permanently delete the
-                  user account and remove all associated data.
-                </p>
+                <p>{t.description}</p>
 
                 {/* User Information */}
                 <div className="rounded-lg border p-4 bg-muted/50">
                   <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                     <UserIcon className="h-4 w-4" />
-                    User Details
+                    {t.userDetails}
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Name:</span>
+                      <span className="text-muted-foreground">{t.name}</span>
                       <span className="font-medium">{logic.userName}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Email:</span>
+                      <span className="text-muted-foreground">{t.email}</span>
                       <span className="font-medium">{logic.userEmail}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status:</span>
+                      <span className="text-muted-foreground">{t.status}</span>
                       <Badge
                         variant={
                           logic.userStatus === "active" ? "default" : "secondary"
                         }
                       >
-                        {logic.userStatus === "active" ? "Active" : "Inactive"}
+                        {logic.userStatus === "active" ? labels.common.active : labels.common.inactive}
                       </Badge>
                     </div>
                     {logic.userCreatedAt && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Created:</span>
+                        <span className="text-muted-foreground">{t.created}</span>
                         <span className="font-medium">{logic.userCreatedAt}</span>
                       </div>
                     )}
@@ -372,12 +372,10 @@ export function createDeleteUserDialogFactory(
                   <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
                     <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-orange-800">
                       <ShieldIcon className="h-4 w-4" />
-                      Active Role Assignments
+                      {t.activeRoleAssignments}
                     </h4>
                     <p className="text-sm text-orange-700 mb-3">
-                      This user has {logic.activeRoleCount} active role
-                      assignment(s) across {logic.activeOrganizationCount} org(s).
-                      Deleting this user will remove all role assignments.
+                      {t.roleImpact(logic.activeRoleCount, logic.activeOrganizationCount)}
                     </p>
                     <div className="space-y-2">
                       {logic.rolesPreview.map((role, index) => (
@@ -393,7 +391,7 @@ export function createDeleteUserDialogFactory(
                       ))}
                       {logic.remainingRolesCount > 0 && (
                         <p className="text-xs text-orange-600">
-                          ... and {logic.remainingRolesCount} more
+                          {t.moreRoles(logic.remainingRolesCount)}
                         </p>
                       )}
                     </div>
@@ -403,9 +401,7 @@ export function createDeleteUserDialogFactory(
                 {/* Confirmation Warning */}
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4">
                   <p className="text-sm text-red-800">
-                    <strong>Warning:</strong> This action is permanent and cannot
-                    be undone. The user will be completely removed from the
-                    system.
+                    <strong>{t.warningLabel}</strong> {t.warning}
                   </p>
                 </div>
               </div>
@@ -414,7 +410,7 @@ export function createDeleteUserDialogFactory(
 
           <AlertDialogFooter>
             <AlertDialogCancel disabled={logic.isDeleting}>
-              Cancel
+              {labels.common.cancel}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
@@ -425,7 +421,7 @@ export function createDeleteUserDialogFactory(
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {logic.isDeleting && <LoaderIcon className="mr-2" />}
-              {logic.isDeleting ? "Deleting..." : "Delete User"}
+              {logic.isDeleting ? labels.common.deleting : t.confirm}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

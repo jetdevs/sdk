@@ -17,6 +17,7 @@ const clientEntries = [
   'ui/auth-pages/index',
   'ui/app-header/index',
   'ui/select/index',
+  'ui/labels/index',
   'hooks/index',
   'stores/index',
   'providers/index',
