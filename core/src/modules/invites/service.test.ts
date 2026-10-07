@@ -71,9 +71,14 @@ function fakeStore(clock: () => Date) {
     async listByOrg(_db, orgId, c) {
       return rows.filter((r) => r.orgId === orgId && r.clientId === c.clientId && r.sourceSystem === c.sourceSystem).map((r) => ({ ...r }));
     },
-    async acceptConditional(_db, { id, tokenHash, userId, now }) {
+    async acceptConditional(_db, { id, tokenHash, userId, email, now }) {
       const r = rows.find(
-        (x) => x.id === id && x.tokenHash === tokenHash && x.status === 'pending' && x.expiresAt.getTime() > clock().getTime(),
+        (x) =>
+          x.id === id &&
+          x.tokenHash === tokenHash &&
+          x.email === email &&
+          x.status === 'pending' &&
+          x.expiresAt.getTime() > clock().getTime(),
       );
       if (!r) return null;
       Object.assign(r, { status: 'accepted', acceptedAt: now, acceptedUserId: userId, provisionState: 'pending' });
@@ -91,7 +96,10 @@ const db = new Proxy({}, {
 
 const CALLER: InviteCaller = { clientId: 'client-a', sourceSystem: 'src-a' };
 const OTHER: InviteCaller = { clientId: 'client-b', sourceSystem: 'src-a' };
-const ORGS: Record<string, { orgId: number; orgName: string }> = { 'org-1': { orgId: 11, orgName: 'Acme' } };
+const ORGS: Record<string, { orgId: number; orgName: string }> = {
+  'org-1': { orgId: 11, orgName: 'Acme' },
+  'org-2': { orgId: 22, orgName: 'Globex' },
+};
 
 function setup(over: Partial<CreateInviteServiceOptions> = {}) {
   let t = T0;
@@ -178,7 +186,7 @@ describe('p131 INV-001 invite service (unit)', () => {
     const r = await svc.create(db, CALLER, input());
     expect(r.invite.expiresAt.getTime()).toBe(T0.getTime() + 7 * DAY);
     advance(3 * DAY);
-    const again = await svc.resend(db, CALLER, r.invite.id);
+    const again = await svc.resend(db, CALLER, r.invite.id, 'org-1');
     expect(again.token).not.toBe(r.token);
     expect(again.invite.id).toBe(r.invite.id);
     expect(again.invite.expiresAt.getTime()).toBe(T0.getTime() + 10 * DAY);
@@ -206,8 +214,8 @@ describe('p131 INV-001 invite service (unit)', () => {
     const p = await svc.create(db, CALLER, input({ email: 'p@x.io' }));
     const a = await svc.create(db, CALLER, input({ email: 'a@x.io' }));
     const c = await svc.create(db, CALLER, input({ email: 'c@x.io' }));
-    await svc.accept(db, { inviteId: a.invite.id, token: a.token, userId: 5 });
-    await svc.cancel(db, CALLER, c.invite.id);
+    await svc.accept(db, { inviteId: a.invite.id, token: a.token, userId: 5, email: 'a@x.io' });
+    await svc.cancel(db, CALLER, c.invite.id, 'org-1');
     expect((await svc.getByToken(db, p.token)).status).toBe('pending');
     expect((await svc.getByToken(db, a.token)).status).toBe('accepted');
     expect((await svc.getByToken(db, c.token)).status).toBe('cancelled');
@@ -221,19 +229,19 @@ describe('p131 INV-001 invite service (unit)', () => {
   it('AC6: accept is single-use — a second accept fails with no side effects', async () => {
     const { svc, rows } = setup();
     const r = await svc.create(db, CALLER, input());
-    const ok = await svc.accept(db, { inviteId: r.invite.id, token: r.token, userId: 5 });
+    const ok = await svc.accept(db, { inviteId: r.invite.id, token: r.token, userId: 5, email: 'ann@example.com' });
     expect(ok.status).toBe('accepted');
     expect(ok.provisionState).toBe('pending');
     const before = JSON.stringify(rows);
-    await expect(svc.accept(db, { inviteId: r.invite.id, token: r.token, userId: 6 })).rejects.toBeInstanceOf(InviteError);
+    await expect(svc.accept(db, { inviteId: r.invite.id, token: r.token, userId: 6, email: 'ann@example.com' })).rejects.toBeInstanceOf(InviteError);
     expect(JSON.stringify(rows)).toBe(before);
-    await expect(svc.accept(db, { inviteId: r.invite.id, token: 'wrong', userId: 6 })).rejects.toMatchObject({ reason: 'not_acceptable' });
+    await expect(svc.accept(db, { inviteId: r.invite.id, token: 'wrong', userId: 6, email: 'ann@example.com' })).rejects.toMatchObject({ reason: 'not_acceptable' });
   });
 
   it('AC7 (I5): email variables are exactly org_name, inviter_name, accept_url, expires_at — no role', async () => {
     const { svc, sent } = setup();
     const r = await svc.create(db, CALLER, input());
-    await svc.resend(db, CALLER, r.invite.id);
+    await svc.resend(db, CALLER, r.invite.id, 'org-1');
     expect(sent).toHaveLength(2);
     for (const m of sent) {
       expect(Object.keys(m).sort()).toEqual(['to', 'variables']);
@@ -262,19 +270,19 @@ describe('p131 INV-001 invite service (unit)', () => {
   it('AC9 (P13/P22): accept racing resend or cancel — exactly one wins', async () => {
     const { svc } = setup();
     const r = await svc.create(db, CALLER, input());
-    await svc.resend(db, CALLER, r.invite.id);
-    await expect(svc.accept(db, { inviteId: r.invite.id, token: r.token, userId: 1 })).rejects.toMatchObject({ reason: 'not_acceptable' });
+    await svc.resend(db, CALLER, r.invite.id, 'org-1');
+    await expect(svc.accept(db, { inviteId: r.invite.id, token: r.token, userId: 1, email: 'ann@example.com' })).rejects.toMatchObject({ reason: 'not_acceptable' });
 
     const s = setup();
     const x = await s.svc.create(db, CALLER, input());
-    await s.svc.accept(db, { inviteId: x.invite.id, token: x.token, userId: 1 });
-    await expect(s.svc.cancel(db, CALLER, x.invite.id)).rejects.toMatchObject({ reason: 'not_pending' });
-    await expect(s.svc.resend(db, CALLER, x.invite.id)).rejects.toMatchObject({ reason: 'not_pending' });
+    await s.svc.accept(db, { inviteId: x.invite.id, token: x.token, userId: 1, email: 'ann@example.com' });
+    await expect(s.svc.cancel(db, CALLER, x.invite.id, 'org-1')).rejects.toMatchObject({ reason: 'not_pending' });
+    await expect(s.svc.resend(db, CALLER, x.invite.id, 'org-1')).rejects.toMatchObject({ reason: 'not_pending' });
 
     const u = setup();
     const y = await u.svc.create(db, CALLER, input());
     u.advance(7 * DAY);
-    await expect(u.svc.accept(db, { inviteId: y.invite.id, token: y.token, userId: 1 })).rejects.toMatchObject({ reason: 'not_acceptable' });
+    await expect(u.svc.accept(db, { inviteId: y.invite.id, token: y.token, userId: 1, email: 'ann@example.com' })).rejects.toMatchObject({ reason: 'not_acceptable' });
   });
 
   it('AC10 (P21): list/resend/cancel/cancelByEmail are caller-scoped; a foreign id behaves as not found', async () => {
@@ -282,8 +290,8 @@ describe('p131 INV-001 invite service (unit)', () => {
     const r = await svc.create(db, CALLER, input());
     expect(await svc.list(db, OTHER, 'org-1')).toEqual([]);
     expect(await svc.list(db, { clientId: 'client-a', sourceSystem: 'src-z' }, 'org-1')).toEqual([]);
-    await expect(svc.resend(db, OTHER, r.invite.id)).rejects.toMatchObject({ reason: 'not_found' });
-    await expect(svc.cancel(db, OTHER, r.invite.id)).rejects.toMatchObject({ reason: 'not_found' });
+    await expect(svc.resend(db, OTHER, r.invite.id, 'org-1')).rejects.toMatchObject({ reason: 'not_found' });
+    await expect(svc.cancel(db, OTHER, r.invite.id, 'org-1')).rejects.toMatchObject({ reason: 'not_found' });
     expect(await svc.cancelByEmail(db, OTHER, { sourceOrgRef: 'org-1', email: 'ann@example.com' })).toEqual({ cancelled: 0 });
     await expect(svc.create(db, OTHER, input())).rejects.toMatchObject({ reason: 'conflict' });
     expect(rows[0]!.status).toBe('pending');
@@ -299,7 +307,7 @@ describe('p131 INV-001 invite service (unit)', () => {
     const r = await svc.create(db, CALLER, input());
     expect(r.emailSent).toBe(false);
     expect(rows[0]!.status).toBe('pending');
-    const again = await svc.resend(db, CALLER, r.invite.id);
+    const again = await svc.resend(db, CALLER, r.invite.id, 'org-1');
     expect(again.emailSent).toBe(false);
     expect(rows[0]!.status).toBe('pending');
   });
@@ -314,13 +322,55 @@ describe('p131 INV-001 invite service (unit)', () => {
       expiresAt: r.invite.expiresAt,
       tag: 'org-invite:org-1',
     });
-    const again = await svc.resend(db, CALLER, r.invite.id);
+    const again = await svc.resend(db, CALLER, r.invite.id, 'org-1');
     expect(codes).toHaveLength(2);
     expect(codes[0]!.revoked).toBe(true);
     expect(again.invite.accessCodeId).toBe(codes[1]!.id);
     expect(codes[1]!.tag).toBe('org-invite:org-1');
-    await svc.cancel(db, CALLER, r.invite.id);
+    await svc.cancel(db, CALLER, r.invite.id, 'org-1');
     expect(codes[1]!.revoked).toBe(true);
+  });
+
+  it('P1-A: accept is bound to the invited email — another account with the forwarded link gets not_acceptable, invite stays pending', async () => {
+    const { svc, rows } = setup();
+    const r = await svc.create(db, CALLER, input());
+    const before = JSON.stringify(rows);
+    await expect(
+      svc.accept(db, { inviteId: r.invite.id, token: r.token, userId: 9, email: 'mallory@example.com' }),
+    ).rejects.toMatchObject({ reason: 'not_acceptable' });
+    await expect(svc.accept(db, { inviteId: r.invite.id, token: r.token, userId: 9, email: '' })).rejects.toMatchObject({
+      reason: 'not_acceptable',
+    });
+    expect(JSON.stringify(rows)).toBe(before);
+    expect(rows[0]!.status).toBe('pending');
+    expect(rows[0]!.acceptedUserId).toBeNull();
+  });
+
+  it('P1-A: accept email match is case- and whitespace-insensitive', async () => {
+    const { svc } = setup();
+    const r = await svc.create(db, CALLER, input());
+    const ok = await svc.accept(db, { inviteId: r.invite.id, token: r.token, userId: 5, email: '  ANN@example.Com\t' });
+    expect(ok.status).toBe('accepted');
+    expect(ok.acceptedUserId).toBe(5);
+  });
+
+  it('P1-B: resend/cancel are org-scoped — same client, another org\'s sourceOrgRef → not_found, no state change', async () => {
+    const { svc, rows, sent, codes } = setup();
+    const r = await svc.create(db, CALLER, input());
+    const before = JSON.stringify(rows);
+    const sentBefore = sent.length;
+    const codesBefore = JSON.stringify(codes);
+    await expect(svc.resend(db, CALLER, r.invite.id, 'org-2')).rejects.toMatchObject({ reason: 'not_found' });
+    await expect(svc.cancel(db, CALLER, r.invite.id, 'org-2')).rejects.toMatchObject({ reason: 'not_found' });
+    // unknown org answers the same as a foreign org (no oracle)
+    await expect(svc.resend(db, CALLER, r.invite.id, 'org-nope')).rejects.toMatchObject({ reason: 'not_found' });
+    await expect(svc.cancel(db, CALLER, r.invite.id, 'org-nope')).rejects.toMatchObject({ reason: 'not_found' });
+    // missing id in the right org answers the same too
+    await expect(svc.cancel(db, CALLER, 9999, 'org-1')).rejects.toMatchObject({ reason: 'not_found' });
+    expect(JSON.stringify(rows)).toBe(before);
+    expect(sent.length).toBe(sentBefore);
+    expect(JSON.stringify(codes)).toBe(codesBefore);
+    expect((await svc.cancel(db, CALLER, r.invite.id, 'org-1')).status).toBe('cancelled');
   });
 
   it('create: an expired open row is retired and a fresh row inserted', async () => {

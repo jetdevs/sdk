@@ -63,6 +63,7 @@ function memStore(): InviteStore {
         .filter((r) => r.orgId === orgId && r.clientId === k.clientId && r.sourceSystem === k.sourceSystem)
         .map((r) => ({ ...r }));
     },
+    // accept is not routed through these handlers; email binding is covered in service.test.ts.
     async acceptConditional() {
       return null;
     },
@@ -278,17 +279,44 @@ describe('invite handlers — behaviour', () => {
     const { id } = await (await h.create(post('/invites', BODY, 'key-yobo'))).json();
     const ctx = { params: Promise.resolve({ id: String(id) }) };
 
-    expect((await h.resend(post('/r', {}, 'key-cadra'), ctx)).status).toBe(404);
-    expect((await h.cancel(post('/c', {}, 'key-cadra'), ctx)).status).toBe(404);
+    expect((await h.resend(post('/r', { sourceOrgRef: '42' }, 'key-cadra'), ctx)).status).toBe(404);
+    expect((await h.cancel(post('/c', { sourceOrgRef: '42' }, 'key-cadra'), ctx)).status).toBe(404);
 
-    const r = await h.resend(post('/r', {}, 'key-yobo'), ctx);
+    const r = await h.resend(post('/r', { sourceOrgRef: '42' }, 'key-yobo'), ctx);
     expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({ id, status: 'pending', emailSent: true });
 
-    const c = await h.cancel(post('/c', {}, 'key-yobo'), ctx);
+    const c = await h.cancel(post('/c', { sourceOrgRef: '42' }, 'key-yobo'), ctx);
     expect(await c.json()).toEqual({ id, status: 'cancelled' });
     // Cancelling twice → 409 not_pending.
-    expect((await h.cancel(post('/c', {}, 'key-yobo'), ctx)).status).toBe(409);
+    expect((await h.cancel(post('/c', { sourceOrgRef: '42' }, 'key-yobo'), ctx)).status).toBe(409);
+  });
+
+  it('resend/cancel require a sourceOrgRef body — 400 before any service call', async () => {
+    const h = createInviteHandlers({ service: tripwireService(), db, authorize: () => CADRA });
+    const ctx = { params: { id: '1' } };
+    for (const body of [{}, { sourceOrgRef: '' }, { sourceOrgRef: '   ' }, { sourceOrgRef: 42 }, { sourceOrgRef: 'x'.repeat(256) }, 'not json']) {
+      for (const fn of [h.resend, h.cancel]) {
+        const res = await fn(post('/x', body), ctx);
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({ error: 'invalid_body', field: 'sourceOrgRef' });
+      }
+    }
+  });
+
+  it('resend/cancel with another org\'s sourceOrgRef (same client) answer 404 and change nothing', async () => {
+    const { service } = setup();
+    const h = createInviteHandlers({ service, db, authorize: authBy(KEYS) });
+    const { id } = await (await h.create(post('/invites', BODY, 'key-cadra'))).json();
+    await h.create(post('/invites', { ...BODY, sourceOrgRef: '77', email: 'other@x.co' }, 'key-cadra'));
+    const ctx = { params: Promise.resolve({ id: String(id) }) };
+    expect((await h.resend(post('/r', { sourceOrgRef: '77' }, 'key-cadra'), ctx)).status).toBe(404);
+    expect((await h.cancel(post('/c', { sourceOrgRef: '77' }, 'key-cadra'), ctx)).status).toBe(404);
+    expect((await h.cancel(post('/c', { sourceOrgRef: 'never' }, 'key-cadra'), ctx)).status).toBe(404);
+    const list = await (await h.list(get('/invites?orgRef=42', 'key-cadra'))).json();
+    expect(list.invites.find((i: { id: number }) => i.id === id).status).toBe('pending');
+    const ok = await h.cancel(post('/c', { sourceOrgRef: ' 42 ' }, 'key-cadra'), ctx);
+    expect(await ok.json()).toEqual({ id, status: 'cancelled' });
   });
 
   it('cancel-by-email is caller-scoped', async () => {

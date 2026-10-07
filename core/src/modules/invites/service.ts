@@ -193,9 +193,22 @@ export function createInviteService(options: CreateInviteServiceOptions) {
     );
   }
 
-  async function ownedPending(db: InviteDb, caller: InviteCaller, id: number): Promise<OrgInvite> {
+  /**
+   * Caller-owned AND org-scoped: the row must belong to the caller's client +
+   * source system AND to the org named by `sourceOrgRef`. A row in another org
+   * answers exactly like a foreign id (`not_found`) — no existence oracle.
+   */
+  async function ownedPending(
+    db: InviteDb,
+    caller: InviteCaller,
+    id: number,
+    sourceOrgRef: string,
+  ): Promise<OrgInvite> {
+    const org = await options.resolveOrg(db, { sourceSystem: caller.sourceSystem, sourceOrgRef, create: false });
     const row = await store.getById(db, id);
-    if (!owns(row, caller)) throw new InviteError('not_found', `invite ${id} not found`);
+    if (!org || !owns(row, caller) || row.orgId !== org.orgId) {
+      throw new InviteError('not_found', `invite ${id} not found`);
+    }
     if (row.status !== 'pending') throw new InviteError('not_pending', `invite ${id} is ${row.status}`);
     return row;
   }
@@ -208,12 +221,13 @@ export function createInviteService(options: CreateInviteServiceOptions) {
     db: InviteDb,
     caller: InviteCaller,
     id: number,
+    sourceOrgRef: string,
   ): Promise<Omit<CreateInviteResult, 'superseded' | 'connectOrgId'>> {
     const token = generateInviteToken();
     const tokenHash = hashInviteToken(token);
     const expiresAt = new Date(now().getTime() + ttlMs);
     const row = await store.transaction(db, async (tx) => {
-      const cur = await ownedPending(tx, caller, id);
+      const cur = await ownedPending(tx, caller, id, sourceOrgRef);
       await dropCode(tx, cur.accessCodeId);
       let accessCodeId: number | null = null;
       if (gate) {
@@ -229,9 +243,9 @@ export function createInviteService(options: CreateInviteServiceOptions) {
     return { invite: toPublicInvite(row), token, emailSent };
   }
 
-  async function cancel(db: InviteDb, caller: InviteCaller, id: number): Promise<PublicInvite> {
+  async function cancel(db: InviteDb, caller: InviteCaller, id: number, sourceOrgRef: string): Promise<PublicInvite> {
     return store.transaction(db, async (tx) => {
-      const cur = await ownedPending(tx, caller, id);
+      const cur = await ownedPending(tx, caller, id, sourceOrgRef);
       const row = await store.cancel(tx, id, now());
       if (!row) throw new InviteError('not_pending', `invite ${id} is no longer pending`);
       await dropCode(tx, cur.accessCodeId);
@@ -279,15 +293,23 @@ export function createInviteService(options: CreateInviteServiceOptions) {
    * Single-use accept inside the caller's account transaction (P13). The raw
    * token is re-validated by the conditional UPDATE (P20) — 0 rows throws and
    * the caller's tx rolls back, so nothing else is written.
+   *
+   * `email` is the accepting account's email and MUST match the invited
+   * address (case/whitespace-insensitive); a forwarded link cannot be accepted
+   * by a different account — mismatch → `not_acceptable`, invite stays pending.
    */
   async function accept(
     tx: InviteDb,
-    input: { inviteId: number; token: string; userId: number },
+    input: { inviteId: number; token: string; userId: number; email: string },
   ): Promise<PublicInvite> {
+    if (typeof input.email !== 'string' || !input.email.trim()) {
+      throw new InviteError('not_acceptable', `invite ${input.inviteId} cannot be accepted`);
+    }
     const row = await store.acceptConditional(tx, {
       id: input.inviteId,
       tokenHash: hashInviteToken(input.token),
       userId: input.userId,
+      email: normEmail(input.email),
       now: now(),
     });
     if (!row) throw new InviteError('not_acceptable', `invite ${input.inviteId} cannot be accepted`);

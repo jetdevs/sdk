@@ -6,8 +6,8 @@
  *
  *   POST /invites                       → create (supersedes an open invite)
  *   GET  /invites?orgRef=<sourceOrgRef> → list (caller-scoped, P21)
- *   POST /invites/:id/resend            → new token, expiry restarted
- *   POST /invites/:id/cancel
+ *   POST /invites/:id/resend            → { sourceOrgRef } — new token, expiry restarted
+ *   POST /invites/:id/cancel            → { sourceOrgRef }
  *   POST /invites/cancel-by-email       → D10 removal hook
  *
  * Order in every handler: authorize FIRST (no body read, no db touch before
@@ -93,6 +93,20 @@ async function readJson(req: Request): Promise<{ ok: true; body: unknown } | { o
   }
 }
 
+/**
+ * resend/cancel body: `{ sourceOrgRef }` (required, trimmed, 1..255). Scopes the
+ * id to one org so a caller cannot act on another org's invite by id. A missing
+ * or unparseable body is the same 400 as a missing field.
+ */
+async function readSourceOrgRef(req: Request): Promise<string | null> {
+  const raw = await readJson(req);
+  if (!raw.ok || !raw.body || typeof raw.body !== 'object') return null;
+  const v = (raw.body as { sourceOrgRef?: unknown }).sourceOrgRef;
+  if (typeof v !== 'string') return null;
+  const ref = v.trim();
+  return ref && ref.length <= 255 ? ref : null;
+}
+
 function parseId(raw: string | undefined): number | null {
   if (!raw || !/^[1-9]\d{0,15}$/.test(raw)) return null;
   const n = Number(raw);
@@ -173,14 +187,16 @@ export function createInviteHandlers(options: CreateInviteHandlersOptions) {
     );
   }
 
-  /** POST /invites/:id/resend */
+  /** POST /invites/:id/resend — body { sourceOrgRef } (required; org scope). */
   function resend(req: Request, ctx?: InviteRouteContext): Promise<Response> {
     return guard(
       req,
       async (caller) => {
         const id = await idFrom(ctx);
         if (id === null) return json({ error: 'invalid_id' }, 400);
-        const r = await service.resend(getDb(), caller, id);
+        const sourceOrgRef = await readSourceOrgRef(req);
+        if (sourceOrgRef === null) return json({ error: 'invalid_body', field: 'sourceOrgRef' }, 400);
+        const r = await service.resend(getDb(), caller, id, sourceOrgRef);
         return json({
           id: r.invite.id,
           status: r.invite.status,
@@ -192,14 +208,16 @@ export function createInviteHandlers(options: CreateInviteHandlersOptions) {
     );
   }
 
-  /** POST /invites/:id/cancel */
+  /** POST /invites/:id/cancel — body { sourceOrgRef } (required; org scope). */
   function cancel(req: Request, ctx?: InviteRouteContext): Promise<Response> {
     return guard(
       req,
       async (caller) => {
         const id = await idFrom(ctx);
         if (id === null) return json({ error: 'invalid_id' }, 400);
-        const inv = await service.cancel(getDb(), caller, id);
+        const sourceOrgRef = await readSourceOrgRef(req);
+        if (sourceOrgRef === null) return json({ error: 'invalid_body', field: 'sourceOrgRef' }, 400);
+        const inv = await service.cancel(getDb(), caller, id, sourceOrgRef);
         return json({ id: inv.id, status: inv.status });
       },
       'invites.cancel',
