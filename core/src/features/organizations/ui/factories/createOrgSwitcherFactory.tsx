@@ -31,6 +31,7 @@
  */
 
 import * as React from "react";
+import { useCoreLabels } from "../../../../ui/labels";
 import {
   useOrgSwitcherLogic,
   type SwitcherOrgData,
@@ -338,6 +339,7 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
     onSwitchSuccess,
     onSwitchError,
   }: OrgSwitcherProps) {
+    const t = useCoreLabels().orgSwitcher;
     const { data: session, update: updateSession } = hooks.useSession();
     const router = hooks.useRouter();
 
@@ -376,7 +378,7 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
           const idNum = Number(rawId);
           const name =
             String(rawName).trim() ||
-            (Number.isFinite(idNum) ? `Organization ${idNum}` : "Organization");
+            (Number.isFinite(idNum) ? t.organizationWithId(idNum) : t.organization);
 
           // Normalize roles
           let roles: string[] = [];
@@ -402,7 +404,7 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
           };
         })
         .filter((o: SwitcherOrgData) => Number.isFinite(o.id));
-    }, [userOrgs]);
+    }, [userOrgs, t]);
 
     // Use the logic hook
     const {
@@ -456,13 +458,13 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
               router.push(redirectPath);
             }
           } else {
-            const errorMsg = result.error || "Failed to switch organization";
+            const errorMsg = result.error || t.switchFailed;
             toast.error(errorMsg);
             onSwitchError?.(new Error(errorMsg));
           }
         } catch (error) {
           console.error("Error switching org:", error);
-          toast.error("Failed to switch organization");
+          toast.error(t.switchFailed);
           onSwitchError?.(
             error instanceof Error ? error : new Error("Unknown error")
           );
@@ -484,7 +486,7 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
     // System role with single org - show text only
     if (hasSystemRole && normalizedOrgs.length <= 1) {
       const orgName =
-        displayOrg?.name || session?.user?.currentOrg?.name || "Organization";
+        displayOrg?.name || session?.user?.currentOrg?.name || t.organization;
       return (
         <div className={`flex items-center gap-2 px-3 py-2 text-sm ${className || ""}`}>
           <Building2Icon className="h-4 w-4 text-muted-foreground" />
@@ -509,7 +511,7 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
         <div className={`flex items-center gap-2 px-3 py-2 text-sm ${className || ""}`}>
           <Building2Icon className="h-4 w-4 text-muted-foreground" />
           <span className="font-medium">
-            {displayOrg?.name || "Organization"}
+            {displayOrg?.name || t.organization}
           </span>
         </div>
       );
@@ -531,7 +533,7 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
             <div className="flex items-center gap-2 flex-1 truncate">
               <Building2Icon className="h-4 w-4 shrink-0" />
               <span className="truncate" title={displayOrg?.name}>
-                {displayOrg?.name || "Select Organization"}
+                {displayOrg?.name || t.selectOrganization}
               </span>
               {displayOrg?.customDomain && isCustomDomainOrg?.(displayOrg) && (
                 <GlobeIcon className="h-3 w-3 text-muted-foreground" />
@@ -541,7 +543,7 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-[220px] max-h-[400px] overflow-y-auto bg-popover backdrop-blur-xl border-border shadow-xl">
-          <DropdownMenuLabel className="text-xs text-muted-foreground font-medium">Switch Organization</DropdownMenuLabel>
+          <DropdownMenuLabel className="text-xs text-muted-foreground font-medium">{t.title}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
           {/* Search input - only show when many orgs */}
@@ -551,7 +553,7 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
                 <div className="relative">
                   <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
-                    placeholder="Search..."
+                    placeholder={t.searchPlaceholder}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-8 h-7 text-xs"
@@ -565,7 +567,7 @@ export function createOrgSwitcherFactory(config: OrgSwitcherFactoryConfig) {
           {/* Organization list */}
           {filteredOrgs.length === 0 ? (
             <div className="px-2 py-4 text-xs text-center text-muted-foreground">
-              No organizations found
+              {t.noResults}
             </div>
           ) : (
             filteredOrgs.map((org) => (

@@ -24,6 +24,7 @@
  */
 
 import * as React from "react";
+import { useCoreLabels } from "../labels";
 
 // =============================================================================
 // TYPES
@@ -255,6 +256,8 @@ export function createDeleteRoleDialogFactory(
     onSuccess,
     role,
   }: DeleteRoleDialogProps) {
+    const labels = useCoreLabels();
+    const t = labels.deleteRole;
     const [isDeleting, setIsDeleting] = React.useState(false);
 
     const deleteRoleMutation = api.role.delete.useMutation();
@@ -275,7 +278,7 @@ export function createDeleteRoleDialogFactory(
         await deleteRoleMutation.mutateAsync(role.id);
         await utils.role.getAllWithStats.invalidate();
 
-        toast.success(`Role "${role.name}" has been deleted successfully`);
+        toast.success(t.deleted(role.name));
 
         onSuccess?.();
         onClose();
@@ -287,18 +290,16 @@ export function createDeleteRoleDialogFactory(
           errorMessage.includes("FORBIDDEN") ||
           errorMessage.includes("system")
         ) {
-          toast.error("Cannot delete system roles");
+          toast.error(t.errorSystemRole);
         } else if (errorMessage.includes("not found")) {
-          toast.error("Role not found. It may have already been deleted.");
+          toast.error(t.errorNotFound);
         } else if (
           errorMessage.includes("constraint") ||
           errorMessage.includes("foreign key")
         ) {
-          toast.error(
-            "Cannot delete role. Users are still assigned to this role."
-          );
+          toast.error(t.errorInUse);
         } else {
-          toast.error("Failed to delete role. Please try again.");
+          toast.error(t.errorGeneric);
         }
       } finally {
         setIsDeleting(false);
@@ -318,22 +319,21 @@ export function createDeleteRoleDialogFactory(
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangleIcon />
-              Delete Role
+              {t.title}
               {isSystemRole && (
                 <Badge variant="secondary" className="ml-2">
                   <LockIcon className="mr-1" />
-                  System Role
+                  {t.systemRole}
                 </Badge>
               )}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>
-                  Are you sure you want to delete the role{" "}
-                  <strong>&quot;{role.name}&quot;</strong>?
-                  {isSystemRole
-                    ? " System roles cannot be deleted as they are required for system functionality."
-                    : " This action cannot be undone."}
+                  {t.confirmBefore}{" "}
+                  <strong>&quot;{role.name}&quot;</strong>
+                  {t.confirmAfter}{" "}
+                  {isSystemRole ? t.systemRoleNote : t.cannotBeUndone}
                 </p>
 
                 {!isSystemRole && (
@@ -342,31 +342,27 @@ export function createDeleteRoleDialogFactory(
                     <div className="rounded-lg border p-4 bg-muted/50">
                       <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                         <AlertTriangleIcon />
-                        Impact Assessment
+                        {t.impactAssessment}
                       </h4>
 
                       <div className="space-y-2 text-sm">
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-2">
                             <UsersIcon className="text-muted-foreground" />
-                            Users affected:
+                            {t.usersAffected}
                           </span>
                           <Badge variant={hasUsers ? "destructive" : "secondary"}>
-                            {userCount}{" "}
-                            {userCount === 1 ? "user" : "users"}
+                            {t.userCount(userCount)}
                           </Badge>
                         </div>
 
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-2">
                             <ShieldIcon className="text-muted-foreground" />
-                            Permissions:
+                            {t.permissions}
                           </span>
                           <Badge variant="outline">
-                            {permissionCount}{" "}
-                            {permissionCount === 1
-                              ? "permission"
-                              : "permissions"}
+                            {t.permissionCount(permissionCount)}
                           </Badge>
                         </div>
                       </div>
@@ -374,13 +370,10 @@ export function createDeleteRoleDialogFactory(
                       {hasUsers && (
                         <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
                           <p className="text-sm text-destructive font-medium">
-                            Warning: {userCount}{" "}
-                            {userCount === 1 ? "user is" : "users are"}{" "}
-                            currently assigned to this role.
+                            {t.usersAssigned(userCount)}
                           </p>
                           <p className="text-xs text-destructive/80 mt-1">
-                            These users will lose all permissions associated with
-                            this role.
+                            {t.usersLosePermissions}
                           </p>
                         </div>
                       )}
@@ -389,13 +382,12 @@ export function createDeleteRoleDialogFactory(
                     {/* Deletion Details */}
                     <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-md">
                       <p>
-                        <strong>What happens when you delete this role:</strong>
+                        <strong>{t.whatHappens}</strong>
                       </p>
                       <ul className="mt-1 space-y-1 list-disc list-inside">
-                        <li>The role will be permanently deleted from the database</li>
-                        <li>Users will lose access to permissions from this role</li>
-                        <li>Role assignments will be removed</li>
-                        <li>This action cannot be undone</li>
+                        {t.consequences.map((line, i) => (
+                          <li key={i}>{line}</li>
+                        ))}
                       </ul>
                     </div>
                   </>
@@ -405,12 +397,10 @@ export function createDeleteRoleDialogFactory(
                   <div className="rounded-lg border p-4 bg-muted/50">
                     <div className="flex items-center gap-2 text-sm">
                       <LockIcon className="text-muted-foreground" />
-                      <span className="font-medium">System Role Protection</span>
+                      <span className="font-medium">{t.protectionTitle}</span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">
-                      This role is protected because it&apos;s essential for
-                      system functionality. System roles cannot be deleted to
-                      maintain platform integrity.
+                      {t.protectionBody}
                     </p>
                   </div>
                 )}
@@ -419,7 +409,7 @@ export function createDeleteRoleDialogFactory(
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>{labels.common.cancel}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
@@ -429,7 +419,7 @@ export function createDeleteRoleDialogFactory(
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting && <LoaderIcon className="mr-2" />}
-              {isSystemRole ? "Cannot Delete" : "Delete Role"}
+              {isSystemRole ? t.cannotDelete : t.confirm}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -549,6 +539,8 @@ export function createBulkDeleteDialogFactory(
     roles,
     isLoading = false,
   }: BulkDeleteDialogProps) {
+    const labels = useCoreLabels();
+    const t = labels.bulkDeleteRoles;
     const systemRoles = roles.filter((role) => role.isSystemRole);
     const customRoles = roles.filter((role) => !role.isSystemRole);
     const totalUsers = roles.reduce((sum, role) => sum + (role.userCount ?? 0), 0);
@@ -563,11 +555,10 @@ export function createBulkDeleteDialogFactory(
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <TrashIcon className="text-destructive" />
-              Confirm Bulk Delete
+              {t.title}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              You are about to delete {roles.length} role(s). This action cannot
-              be undone.
+              {t.description(roles.length)}
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -578,12 +569,11 @@ export function createBulkDeleteDialogFactory(
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangleIcon />
                   <span className="font-medium text-destructive">
-                    System Roles Cannot Be Deleted
+                    {t.systemRolesTitle}
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-2">
-                  The following {systemRoles.length} system role(s) will be
-                  skipped:
+                  {t.systemRolesSkipped(systemRoles.length)}
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {systemRoles.map((role) => (
@@ -601,7 +591,7 @@ export function createBulkDeleteDialogFactory(
                 <div className="flex items-center gap-2">
                   <TrashIcon className="text-destructive h-4 w-4" />
                   <span className="font-medium">
-                    Roles to Delete ({customRoles.length})
+                    {t.rolesToDelete(customRoles.length)}
                   </span>
                 </div>
 
@@ -646,7 +636,7 @@ export function createBulkDeleteDialogFactory(
                       {totalUsers}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Users Affected
+                      {t.usersAffected}
                     </div>
                   </div>
                   <div className="text-center">
@@ -654,7 +644,7 @@ export function createBulkDeleteDialogFactory(
                       {totalPermissions}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Permissions Removed
+                      {t.permissionsRemoved}
                     </div>
                   </div>
                 </div>
@@ -666,14 +656,14 @@ export function createBulkDeleteDialogFactory(
               <div className="text-center py-4 text-muted-foreground">
                 <AlertTriangleIcon />
                 <p>
-                  No roles can be deleted. All selected roles are system roles.
+                  {t.noneDeletable}
                 </p>
               </div>
             )}
           </div>
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isLoading}>{labels.common.cancel}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
@@ -682,7 +672,7 @@ export function createBulkDeleteDialogFactory(
               disabled={isLoading || customRoles.length === 0}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isLoading ? "Deleting..." : `Delete ${customRoles.length} Role(s)`}
+              {isLoading ? labels.common.deleting : t.confirm(customRoles.length)}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -877,6 +867,8 @@ export function createCreateRoleDialogFactory(
     onClose,
     onSuccess,
   }: CreateRoleDialogProps) {
+    const labels = useCoreLabels();
+    const t = labels.createRole;
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [currentStep, setCurrentStep] = React.useState(1);
     const [formData, setFormData] = React.useState({
@@ -906,17 +898,17 @@ export function createCreateRoleDialogFactory(
       const newErrors: { name?: string; description?: string } = {};
 
       if (!formData.name || formData.name.trim().length === 0) {
-        newErrors.name = "Role name is required";
+        newErrors.name = t.errorNameRequired;
       } else if (formData.name.length < 2) {
-        newErrors.name = "Role name must be at least 2 characters";
+        newErrors.name = t.errorNameTooShort;
       } else if (formData.name.length > 100) {
-        newErrors.name = "Role name must be less than 100 characters";
+        newErrors.name = t.errorNameTooLong;
       } else if (!/^[a-zA-Z0-9\s\-_]+$/.test(formData.name)) {
-        newErrors.name = "Role name can only contain letters, numbers, spaces, hyphens, and underscores";
+        newErrors.name = t.errorNameInvalid;
       }
 
       if (formData.description && formData.description.length > 500) {
-        newErrors.description = "Description must be less than 500 characters";
+        newErrors.description = t.errorDescriptionTooLong;
       }
 
       setErrors(newErrors);
@@ -946,9 +938,7 @@ export function createCreateRoleDialogFactory(
 
         await utils.role.getAllWithStats.invalidate();
 
-        toast.success(
-          `Role "${newRole?.name || "New role"}" created successfully`
-        );
+        toast.success(t.created(newRole?.name));
 
         resetForm();
         onSuccess?.(newRole);
@@ -961,9 +951,9 @@ export function createCreateRoleDialogFactory(
           errorMessage.includes("duplicate") ||
           errorMessage.includes("unique")
         ) {
-          toast.error("A role with this name already exists");
+          toast.error(t.errorDuplicate);
         } else {
-          toast.error("Failed to create role. Please try again.");
+          toast.error(t.errorGeneric);
         }
       } finally {
         setIsSubmitting(false);
@@ -976,10 +966,10 @@ export function createCreateRoleDialogFactory(
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShieldIconLarge />
-              Create New Role
+              {t.title}
             </DialogTitle>
             <DialogDescription>
-              Create a new role to organize user permissions and access levels.
+              {t.description}
             </DialogDescription>
           </DialogHeader>
 
@@ -1004,7 +994,7 @@ export function createCreateRoleDialogFactory(
                 >
                   1
                 </div>
-                <span>Basic Information</span>
+                <span>{t.stepBasic}</span>
               </div>
               <div className="flex-1 mx-4">
                 <div className="h-[2px] bg-muted relative">
@@ -1034,7 +1024,7 @@ export function createCreateRoleDialogFactory(
                 >
                   2
                 </div>
-                <span>Review & Create</span>
+                <span>{t.stepReview}</span>
               </div>
             </div>
           </div>
@@ -1044,10 +1034,10 @@ export function createCreateRoleDialogFactory(
               <>
                 {/* Role Name */}
                 <div className="space-y-2">
-                  <Label htmlFor="name">Role Name *</Label>
+                  <Label htmlFor="name">{t.nameLabel}</Label>
                   <Input
                     id="name"
-                    placeholder="e.g., Content Manager, Support Agent"
+                    placeholder={t.namePlaceholder}
                     value={formData.name}
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, name: e.target.value }))
@@ -1061,10 +1051,10 @@ export function createCreateRoleDialogFactory(
 
                 {/* Description */}
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">{t.descriptionLabel}</Label>
                   <Textarea
                     id="description"
-                    placeholder="Describe the role's purpose and responsibilities..."
+                    placeholder={t.descriptionPlaceholder}
                     rows={3}
                     value={formData.description}
                     onChange={(e) =>
@@ -1085,9 +1075,9 @@ export function createCreateRoleDialogFactory(
                 {/* Active Status */}
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="isActive">Active Status</Label>
+                    <Label htmlFor="isActive">{t.activeLabel}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Active roles can be assigned to users
+                      {t.activeHint}
                     </p>
                   </div>
                   <Switch
@@ -1105,29 +1095,29 @@ export function createCreateRoleDialogFactory(
             {currentStep === 2 && (
               <div className="space-y-4">
                 <div className="rounded-lg border p-4 space-y-2">
-                  <h4 className="font-medium">Review Role Details</h4>
+                  <h4 className="font-medium">{t.reviewTitle}</h4>
                   <div className="space-y-1 text-sm">
                     <p>
-                      <span className="text-muted-foreground">Name:</span>{" "}
+                      <span className="text-muted-foreground">{t.reviewName}</span>{" "}
                       {formData.name}
                     </p>
                     <p>
-                      <span className="text-muted-foreground">Description:</span>{" "}
-                      {formData.description || "No description provided"}
+                      <span className="text-muted-foreground">{t.reviewDescription}</span>{" "}
+                      {formData.description || t.noDescription}
                     </p>
                     <p>
-                      <span className="text-muted-foreground">Status:</span>{" "}
-                      {formData.isActive ? "Active" : "Inactive"}
+                      <span className="text-muted-foreground">{t.reviewStatus}</span>{" "}
+                      {formData.isActive ? labels.common.active : labels.common.inactive}
                     </p>
                   </div>
                 </div>
 
                 <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
-                  <p className="font-medium mb-2">Next Steps After Creation:</p>
+                  <p className="font-medium mb-2">{t.nextStepsTitle}</p>
                   <ul className="space-y-1 ml-4 list-disc">
-                    <li>Assign permissions to define what this role can do</li>
-                    <li>Add users to this role to grant them access</li>
-                    <li>Configure role-specific settings as needed</li>
+                    {t.nextSteps.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -1143,10 +1133,10 @@ export function createCreateRoleDialogFactory(
                   onClick={handleClose}
                   disabled={isSubmitting}
                 >
-                  Cancel
+                  {labels.common.cancel}
                 </Button>
                 <Button type="button" onClick={handleNext} disabled={isSubmitting}>
-                  Next
+                  {labels.common.next}
                   <ChevronRightIcon />
                 </Button>
               </>
@@ -1159,7 +1149,7 @@ export function createCreateRoleDialogFactory(
                   disabled={isSubmitting}
                 >
                   <ChevronLeftIcon />
-                  Back
+                  {labels.common.back}
                 </Button>
                 <Button
                   type="button"
@@ -1167,7 +1157,7 @@ export function createCreateRoleDialogFactory(
                   disabled={isSubmitting}
                 >
                   {isSubmitting && <LoaderIcon className="mr-2" />}
-                  Create Role
+                  {t.submit}
                 </Button>
               </>
             )}
