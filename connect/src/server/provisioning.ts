@@ -414,12 +414,25 @@ export class InvitesClient {
     return Array.isArray(r.invites) ? r.invites : []
   }
 
-  resend(id: number): Promise<{ id: number; status: ConnectInviteStatus; expiresAt: string; emailSent: boolean }> {
-    return this.call('POST', `/api/internal/invites/${encodeURIComponent(String(id))}/resend`, {})
+  /**
+   * POST /api/internal/invites/:id/resend — body `{ sourceOrgRef }` (required).
+   * Connect only resends when the invite belongs to that org; anything else
+   * is `not_found` (404).
+   */
+  resend(
+    id: number,
+    sourceOrgRef: string,
+  ): Promise<{ id: number; status: ConnectInviteStatus; expiresAt: string; emailSent: boolean }> {
+    return this.call('POST', `/api/internal/invites/${encodeURIComponent(String(id))}/resend`, { sourceOrgRef })
   }
 
-  cancel(id: number): Promise<{ id: number; status: ConnectInviteStatus }> {
-    return this.call('POST', `/api/internal/invites/${encodeURIComponent(String(id))}/cancel`, {})
+  /**
+   * POST /api/internal/invites/:id/cancel — body `{ sourceOrgRef }` (required).
+   * Connect only cancels when the invite belongs to that org; anything else
+   * is `not_found` (404).
+   */
+  cancel(id: number, sourceOrgRef: string): Promise<{ id: number; status: ConnectInviteStatus }> {
+    return this.call('POST', `/api/internal/invites/${encodeURIComponent(String(id))}/cancel`, { sourceOrgRef })
   }
 
   cancelByEmail(args: { sourceOrgRef: string; email: string }): Promise<{ cancelled: number }> {

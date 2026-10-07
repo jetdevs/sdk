@@ -54,12 +54,14 @@ export interface InviteStore {
   cancel(db: InviteDb, id: number, now: Date): Promise<OrgInvite | null>;
   listByOrg(db: InviteDb, orgId: number, caller: InviteCaller): Promise<OrgInvite[]>;
   /**
-   * The P13 guard: `UPDATE … WHERE id AND token_hash AND status='pending' AND
-   * expires_at > now`. Null = 0 rows = nothing written.
+   * The P13 guard: `UPDATE … WHERE id AND token_hash AND email AND
+   * status='pending' AND expires_at > now`. `email` is the acceptor's
+   * normalised email — the invite is bound to the address it was sent to.
+   * Null = 0 rows = nothing written.
    */
   acceptConditional(
     db: InviteDb,
-    input: { id: number; tokenHash: string; userId: number; now: Date },
+    input: { id: number; tokenHash: string; userId: number; email: string; now: Date },
   ): Promise<OrgInvite | null>;
 }
 
@@ -147,7 +149,7 @@ export function createDrizzleInviteStore(): InviteStore {
           .orderBy(asc(orgInvites.id)),
       );
     },
-    async acceptConditional(db, { id, tokenHash, userId, now }) {
+    async acceptConditional(db, { id, tokenHash, userId, email, now }) {
       return first(
         cast(
           await db
@@ -157,6 +159,7 @@ export function createDrizzleInviteStore(): InviteStore {
               and(
                 eq(orgInvites.id, id),
                 eq(orgInvites.tokenHash, tokenHash),
+                eq(orgInvites.email, email),
                 eq(orgInvites.status, 'pending'),
                 gt(orgInvites.expiresAt, sql`now()`),
               ),

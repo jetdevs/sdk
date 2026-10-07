@@ -44,8 +44,8 @@ describe('InvitesClient', () => {
     const c = new InvitesClient({ baseUrl: 'https://connect.test/', internalApiKey: 'k-123', fetchImpl: impl })
     await c.create(ARGS)
     await c.list('org 42')
-    await c.resend(5)
-    await c.cancel(5)
+    await c.resend(5, '42')
+    await c.cancel(5, '42')
     await c.cancelByEmail({ sourceOrgRef: '42', email: 'ana@example.com' })
     expect(calls.map((x) => `${x.method} ${x.url}`)).toEqual([
       'POST https://connect.test/api/internal/invites',
@@ -55,6 +55,14 @@ describe('InvitesClient', () => {
       'POST https://connect.test/api/internal/invites/cancel-by-email',
     ])
     for (const call of calls) expect(call.headers['X-Internal-API-Key']).toBe('k-123')
+  })
+
+  it('resend/cancel send { sourceOrgRef } as the body (org scope)', async () => {
+    const { calls, impl } = fakeFetch({ status: 200, body: { id: 5 } })
+    const c = new InvitesClient({ baseUrl: 'https://connect.test', internalApiKey: 'k', fetchImpl: impl })
+    await c.resend(5, 'org-42')
+    await c.cancel(5, 'org-42')
+    expect(calls.map((x) => JSON.parse(x.body!))).toEqual([{ sourceOrgRef: 'org-42' }, { sourceOrgRef: 'org-42' }])
   })
 
   it('never sends a password — a stray password on the args is dropped (I1)', async () => {
@@ -78,7 +86,7 @@ describe('InvitesClient', () => {
   it('non-2xx throws ConnectInvitesError with the route code', async () => {
     const { impl } = fakeFetch({ status: 404, body: { error: 'not_found' } })
     const c = new InvitesClient({ baseUrl: 'https://connect.test', internalApiKey: 'k', fetchImpl: impl })
-    await expect(c.cancel(9)).rejects.toMatchObject({ name: 'ConnectInvitesError', status: 404, code: 'not_found' })
+    await expect(c.cancel(9, '42')).rejects.toMatchObject({ name: 'ConnectInvitesError', status: 404, code: 'not_found' })
   })
 
   it('network failure throws unreachable', async () => {

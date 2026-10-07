@@ -73,13 +73,24 @@ describe.skipIf(!admin)('p131 invites — real local Postgres', () => {
     const c2 = (await openLocalTestDb({ searchPath: SCHEMA }))!;
     extra.push(c1, c2);
     const out = await Promise.allSettled([
-      svc.accept(c1.db as unknown as InviteDb, { inviteId: r.invite.id, token: r.token, userId: 1 }),
-      svc.cancel(c2.db as unknown as InviteDb, CALLER, r.invite.id),
+      svc.accept(c1.db as unknown as InviteDb, { inviteId: r.invite.id, token: r.token, userId: 1, email: 'race@x.io' }),
+      svc.cancel(c2.db as unknown as InviteDb, CALLER, r.invite.id, 'org-1'),
     ]);
     expect(out.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
     const again = await Promise.allSettled([
-      svc.accept(c1.db as unknown as InviteDb, { inviteId: r.invite.id, token: r.token, userId: 2 }),
+      svc.accept(c1.db as unknown as InviteDb, { inviteId: r.invite.id, token: r.token, userId: 2, email: 'race@x.io' }),
     ]);
     expect(again[0]!.status).toBe('rejected');
+  });
+
+  it('P1-A: accept WHERE binds the invited email — wrong email is 0 rows, invite stays pending; case-insensitive match accepts', async () => {
+    const db = h.db as unknown as InviteDb;
+    const r = await svc.create(db, CALLER, { ...input, email: 'bound@x.io' });
+    await expect(svc.accept(db, { inviteId: r.invite.id, token: r.token, userId: 3, email: 'other@x.io' })).rejects.toMatchObject({
+      reason: 'not_acceptable',
+    });
+    expect(await count(`org_invites where id = ${r.invite.id} and status = 'pending' and accepted_user_id is null`)).toBe(1);
+    const ok = await svc.accept(db, { inviteId: r.invite.id, token: r.token, userId: 3, email: ' BOUND@X.io ' });
+    expect(ok.status).toBe('accepted');
   });
 });
