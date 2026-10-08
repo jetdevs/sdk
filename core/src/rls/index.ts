@@ -112,6 +112,8 @@ export {
   // Configuration SQL
   RLS_CONTEXT_FUNCTIONS,
   RLS_ROLES_SQL,
+  getRlsRolesSql,
+  APP_USER_PASSWORD_ENV,
   RLS_FUNCTION_PERMISSIONS,
   RLS_TABLE_PERMISSIONS,
 } from './policies';
