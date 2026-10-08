@@ -30,6 +30,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS access_codes_code_upper_idx ON access_codes (u
 CREATE UNIQUE INDEX IF NOT EXISTS access_codes_personal_owner_idx ON access_codes (owner_user_id, app) WHERE kind = 'personal';
 CREATE INDEX IF NOT EXISTS access_codes_app_idx ON access_codes (app);
 CREATE INDEX IF NOT EXISTS access_codes_bound_email_idx ON access_codes (lower(bound_email)) WHERE bound_email IS NOT NULL;
+-- YMS-474: external owner ref (an owner with no Connect user). ALTER, not the
+-- CREATE above, so a DB created before this column gets it too.
+ALTER TABLE access_codes ADD COLUMN IF NOT EXISTS owner_ref varchar(128);
+CREATE UNIQUE INDEX IF NOT EXISTS access_codes_personal_owner_ref_idx ON access_codes (app, owner_ref) WHERE kind = 'personal' AND owner_ref IS NOT NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'access_codes_personal_owner_chk' AND conrelid = 'access_codes'::regclass) THEN
+    ALTER TABLE access_codes ADD CONSTRAINT access_codes_personal_owner_chk
+      CHECK (owner_ref IS NULL OR (kind = 'personal' AND owner_user_id IS NULL));
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS access_redemptions (
   id serial PRIMARY KEY,

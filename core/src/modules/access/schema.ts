@@ -32,6 +32,13 @@ export const accessCodes = pgTable(
     code: varchar('code', { length: 32 }).notNull(),
     kind: varchar('kind', { length: 16 }).notNull(),
     ownerUserId: integer('owner_user_id').references(() => users.id, { onDelete: 'cascade' }),
+    /**
+     * External owner of a personal code when the owner has no Connect user
+     * (YMS-474), e.g. `yobo:user:526`. Only on a personal code, and never
+     * beside owner_user_id (access_codes_personal_owner_chk). An admin-made
+     * personal code with neither owner stays legal (createCode allows it).
+     */
+    ownerRef: varchar('owner_ref', { length: 128 }),
     app: varchar('app', { length: 64 }).notNull(),
     maxUses: integer('max_uses'),
     uses: integer('uses').notNull().default(0),
@@ -49,6 +56,9 @@ export const accessCodes = pgTable(
     uniqueIndex('access_codes_personal_owner_idx')
       .on(t.ownerUserId, t.app)
       .where(sql`kind = 'personal'`),
+    uniqueIndex('access_codes_personal_owner_ref_idx')
+      .on(t.app, t.ownerRef)
+      .where(sql`kind = 'personal' AND owner_ref IS NOT NULL`),
     index('access_codes_app_idx').on(t.app),
     index('access_codes_bound_email_idx')
       .on(sql`lower(${t.boundEmail})`)
@@ -57,6 +67,10 @@ export const accessCodes = pgTable(
     check('access_codes_status_chk', sql`status IN ('active','revoked')`),
     check('access_codes_uses_chk', sql`uses >= 0`),
     check('access_codes_max_uses_chk', sql`max_uses IS NULL OR max_uses >= 0`),
+    check(
+      'access_codes_personal_owner_chk',
+      sql`owner_ref IS NULL OR (kind = 'personal' AND owner_user_id IS NULL)`,
+    ),
   ],
 );
 
