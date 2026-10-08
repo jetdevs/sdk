@@ -218,6 +218,38 @@ describe.skipIf(!admin)('p107 access module — real local Postgres', () => {
     ).rejects.toMatchObject({ code: '23505' });
   });
 
+  it('personal code for an external ref (YMS-474): idempotent, capped, redeemable; one owner kind only', async () => {
+    const ref = 'yobo:user:526';
+    const p = await svc.getOrIssuePersonalCodeForRef(h.db, ref);
+    expect(p).toMatchObject({ kind: 'personal', ownerUserId: null, ownerRef: ref, maxUses: 10, createdBy: null });
+    expect((await svc.getOrIssuePersonalCodeForRef(h.db, ref)).id).toBe(p.id);
+    // A concurrent first issue still yields ONE code.
+    const ref2 = 'yobo:user:527';
+    const [a, b] = await Promise.all([
+      svc.getOrIssuePersonalCodeForRef((await open()).db, ref2),
+      svc.getOrIssuePersonalCodeForRef((await open()).db, ref2),
+    ]);
+    expect(a.id).toBe(b.id);
+    // Same ref, other app: a separate code.
+    const other = await createAccessService({ app: 'other' }).getOrIssuePersonalCodeForRef(h.db, ref);
+    expect(other.id).not.toBe(p.id);
+    // Redeem/validate by code unchanged.
+    await h.db.transaction((tx) => svc.redeem(tx, { codeId: p.id, userId: user(), source: 'typed' }));
+    expect(await svc.validate(h.db, { code: p.code })).toMatchObject({ ok: true });
+    // DB guards: a second personal code for the same ref; both owners; a ref on a campaign code.
+    await expect(
+      h.client.unsafe(`insert into access_codes (code, kind, app, owner_ref) values ('REFDUP01', 'personal', 'cadra', '${ref}')`),
+    ).rejects.toMatchObject({ code: '23505' });
+    await expect(
+      h.client.unsafe(`insert into access_codes (code, kind, app, owner_ref, owner_user_id) values ('REFBOTH1', 'personal', 'cadra', 'yobo:user:9', 1)`),
+    ).rejects.toMatchObject({ code: '23514' });
+    // An ownerless personal code (admin createCode) stays legal.
+    await h.client.unsafe(`insert into access_codes (code, kind, app) values ('REFNONE1', 'personal', 'cadra')`);
+    await expect(
+      h.client.unsafe(`insert into access_codes (code, kind, app, owner_ref) values ('REFCAMP1', 'campaign', 'cadra', 'yobo:user:9')`),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
   it('personal code: issued once at the default cap; 10 redeems OK, 11th exhausted; raised cap admits it', async () => {
     const owner = user();
     const p = await svc.getOrIssuePersonalCode(h.db, owner);

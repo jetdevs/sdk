@@ -7,7 +7,15 @@
 import { describe, expect, it } from 'vitest';
 
 import { CODE_ALPHABET, CODE_RE, generateCode, isValidCodeFormat, normalizeCode } from './codes';
-import { createAccessService, decideAccess, evaluateCode, hashAccessToken, type AccessDb } from './service';
+import {
+  AccessOwnerRefFormatError,
+  createAccessService,
+  decideAccess,
+  evaluateCode,
+  hashAccessToken,
+  isValidOwnerRef,
+  type AccessDb,
+} from './service';
 import type { AccessCode, ValidateResult } from './types';
 
 const NOW = new Date('2026-10-02T12:00:00Z');
@@ -18,6 +26,7 @@ function code(over: Partial<AccessCode> = {}): AccessCode {
     code: 'ABCD2345',
     kind: 'campaign',
     ownerUserId: null,
+    ownerRef: null,
     app: 'cadra',
     maxUses: null,
     uses: 0,
@@ -194,5 +203,36 @@ describe('decide (stub db)', () => {
       mode: 'off',
       via: 'off',
     });
+  });
+});
+
+describe('owner ref (YMS-474)', () => {
+  it('accepts <system>:<path> lower-case refs', () => {
+    for (const r of ['yobo:user:526', 'yobo:user:1', 'ya:x', 'cadra-x_1:chat:wa:abc_9-z']) expect(isValidOwnerRef(r)).toBe(true);
+  });
+  it('rejects junk, phones, emails, upper case, empty halves and over-long refs', () => {
+    for (const r of [
+      '',
+      'yobo',
+      'yobo:',
+      ':user:1',
+      'Yobo:user:1',
+      'yobo:User:1',
+      '1yobo:user:1',
+      'yobo:+6281234',
+      'yobo:a@b.com',
+      'yobo:user 1',
+      'y:user:1',
+      `yobo:${'a'.repeat(91)}`,
+      `${'a'.repeat(33)}:user:1`,
+      42,
+      null,
+    ]) expect(isValidOwnerRef(r)).toBe(false);
+    expect(isValidOwnerRef(`yobo:${'a'.repeat(90)}`)).toBe(true);
+  });
+  it('getOrIssuePersonalCodeForRef refuses a bad ref before touching the db', async () => {
+    const svc = createAccessService({ app: 'yobo' });
+    const db = new Proxy({}, { get: () => { throw new Error('db touched'); } }) as unknown as AccessDb;
+    await expect(svc.getOrIssuePersonalCodeForRef(db, 'yobo:+6281234')).rejects.toBeInstanceOf(AccessOwnerRefFormatError);
   });
 });

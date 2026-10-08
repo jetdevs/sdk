@@ -45,6 +45,8 @@ export interface AccessCode {
   code: string;
   kind: AccessCodeKind;
   ownerUserId: number | null;
+  /** External owner (YMS-474), e.g. `yobo:user:526`; set only on a personal code with no owner user. */
+  ownerRef: string | null;
   app: string;
   maxUses: number | null;
   uses: number;

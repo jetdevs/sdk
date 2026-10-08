@@ -75,6 +75,14 @@ export class AccessCodeFormatError extends AccessError {
   }
 }
 
+/** An owner ref that does not match OWNER_REF_RE (the ref is not echoed: it may be caller junk). */
+export class AccessOwnerRefFormatError extends AccessError {
+  constructor(_ref: string) {
+    super('invalid_owner_ref', 'owner ref does not match OWNER_REF_RE');
+    this.name = 'AccessOwnerRefFormatError';
+  }
+}
+
 /** A waitlist transition was asked from a state that does not allow it (or the entry is gone). */
 export class WaitlistStateError extends AccessError {
   constructor(
@@ -191,6 +199,16 @@ function toEntry(r: WaitlistRow): WaitlistEntry {
     state: r.state as WaitlistState,
     resendHistory: r.resendHistory ?? [],
   };
+}
+
+/**
+ * External owner ref shape (YMS-474): `<system>:<id path>`, lower-case, e.g.
+ * `yobo:user:526`. Never a raw phone or email (no `@`, no `+`).
+ */
+export const OWNER_REF_RE = /^[a-z][a-z0-9_-]{1,31}:[a-z0-9_:-]{1,90}$/;
+
+export function isValidOwnerRef(ref: unknown): ref is string {
+  return typeof ref === 'string' && OWNER_REF_RE.test(ref);
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -415,6 +433,45 @@ export function createAccessService(options: CreateAccessServiceOptions) {
       if (row) return row;
     }
     throw new Error(`getOrIssuePersonalCode: could not issue a code for user ${userId}`);
+  }
+
+  /**
+   * The personal code owned by an EXTERNAL reference (YMS-474) — an owner with
+   * no Connect user, e.g. a WhatsApp-only Yobo user `yobo:user:526`. Same
+   * idempotent find-or-insert and cap as `getOrIssuePersonalCode`; the ref is
+   * shape-checked (`OWNER_REF_RE`) and stored verbatim. Redeem/check are
+   * unchanged (lookup by code).
+   */
+  async function getOrIssuePersonalCodeForRef(db: AccessDb, ownerRef: string): Promise<AccessCode> {
+    if (!isValidOwnerRef(ownerRef)) throw new AccessOwnerRefFormatError(ownerRef);
+    const find = async () => {
+      const rows = await db
+        .select()
+        .from(accessCodes)
+        .where(and(eq(accessCodes.app, app), eq(accessCodes.kind, 'personal'), eq(accessCodes.ownerRef, ownerRef)))
+        .limit(1);
+      return rows[0] ? toCode(rows[0]) : null;
+    };
+    const existing = await find();
+    if (existing) return existing;
+    const { personalCodeDefaultCap } = await getAppSettings(db);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await db
+        .insert(accessCodes)
+        .values({
+          code: generateCode(codeLength),
+          kind: 'personal',
+          ownerRef,
+          app,
+          maxUses: personalCodeDefaultCap,
+          grantsAccess: true,
+          createdBy: null,
+        })
+        .onConflictDoNothing();
+      const row = await find();
+      if (row) return row;
+    }
+    throw new Error('getOrIssuePersonalCodeForRef: could not issue a code for the ref');
   }
 
   async function validate(
@@ -729,6 +786,7 @@ export function createAccessService(options: CreateAccessServiceOptions) {
     setCodeMaxUses,
     listCodes,
     getOrIssuePersonalCode,
+    getOrIssuePersonalCodeForRef,
     validate,
     findBoundInvite,
     // gate
