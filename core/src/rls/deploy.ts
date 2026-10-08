@@ -205,7 +205,12 @@ export async function ensureRlsRoles(
     } catch (error) {
       let errorMessage = error instanceof Error ? error.message : 'Unknown error';
       // Drivers may echo the failed query; never print the password
-      if (appUserPassword) errorMessage = errorMessage.split(appUserPassword).join('***');
+      if (appUserPassword) {
+        // The SQL holds the quote-doubled form, so mask that before the raw one
+        for (const form of [appUserPassword.replace(/'/g, "''"), appUserPassword]) {
+          errorMessage = errorMessage.split(form).join('***');
+        }
+      }
       console.error(`  Failed to create roles: ${errorMessage}`);
       // Continue anyway as roles might already exist
     }

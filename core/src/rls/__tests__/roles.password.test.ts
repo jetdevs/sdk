@@ -60,8 +60,8 @@ describe('ensureRlsRoles', () => {
     vi.spyOn(console, 'error').mockImplementation((msg: string) => { errors.push(msg); });
     await ensureRlsRoles(async (sql) => {
       if (sql.includes('CREATE ROLE')) throw new Error(`Failed query: ${sql}`);
-    }, { appUserPassword: 'top-secret' });
+    }, { appUserPassword: "top'secret" });
     expect(errors.join('\n')).toContain('Failed to create roles');
-    expect(errors.join('\n')).not.toContain('top-secret');
+    expect(errors.join('\n')).not.toContain('secret');
   });
 });
