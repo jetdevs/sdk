@@ -29,10 +29,7 @@ export const ALLOWLIST: AllowEntry[] = [
   { kind: 'writer', file: 'core/src/modules/users/repository.ts', contains: 'async updatePassword(db: PostgresJsDatabase<any>, userId: number, hashedPassword: string)', role: 'sdk-seam', why: 'the repository write — called only on the seam transaction' },
   { kind: 'set-block', file: 'core/src/modules/users/repository.ts', contains: '.set({', role: 'sdk-seam', why: 'its UPDATE (multi-line .set)' },
   { kind: 'writer', file: 'core/src/modules/users/repository.ts', contains: 'password: hashedPassword,', role: 'sdk-seam', why: 'its UPDATE' },
-  { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'const hashedPassword = input.password', role: 'sdk-seam', why: `users create / invite — ${SEAM}` },
-  { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: '? await deps.hashPassword(input.password, 10)', role: 'sdk-seam', why: 'their hashes' },
-  { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'password: hashedPassword,', role: 'sdk-seam', why: 'their inserts' },
-  { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'if (hashedPassword) {', role: 'sdk-seam', why: 'the credential-written announcement' },
+  // users create / invite: no hash, no insert of a verifier, no announcement — invite-only (YMS-494 S6).
   { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'finalUpdateData.password = await deps.hashPassword(password, 10);', role: 'sdk-seam', why: `users update with a password — ${SEAM}` },
   { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'const hashedPassword = await deps.hashPassword(input.newPassword, 10);', role: 'sdk-seam', why: `users changePassword — ${SEAM}` },
   { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'await repo.updatePassword(tx, userId, hashedPassword);', role: 'sdk-seam', why: 'its write, on the seam tx' },

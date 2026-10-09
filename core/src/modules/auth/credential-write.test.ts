@@ -361,20 +361,15 @@ async function ownedId(env: WriterEnv): Promise<number> {
  * static allowlist (part 3) maps every call site to.
  */
 const WRITERS: Record<string, (env: WriterEnv) => Promise<unknown>> = {
-  'users.router.create': async (env) => {
-    const Repo = makeUsersRouterRepo(env);
-    const cfg: any = createUserRouterConfig({ Repository: Repo as any, hashPassword: env.hashPassword, comparePassword: env.comparePassword, credentialWriteGate: env.gate });
-    return cfg.create.handler({ input: { email: 'created@example.test', password: NEW }, service: { db: env.db, orgId: 1, userId: '1' }, actor: {}, db: env.db, repo: new Repo(env.db), ctx: {} });
-  },
-  'users.router.invite': async (env) => {
-    const Repo = makeUsersRouterRepo(env);
-    const cfg: any = createUserRouterConfig({ Repository: Repo as any, hashPassword: env.hashPassword, comparePassword: env.comparePassword, credentialWriteGate: env.gate });
-    return cfg.invite.handler({ input: { email: 'invited@example.test', password: NEW, roleId: 3 }, service: { db: env.db, orgId: 1, userId: '1' }, actor: {}, db: env.db, repo: new Repo(env.db), ctx: {} });
-  },
+  // users.router.create / users.router.invite are no longer credential
+  // writers: invite-only (YMS-494 S6) — they refuse any password and store no
+  // verifier, so they are not in this list or the static allowlist.
   'users.router.update': async (env) => {
     const Repo = makeUsersRouterRepo(env);
     const cfg: any = createUserRouterConfig({ Repository: Repo as any, hashPassword: env.hashPassword, comparePassword: env.comparePassword, credentialWriteGate: env.gate });
-    return cfg.update.handler({ input: { id: await ownedId(env), password: NEW }, service: { db: env.db, orgId: 1, userId: '1' }, actor: {}, db: env.db, repo: new Repo(env.db), ctx: {} });
+    // Own password only (YMS-494 S6): the caller IS the owned user.
+    const id = await ownedId(env);
+    return cfg.update.handler({ input: { id, password: NEW }, service: { db: env.db, orgId: 1, userId: String(id) }, actor: {}, db: env.db, repo: new Repo(env.db), ctx: {} });
   },
   'users.router.changePassword': async (env) => {
     const Repo = makeUsersRouterRepo(env);
@@ -499,8 +494,6 @@ describe.skipIf(!handle)('every SDK writer goes through the seam — real local 
 
   it('each writer names its own operation to the gate', async () => {
     const expected: Record<string, string> = {
-      'users.router.create': 'create',
-      'users.router.invite': 'invite',
       'users.router.update': 'update',
       'users.router.changePassword': 'change-password',
       'users.service.invite': 'invite',
@@ -537,8 +530,6 @@ const ALLOWLIST: Array<{ file: string; line: string; writer: string }> = [
   { file: 'modules/password-reset/service.ts', line: 'const hashedPassword = await hashPassword(password);', writer: 'password-reset.consume' },
   { file: 'modules/users/repository.ts', line: 'updatePassword(db: any, userId: number, hashedPassword: string): Promise<UserWithRoles | null>;', writer: 'definition' },
   { file: 'modules/users/repository.ts', line: 'async updatePassword(db: PostgresJsDatabase<any>, userId: number, hashedPassword: string): Promise<UserWithRoles | null> {', writer: 'definition' },
-  { file: 'modules/users/router-config.ts', line: '? await deps.hashPassword(input.password, 10)', writer: 'users.router.invite' },
-  { file: 'modules/users/router-config.ts', line: '? await deps.hashPassword(input.password, 10)', writer: 'users.router.create' },
   { file: 'modules/users/router-config.ts', line: 'finalUpdateData.password = await deps.hashPassword(password, 10);', writer: 'users.router.update' },
   { file: 'modules/users/router-config.ts', line: 'const hashedPassword = await deps.hashPassword(input.newPassword, 10);', writer: 'users.router.changePassword' },
   { file: 'modules/users/router-config.ts', line: 'await repo.updatePassword(tx, userId, hashedPassword);', writer: 'users.router.changePassword' },

@@ -46,6 +46,8 @@ import {
     userCreateSchema,
     userFiltersSchema,
     userUpdateSchema,
+    ADMIN_SET_PASSWORD_REFUSED,
+    carriesPassword,
 } from './schemas';
 
 // =============================================================================
@@ -88,8 +90,8 @@ export interface UserRouterDeps {
 
   /**
    * Optional resolver consulted before any procedure here writes a local
-   * verifier — `invite` and `create` (a new user), `update` (a password on an
-   * existing user) and `changePassword`. It answers WHERE the credential
+   * verifier — `invite` and `create` (a new user, no password), `update` (a
+   * password on the caller's own user) and `changePassword`. It answers WHERE the credential
    * lives; the SDK has no opinion of its own. Per kind:
    *
    * - `local`: write.
@@ -116,8 +118,9 @@ export interface UserRouterDeps {
 
   /**
    * Optional hook fired ONCE after a procedure here has successfully stored a
-   * local verifier — `invite` and `create` when the input CARRIED a password
-   * (`firstSet: true`), `update` with a password, and `changePassword`. It is
+   * local verifier — `update` with a password (the caller's OWN user only,
+   * YMS-494 S6) and `changePassword`. `invite`/`create` never write one: they
+   * refuse any password with BAD_REQUEST (invite-only). It is
    * never fired on a refusal (`external` → redirect, `frozen` → FORBIDDEN,
    * `none` → NOT_FOUND), on a wrong current password, on an invite that only
    * added an existing user to an org, or on an invite/create with no password:
@@ -463,6 +466,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       entityType: 'user',
       repository: deps.Repository,
       handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userCreateSchema>>) => {
+        // Invite-only (YMS-494 S6): nobody hands another person a password.
+        // The schema already refuses one; this holds for direct handler calls.
+        if (carriesPassword(input)) {
+          throw new UserRouterError('BAD_REQUEST', ADMIN_SET_PASSWORD_REFUSED);
+        }
         if (namesForeignOrg(input.orgId, actor)) {
           throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
         }
@@ -578,10 +586,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         // p77 seam: allocating a user goes through the gate, and the hash,
         // the insert, the role and the announcement share one bounded tx.
         const newUser = await withCredentialWrite(deps, { operation: 'invite', db }, async (tx) => {
-          const hashedPassword = input.password
-            ? await deps.hashPassword(input.password, 10)
-            : undefined;
-
+          // No verifier: the invitee sets their own password.
           const created = await repo.create(tx, {
             name: derivedName,
             firstName: input.firstName,
@@ -589,7 +594,6 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             email: input.email,
             phone: input.phone,
             username: input.username,
-            password: hashedPassword,
             isActive: input.isActive,
             currentOrgId: service.orgId,
           });
@@ -603,17 +607,6 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             });
           }
 
-          // Only an invite that CARRIED a password stored a verifier.
-          if (hashedPassword) {
-            await announceCredentialWritten(deps.onCredentialWritten, {
-              db: tx,
-              userId: created.id,
-              operation: 'invite',
-              actorUserId: parseInt(service.userId),
-              firstSet: true,
-              at: new Date(),
-            });
-          }
           return created;
         });
 
@@ -634,6 +627,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       entityType: 'user',
       repository: deps.Repository,
       handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userCreateSchema>>) => {
+        // Invite-only (YMS-494 S6): nobody hands another person a password.
+        // The schema already refuses one; this holds for direct handler calls.
+        if (carriesPassword(input)) {
+          throw new UserRouterError('BAD_REQUEST', ADMIN_SET_PASSWORD_REFUSED);
+        }
         if (namesForeignOrg(input.orgId, actor)) {
           throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
         }
@@ -670,10 +668,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         // p77 seam: gate, then hash + insert + announcement + role in one
         // bounded transaction.
         return withCredentialWrite(deps, { operation: 'create', db }, async (tx) => {
-          const hashedPassword = input.password
-            ? await deps.hashPassword(input.password, 10)
-            : undefined;
-
+          // No verifier: the new user sets their own password.
           const newUser = await repo.create(tx, {
             name: derivedName,
             firstName: input.firstName,
@@ -681,22 +676,9 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             email: input.email,
             phone: input.phone,
             username: input.username,
-            password: hashedPassword,
             isActive: input.isActive,
             currentOrgId: input.orgId,
           });
-
-          // Only a create that CARRIED a password stored a verifier.
-          if (hashedPassword) {
-            await announceCredentialWritten(deps.onCredentialWritten, {
-              db: tx,
-              userId: newUser.id,
-              operation: 'create',
-              actorUserId: parseInt(service.userId),
-              firstSet: true,
-              at: new Date(),
-            });
-          }
 
           // Assign role if provided
           if (input.roleId && input.orgId) {
@@ -723,6 +705,14 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       entityType: 'user',
       repository: deps.Repository,
       handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userUpdateSchema>>) => {
+        // Invite-only (YMS-494 S6): a password is only ever set by its owner.
+        // Nobody — org admin or platform system user — sets ANOTHER user's
+        // password here; that person uses their invitation / reset link.
+        // Checked first: no lookup happens for a refused request.
+        if (input.password && input.id !== parseInt(service.userId)) {
+          throw new UserRouterError('FORBIDDEN', ADMIN_SET_PASSWORD_REFUSED);
+        }
+
         // This route checks no permission in the router, so a user can edit
         // its own profile. Editing someone else needs `user:update`, and the
         // target must belong to the caller's org.
@@ -736,22 +726,8 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
           }
         }
 
-        // DEBUG: Log incoming input to trace password flow
-        console.log('[SDK User Update] Input received:', JSON.stringify({
-          id: input.id,
-          hasPassword: !!input.password,
-          passwordLength: input.password?.length,
-          allKeys: Object.keys(input),
-        }));
-
         const { id, password, ...updateData } = input;
 
-        // DEBUG: Log after destructuring
-        console.log('[SDK User Update] After destructuring:', JSON.stringify({
-          hasPassword: !!password,
-          passwordLength: password?.length,
-          updateDataKeys: Object.keys(updateData),
-        }));
 
         // Verify user exists
         const existing = await repo.findById(db, id);
