@@ -45,6 +45,7 @@ export const ALLOWLIST: AllowEntry[] = [
   { kind: 'writer', file: 'core/src/modules/users/service.ts', contains: 'const hashedPassword = await hooks.hashPassword(newPassword, 12);', role: 'sdk-seam', why: `service changePassword — ${SEAM}` },
   { kind: 'writer', file: 'core/src/modules/users/service.ts', contains: 'const result = await getRepo(tx).updatePassword(tx, userId, hashedPassword);', role: 'sdk-seam', why: 'its write, on the seam tx' },
   { kind: 'writer', file: 'core/src/modules/users/service.ts', contains: "'Example: createUserService({ hooks: { hashPassword: (p) => bcrypt.hash(p, 12)", role: 'non-credential', why: 'an error-message example string' },
+  { kind: 'writer', file: 'core/src/modules/users/user-output.ts', contains: "const SECRET_USER_KEYS = new Set(['password', 'passwordHash', 'hashedPassword']);", role: 'non-credential', why: 'the output-strip denylist (CAD-443): names the keys removed from responses, writes nothing' },
   { kind: 'writer', file: 'connect/src/server/provisioning.ts', contains: 'setCredentialAndLoginRole(args: { sub: string; password?: string; orgId?: number }) {', role: 'gated', why: "the provisioning client's credentials/set call — the IdP answers 503 maintenance while the switch is on (STORY-010/f); each app's caller asks the switch first" },
 ];
 
