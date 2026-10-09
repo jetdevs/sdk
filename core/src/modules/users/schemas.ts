@@ -31,6 +31,35 @@ export type UserFiltersInput = z.infer<typeof userFiltersSchema>;
 // CREATE/UPDATE SCHEMAS
 // =============================================================================
 
+/**
+ * Message for a request that tries to hand another person a password.
+ * Invite-only (YMS-494 S6): an admin never sets someone else's password —
+ * the invitee sets their own through the invitation / reset link.
+ */
+export const ADMIN_SET_PASSWORD_REFUSED =
+  'Setting a password for another user is not allowed. Invite them; they set their own password from the invitation.';
+
+/**
+ * True when an input carries a real password value. An empty string or null
+ * is what a form's default state sends and counts as "no password".
+ */
+export function carriesPassword(input: unknown): boolean {
+  if (!input || typeof input !== 'object' || !('password' in input)) return false;
+  const value = (input as { password?: unknown }).password;
+  return value !== undefined && value !== null && value !== '';
+}
+
+/**
+ * `password` on invite/create: absent, null or '' only. Any real value is a
+ * 400, never silently dropped, so a caller that still sends one finds out.
+ */
+const noAdminSetPassword = z
+  .union([z.literal(''), z.null(), z.undefined()], {
+    errorMap: () => ({ message: ADMIN_SET_PASSWORD_REFUSED }),
+  })
+  .optional()
+  .transform(() => undefined);
+
 export const userCreateSchema = z.object({
   name: z.string().min(1).optional(),
   firstName: z.string().optional(),
@@ -38,7 +67,8 @@ export const userCreateSchema = z.object({
   email: z.string().email(),
   phone: z.string().optional(),
   username: z.string().optional(),
-  password: z.string().optional(),
+  // Invite-only: no password from the inviting admin. See noAdminSetPassword.
+  password: noAdminSetPassword,
   isActive: z.boolean().default(true),
   roleId: z.number().optional(),
   orgId: z.number().optional(),
@@ -63,6 +93,8 @@ export const userUpdateSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().optional().nullable(),
   username: z.string().optional().nullable(),
+  // Only accepted when `id` is the caller's own user — the router refuses a
+  // password for anyone else. Self-serve prefers `changePassword`.
   password: z.string().min(8).optional(),
   isActive: z.boolean().optional(),
   avatar: z.string().optional().nullable(),

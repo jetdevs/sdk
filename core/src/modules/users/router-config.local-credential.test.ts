@@ -94,7 +94,7 @@ describe('users router — canWriteLocalCredential', () => {
     const cfg: any = createUserRouterConfig({ Repository: Repo, hashPassword, comparePassword, canWriteLocalCredential: refuse });
 
     await expect(
-      cfg.invite.handler(userCtx({ input: { email: 'new@example.com', password: 'N3w!Passw0rd' } }, Repo)),
+      cfg.invite.handler(userCtx({ input: { email: 'new@example.com' } }, Repo)),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(writes).toHaveLength(0);
     expect(refuse).toHaveBeenCalledWith(expect.objectContaining({ operation: 'invite', user: null, email: 'new@example.com' }));
@@ -105,7 +105,7 @@ describe('users router — canWriteLocalCredential', () => {
     const { Repo, writes } = stubRepo({ [owned.email]: owned });
     const cfg: any = createUserRouterConfig({ Repository: Repo, hashPassword, comparePassword, canWriteLocalCredential: refuse });
 
-    const result = await cfg.invite.handler(userCtx({ input: { email: owned.email, password: 'Ignored!Pass1' } }, Repo));
+    const result = await cfg.invite.handler(userCtx({ input: { email: owned.email } }, Repo));
     // An org-level caller gets the id and the email it sent, never the stored row (YMS-296).
     expect(result).toEqual({ id: owned.id, email: owned.email });
     expect(writes).toHaveLength(0);
@@ -218,7 +218,7 @@ describe('users router — resolveCredentialOwner', () => {
       for (const proc of ['invite', 'create'] as const) {
         const resolver = resolving(external);
         const { cfg, Repo, writes } = build(resolver);
-        const err = await cfg[proc].handler(userCtx({ input: { email: 'new@example.com', password: 'N3w!Passw0rd' } }, Repo)).catch((e: unknown) => e);
+        const err = await cfg[proc].handler(userCtx({ input: { email: 'new@example.com' } }, Repo)).catch((e: unknown) => e);
         expect(err).toBeInstanceOf(CredentialOwnedElsewhereError);
         expect(err).toMatchObject({ code: 'OWNED_ELSEWHERE', accountUrl: external.accountUrl, resetUrl: external.resetUrl, operation: proc });
         expect(writes).toHaveLength(0);
@@ -248,8 +248,8 @@ describe('users router — resolveCredentialOwner', () => {
   describe('frozen', () => {
     it('every writer refuses FORBIDDEN with the reason, without hashing', async () => {
       const calls: Array<[string, any]> = [
-        ['invite', { email: 'new@example.com', password: 'N3w!Passw0rd' }],
-        ['create', { email: 'new@example.com', password: 'N3w!Passw0rd' }],
+        ['invite', { email: 'new@example.com' }],
+        ['create', { email: 'new@example.com' }],
         ['update', { id: 7, password: 'N3w!Passw0rd' }],
         ['changePassword', { currentPassword: 'Old!Pass1', newPassword: 'N3w!Passw0rd' }],
       ];
@@ -269,12 +269,12 @@ describe('users router — resolveCredentialOwner', () => {
   });
 
   describe('none', () => {
-    it('invite and create allocate with a hashed verifier', async () => {
+    it('invite and create allocate with NO verifier (invite-only)', async () => {
       for (const proc of ['invite', 'create'] as const) {
         const { cfg, Repo, writes } = build(resolving(none));
-        const result = await cfg[proc].handler(userCtx({ input: { email: 'new@example.com', password: 'N3w!Passw0rd' } }, Repo));
+        const result = await cfg[proc].handler(userCtx({ input: { email: 'new@example.com' } }, Repo));
         expect(result).toMatchObject({ id: 99, email: 'new@example.com' });
-        expect(writes[0].data.password).toBe('hashed:N3w!Passw0rd');
+        expect(writes[0].data.password).toBeUndefined();
       }
     });
 
@@ -293,8 +293,8 @@ describe('users router — resolveCredentialOwner', () => {
         const { cfg, Repo, writes } = build(resolver, { [owned.email]: owned });
         await expect(cfg.changePassword.handler(userCtx({ input: { currentPassword: 'Old!Pass1', newPassword: 'N3w!Passw0rd' } }, Repo))).resolves.toEqual({ success: true });
         await cfg.update.handler(userCtx({ input: { id: 7, password: 'Upd!Passw0rd' } }, Repo));
-        await cfg.create.handler(userCtx({ input: { email: 'c@example.com', password: 'Cre!Passw0rd' } }, Repo));
-        await cfg.invite.handler(userCtx({ input: { email: 'i@example.com', password: 'Inv!Passw0rd' } }, Repo));
+        await cfg.create.handler(userCtx({ input: { email: 'c@example.com' } }, Repo));
+        await cfg.invite.handler(userCtx({ input: { email: 'i@example.com' } }, Repo));
         expect(writes.map((w) => w.op)).toEqual(['updatePassword', 'update', 'create', 'create']);
         expect(writes[0].hash).toBe('hashed:N3w!Passw0rd');
         expect(writes[1].data.password).toBe('hashed:Upd!Passw0rd');
@@ -313,8 +313,8 @@ describe('users router — resolveCredentialOwner', () => {
 
     it('guard alone ≡ fromLocalCredentialGuard(guard) as the resolver, on every writer, allow and refuse', async () => {
       const calls: Array<[string, any]> = [
-        ['invite', { email: 'new@example.com', password: 'N3w!Passw0rd' }],
-        ['create', { email: 'new@example.com', password: 'N3w!Passw0rd' }],
+        ['invite', { email: 'new@example.com' }],
+        ['create', { email: 'new@example.com' }],
         ['update', { id: 7, password: 'N3w!Passw0rd' }],
         ['changePassword', { currentPassword: 'Old!Pass1', newPassword: 'N3w!Passw0rd' }],
       ];

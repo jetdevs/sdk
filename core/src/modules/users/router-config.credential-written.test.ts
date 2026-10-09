@@ -107,10 +107,11 @@ describe('users router — onCredentialWritten fires once per successful write',
     const { Repo } = stubRepo({ [owned.email]: owned });
     const cfg: any = createUserRouterConfig({ Repository: Repo, hashPassword, comparePassword, onCredentialWritten });
 
-    await cfg.update.handler(userCtx({ input: { id: 7, password: 'N3w!Passw0rd' }, userId: '42' }, Repo));
+    await cfg.update.handler(userCtx({ input: { id: 7, password: 'N3w!Passw0rd' } }, Repo));
     expect(onCredentialWritten).toHaveBeenCalledTimes(1);
     expect(onCredentialWritten).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 7, operation: 'update', actorUserId: 42, firstSet: false }),
+      // Self only: nobody sets another user's password (YMS-494 S6).
+      expect.objectContaining({ userId: 7, operation: 'update', actorUserId: 7, firstSet: false }),
     );
 
     onCredentialWritten.mockClear();
@@ -123,23 +124,25 @@ describe('users router — onCredentialWritten fires once per successful write',
     const { Repo } = stubRepo({ 'none@example.com': { id: 8, email: 'none@example.com', password: null } });
     const cfg: any = createUserRouterConfig({ Repository: Repo, hashPassword, comparePassword, onCredentialWritten });
 
-    await cfg.update.handler(userCtx({ input: { id: 8, password: 'N3w!Passw0rd' } }, Repo));
+    await cfg.update.handler(userCtx({ input: { id: 8, password: 'N3w!Passw0rd' }, userId: '8' }, Repo));
     expect(onCredentialWritten).toHaveBeenCalledWith(expect.objectContaining({ operation: 'update', firstSet: true }));
   });
 
-  it('invite and create announce only when the input CARRIED a password', async () => {
+  it('invite and create never announce — they write no verifier (invite-only, YMS-494 S6)', async () => {
     for (const procedure of ['invite', 'create'] as const) {
       const onCredentialWritten = vi.fn();
       const { Repo } = stubRepo({});
       const cfg: any = createUserRouterConfig({ Repository: Repo, hashPassword, comparePassword, onCredentialWritten });
 
-      await cfg[procedure].handler(userCtx({ input: { email: 'new@example.com', password: 'N3w!Passw0rd' } }, Repo));
-      expect(onCredentialWritten).toHaveBeenCalledTimes(1);
-      expect(onCredentialWritten).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 99, operation: procedure, actorUserId: 7, firstSet: true }),
-      );
+      await cfg[procedure].handler(userCtx({ input: { email: 'new@example.com' } }, Repo));
+      expect(onCredentialWritten).not.toHaveBeenCalled();
 
-      onCredentialWritten.mockClear();
+      // A password is refused outright, so it never reaches a write either.
+      await expect(
+        cfg[procedure].handler(userCtx({ input: { email: 'pw@example.com', password: 'N3w!Passw0rd' } }, Repo)),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(onCredentialWritten).not.toHaveBeenCalled();
+
       const fresh = stubRepo({});
       const cfg2: any = createUserRouterConfig({ Repository: fresh.Repo, hashPassword, comparePassword, onCredentialWritten });
       await cfg2[procedure].handler(userCtx({ input: { email: 'nopw@example.com' } }, fresh.Repo));
@@ -152,7 +155,7 @@ describe('users router — onCredentialWritten fires once per successful write',
     const { Repo, writes } = stubRepo({ [owned.email]: owned });
     const cfg: any = createUserRouterConfig({ Repository: Repo, hashPassword, comparePassword, onCredentialWritten });
 
-    await cfg.invite.handler(userCtx({ input: { email: owned.email, password: 'Ignored!Pass1' } }, Repo));
+    await cfg.invite.handler(userCtx({ input: { email: owned.email } }, Repo));
     expect(writes).toHaveLength(0);
     expect(onCredentialWritten).not.toHaveBeenCalled();
   });
@@ -196,13 +199,14 @@ describe('users router — onCredentialWritten fires once per successful write',
       resolveCredentialOwner: () => owner,
       onCredentialWritten,
     });
-    await cfg2.invite.handler(userCtx({ input: { email: 'new@example.com', password: 'N3w!Passw0rd' } }, fresh.Repo)).catch(() => undefined);
-    await cfg2.create.handler(userCtx({ input: { email: 'new2@example.com', password: 'N3w!Passw0rd' } }, fresh.Repo)).catch(() => undefined);
+    await cfg2.invite.handler(userCtx({ input: { email: 'new@example.com' } }, fresh.Repo)).catch(() => undefined);
+    await cfg2.create.handler(userCtx({ input: { email: 'new2@example.com' } }, fresh.Repo)).catch(() => undefined);
 
     if (owner.kind === 'none') {
-      // `none` means "nobody else claims it": the two allocating writers run.
+      // `none` means "nobody else claims it": the two allocating writers run,
+      // but with no password they store no verifier, so nothing announces.
       expect(writes).toHaveLength(0);
-      expect(onCredentialWritten.mock.calls.map((c) => c[0].operation)).toEqual(['invite', 'create']);
+      expect(onCredentialWritten).not.toHaveBeenCalled();
     } else {
       expect(writes).toHaveLength(0);
       expect(onCredentialWritten).not.toHaveBeenCalled();
