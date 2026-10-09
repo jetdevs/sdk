@@ -11,6 +11,7 @@
 import { and, ilike, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { IUserRepository } from './repository';
+import { omitUserSecrets } from './user-output';
 import { namesForeignOrg } from '../organizations/org-scope';
 import { findRoleAssignmentRefusal } from '../rbac/assignable-role';
 import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
@@ -263,7 +264,7 @@ async function ownerOrFrozen(
 export function createUserRouterConfig(deps: UserRouterDeps) {
   const resolveOwner = selectCredentialOwnerResolver(deps);
 
-  return {
+  return withSafeUserOutput({
     // -------------------------------------------------------------------------
     // GET ALL USERS WITH STATS (org-scoped)
     // -------------------------------------------------------------------------
@@ -1114,7 +1115,20 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         return { removed };
       },
     },
-  };
+  });
+}
+
+/**
+ * Every procedure's result passes through `omitUserSecrets`: a users row must
+ * never reach a client with its password verifier, whichever repository (SDK
+ * or an app subclass) produced it.
+ */
+function withSafeUserOutput<C extends Record<string, { handler: (...args: any[]) => any }>>(config: C): C {
+  for (const procedure of Object.values(config)) {
+    const handler = procedure.handler;
+    procedure.handler = (async (...args: any[]) => omitUserSecrets(await handler(...args))) as typeof handler;
+  }
+  return config;
 }
 
 // =============================================================================
