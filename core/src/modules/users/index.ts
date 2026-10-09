@@ -113,3 +113,8 @@ export type {
     UserServiceHooks, UserUpdateParams
 } from './service';
 
+// =============================================================================
+// OUTPUT SAFETY
+// =============================================================================
+
+export { isUserSecretKey, omitUserSecrets, publicUserColumns } from './user-output';

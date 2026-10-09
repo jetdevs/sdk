@@ -22,6 +22,7 @@ import {
     type SQL,
 } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
+import { publicUserColumns } from './user-output';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import type {
@@ -245,7 +246,7 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
       const orderByClause = sortOrder === 'asc' ? asc(orderByColumn) : desc(orderByColumn);
 
       const result = await db
-        .select()
+        .select(publicUserColumns(users))
         .from(users)
         .where(whereClause)
         .orderBy(orderByClause)
@@ -404,7 +405,7 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
           createdAt: new Date(),
           updatedAt: new Date(),
         } as any)
-        .returning();
+        .returning(publicUserColumns(users));
 
       return result[0] as unknown as UserWithRoles;
     }
@@ -428,12 +429,7 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
           updatedAt: new Date(),
         } as any)
         .where(eq(users.id, id))
-        .returning();
-
-      // DEBUG: Log what was returned
-      console.log('[SDK User Repo Update] Result returned:', JSON.stringify({
-        hasPasswordInResult: !!result[0]?.password,
-      }));
+        .returning(publicUserColumns(users));
 
       return result[0] as unknown as UserWithRoles;
     }
@@ -449,7 +445,7 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
           updatedAt: new Date(),
         } as any)
         .where(eq(users.id, id))
-        .returning();
+        .returning(publicUserColumns(users));
 
       return result[0] as unknown as UserWithRoles;
     }
@@ -465,7 +461,7 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
           updatedAt: new Date(),
         } as any)
         .where(inArray(users.id, userIds))
-        .returning();
+        .returning(publicUserColumns(users));
 
       return result as unknown as UserWithRoles[];
     }
@@ -786,7 +782,7 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
           updatedAt: new Date(),
         } as any)
         .where(eq(users.id, userId))
-        .returning();
+        .returning(publicUserColumns(users));
 
       return (result[0] as unknown as UserWithRoles) || null;
     }
@@ -802,7 +798,7 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
           updatedAt: new Date(),
         } as any)
         .where(eq(users.id, userId))
-        .returning();
+        .returning(publicUserColumns(users));
 
       return result[0] as unknown as UserWithRoles;
     }
@@ -818,7 +814,7 @@ export function createUserRepositoryClass(schema: UserRepositorySchema) {
           updatedAt: new Date(),
         } as any)
         .where(eq(users.id, userId))
-        .returning();
+        .returning(publicUserColumns(users));
 
       return result[0] as unknown as UserWithRoles;
     }
