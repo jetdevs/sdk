@@ -22,7 +22,8 @@ import {
     generatePoliciesForIsolation,
     RLS_CONTEXT_FUNCTIONS,
     RLS_FUNCTION_PERMISSIONS,
-    RLS_ROLES_SQL,
+    APP_USER_PASSWORD_ENV,
+    getRlsRolesSql,
     RLS_TABLE_PERMISSIONS
 } from './policies';
 import type { RlsRegistry, RlsTableConfig } from './types';
@@ -188,17 +189,28 @@ export async function ensureConfigurationFunctions(
  */
 export async function ensureRlsRoles(
   executeSql: (sql: string) => Promise<void>,
-  options: { dryRun?: boolean; verbose?: boolean } = {}
+  options: { dryRun?: boolean; verbose?: boolean; appUserPassword?: string } = {}
 ): Promise<void> {
-  const { dryRun = false, verbose = false } = options;
+  const {
+    dryRun = false,
+    verbose = false,
+    appUserPassword = process.env[APP_USER_PASSWORD_ENV] || undefined,
+  } = options;
 
   if (!dryRun) {
     try {
-      // Create roles if they don't exist
-      await executeSql(RLS_ROLES_SQL);
+      // Create roles if they don't exist (app_user password from env, never built in)
+      await executeSql(getRlsRolesSql(appUserPassword));
       if (verbose) console.log('  Ensured app_user and internal_api_user roles exist');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      // Drivers may echo the failed query; never print the password
+      if (appUserPassword) {
+        // The SQL holds the quote-doubled form, so mask that before the raw one
+        for (const form of [appUserPassword.replace(/'/g, "''"), appUserPassword]) {
+          errorMessage = errorMessage.split(form).join('***');
+        }
+      }
       console.error(`  Failed to create roles: ${errorMessage}`);
       // Continue anyway as roles might already exist
     }
