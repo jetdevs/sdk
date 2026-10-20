@@ -94,6 +94,57 @@ export function isIdentityRefConflict(err: unknown): boolean {
   return isConnectIdentityRegisterError(err) && err.code === 'ref_conflict'
 }
 
+/** Retire this RP's exact local reference while preserving the canonical identity. */
+export interface DisconnectApplicationIdentityArgs {
+  /** Canonical positive signed 32-bit Connect subject, without leading zeroes. */
+  sub: string
+  /** Nonblank RP-local user reference, at most 64 characters; never normalized. */
+  sourceUserRef: string
+}
+
+export interface DisconnectApplicationIdentityResult {
+  status: 'disconnected' | 'already_disconnected'
+  sub: string
+  sourceUserRef: string
+  canonicalIdentityPreserved: true
+  counts: {
+    grantsRevoked: number
+    clientBindingsCleared: number
+    mappingsRetired: number
+  }
+}
+
+export type DisconnectApplicationIdentityErrorCode =
+  | RegisterIdentityErrorCode
+  | 'mapping_unknown'
+  | 'client_mismatch'
+  | 'maintenance'
+  | 'timeout'
+
+const DISCONNECT_ERROR_CODES: ReadonlySet<string> = new Set([
+  ...REGISTER_ERROR_CODES,
+  'mapping_unknown',
+  'client_mismatch',
+  'maintenance',
+])
+
+export class ConnectIdentityDisconnectError extends Error {
+  readonly kind = 'connect_identity_disconnect_error' as const
+  constructor(
+    readonly code: DisconnectApplicationIdentityErrorCode,
+    /** HTTP status; 0 when no HTTP response was received or input is invalid. */
+    readonly status: number,
+  ) {
+    super(`[connect-provisioning] identity/disconnect refused: ${status} ${code}`)
+    this.name = 'ConnectIdentityDisconnectError'
+  }
+}
+
+/** Duck-typed for independently bundled server entrypoints, like register errors. */
+export function isConnectIdentityDisconnectError(err: unknown): err is ConnectIdentityDisconnectError {
+  return (err as { kind?: unknown } | null)?.kind === 'connect_identity_disconnect_error'
+}
+
 export interface ConnectProvisioningConfig {
   /** Base URL of the Connect IdP (no trailing slash required). */
   baseUrl: string
@@ -103,6 +154,8 @@ export interface ConnectProvisioningConfig {
   fetchImpl?: typeof fetch
   /** Per-request budget for `registerIdentity`, ms (default 10 000). */
   registerTimeoutMs?: number
+  /** Per-request budget for `disconnectApplicationIdentity`, ms (default 10 000). */
+  disconnectTimeoutMs?: number
 }
 
 export class ConnectProvisioningClient {
@@ -111,12 +164,14 @@ export class ConnectProvisioningClient {
   private readonly fetchImpl: typeof fetch
 
   private readonly registerTimeoutMs: number
+  private readonly disconnectTimeoutMs: number
 
   constructor(config: ConnectProvisioningConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, '')
     this.key = config.internalApiKey
     this.fetchImpl = config.fetchImpl ?? fetch
     this.registerTimeoutMs = config.registerTimeoutMs ?? 10_000
+    this.disconnectTimeoutMs = config.disconnectTimeoutMs ?? 10_000
   }
 
   /**
@@ -168,6 +223,59 @@ export class ConnectProvisioningClient {
         ? (body.error as RegisterIdentityErrorCode)
         : 'unexpected'
     throw new ConnectIdentityRegisterError(code, res.status)
+  }
+
+  /**
+   * Requires the RP key's `identity:disconnect` scope. No automatic retries.
+   * Resolves only for HTTP 200 with a validated exact sub/ref echo; every other
+   * outcome throws ConnectIdentityDisconnectError with a stable code/status.
+   */
+  async disconnectApplicationIdentity(args: DisconnectApplicationIdentityArgs): Promise<DisconnectApplicationIdentityResult> {
+    if (
+      !args || typeof args.sub !== 'string' || !/^[1-9]\d*$/.test(args.sub) || Number(args.sub) > 2_147_483_647 ||
+      typeof args.sourceUserRef !== 'string' || !args.sourceUserRef.trim() || args.sourceUserRef.length > 64
+    ) {
+      throw new ConnectIdentityDisconnectError('invalid_body', 0)
+    }
+    let res: Response
+    let signal: AbortSignal | undefined
+    try {
+      signal = AbortSignal.timeout(this.disconnectTimeoutMs)
+      res = await this.fetchImpl(`${this.baseUrl}/api/internal/connect/identity/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Internal-API-Key': this.key,
+        },
+        body: JSON.stringify({ sub: args.sub, sourceUserRef: args.sourceUserRef }),
+        signal,
+      })
+    } catch {
+      throw new ConnectIdentityDisconnectError(signal?.aborted ? 'timeout' : 'unreachable', 0)
+    }
+    let json: unknown
+    try {
+      json = await res.json()
+    } catch {
+      throw new ConnectIdentityDisconnectError(signal.aborted ? 'timeout' : 'unexpected', res.status)
+    }
+    const body = (json ?? {}) as Partial<DisconnectApplicationIdentityResult> & { error?: unknown }
+    const counts = body.counts
+    if (
+      res.status === 200 && (body.status === 'disconnected' || body.status === 'already_disconnected') &&
+      body.sub === args.sub && body.sourceUserRef === args.sourceUserRef && body.canonicalIdentityPreserved === true &&
+      counts && [counts.grantsRevoked, counts.clientBindingsCleared, counts.mappingsRetired].every(
+        (count) => typeof count === 'number' && Number.isSafeInteger(count) && count >= 0,
+      )
+    ) {
+      return body as DisconnectApplicationIdentityResult
+    }
+    const code =
+      !(res.status >= 200 && res.status < 300) && typeof body.error === 'string' && DISCONNECT_ERROR_CODES.has(body.error)
+        ? (body.error as DisconnectApplicationIdentityErrorCode)
+        : 'unexpected'
+    throw new ConnectIdentityDisconnectError(code, res.status)
   }
 
   private async post<T>(path: string, body: unknown): Promise<T> {
