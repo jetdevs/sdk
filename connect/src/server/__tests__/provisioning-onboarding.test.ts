@@ -16,6 +16,7 @@ const exchange = {
   code: 'a'.repeat(64), codeVerifier: 'v'.repeat(43), nonce: prepare.nonce, state: prepare.state,
   redirectUri: 'https://merchant.example/api/signup/connect/callback',
 }
+const controlEmails = ['user\u0000@example.com', 'user\u0001@example.com', 'user@example\u001f.com', 'user@example.com\u007f']
 const seen: { path?: string; headers: http.IncomingHttpHeaders; body: unknown; method?: string }[] = []
 let next: { status: number; body: string; delayMs?: number; bodyDelayMs?: number }
 const server = http.createServer((req, res) => {
@@ -107,7 +108,7 @@ describe('restricted onboarding identity transport', () => {
     null, undefined, [], {}, Object.assign(() => {}, prepare), { ...prepare, state: 42 },
     ...['', 's'.repeat(31), 's'.repeat(129), 's'.repeat(32) + '\n', 'bad!'.repeat(8)].flatMap((value) => [{ ...prepare, state: value }, { ...prepare, nonce: value }]),
     ...['', 'c'.repeat(42), 'c'.repeat(44), 'c'.repeat(43) + '\n', 'c'.repeat(42) + '+'].map((codeChallenge) => ({ ...prepare, codeChallenge })),
-    ...['', 'invalid', 'u@', 'u @example.com', 'u@example.com\n', 42, null].map((expectedEmail) => ({ ...prepare, expectedEmail })),
+    ...['', 'invalid', 'u@', 'u @example.com', 'u@example.com\n', ...controlEmails, 42, null].map((expectedEmail) => ({ ...prepare, expectedEmail })),
     { ...prepare, method: 'passwordless' }, { ...prepare, method: null }, { ...prepare, preflight: 'true' }, { ...prepare, preflight: null }, { ...prepare, preflight: true },
   ])('rejects invalid prepare input locally: %j', async (args) => {
     await expect(client().prepareOnboardingIdentity(args as PrepareOnboardingIdentityArgs)).rejects.toMatchObject({ code: 'invalid_body', status: 0 })
@@ -150,7 +151,7 @@ describe('restricted onboarding identity transport', () => {
   it.each([
     ['issuer', 'https://other.example'], ['issuer', 'https://other.example/path'], ['issuer', null],
     ...['0', '-1', '+1', '01', '42\n', '1e2', '1.1', '2147483648', 42, null].map((value) => ['sub', value]),
-    ...['', 'invalid', 'u @example.com', 'u@example.com\n', null, 42].map((value) => ['email', value]),
+    ...['', 'invalid', 'u @example.com', 'u@example.com\n', ...controlEmails, null, 42].map((value) => ['email', value]),
     ['emailVerified', 'true'], ['emailVerified', null], ['nonce', 'other'], ['state', 'other'], ['clientId', ' '], ['clientId', null], ['name', 42], ['name', null],
   ])('rejects invalid exchange field %s=%j', async (field, value) => {
     next.body = JSON.stringify({ ...identity(), [String(field)]: value })
