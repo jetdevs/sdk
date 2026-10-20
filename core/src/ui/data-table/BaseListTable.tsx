@@ -763,7 +763,10 @@ export function createBaseListTable(ui: DataTableUIComponents) {
       getFilteredRowModel: getFilteredRowModel(),
       getSortedRowModel: getSortedRowModel(),
       getPaginationRowModel: pagination ? getPaginationRowModel() : undefined,
-      manualPagination: pagination?.onPageChange !== undefined,
+      // No pagination config = render `data` as given, never slice it. TanStack
+      // caches the pagination row model on the table instance, so a config that
+      // goes away after first render would otherwise slice at its default 10.
+      manualPagination: !pagination || pagination.onPageChange !== undefined,
       pageCount: pagination?.totalCount ? Math.ceil(pagination.totalCount / pagination.pageSize) : undefined,
       // GATED: only thread getRowId when renderRow is set, so the options object
       // is byte-identical to before when the card/expand props are unused.
