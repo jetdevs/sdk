@@ -31,6 +31,8 @@ import {
     orgUpdateUserRoleSchema,
 } from './schemas';
 import type { IOrgService } from './service';
+import { namesForeignOrg } from './org-scope';
+import { loadRoleAssignability, roleAssignmentRefusal } from '../rbac/assignable-role';
 
 // =============================================================================
 // TYPES
@@ -159,8 +161,9 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
       input: orgListSchema,
       repository: Repository,
       handler: async ({ input, service, actor, repo, db }: OrgHandlerContext<z.infer<typeof orgListSchema>>) => {
-        // Non-system users can only see their own org
-        if (!actor.isSystemUser && !input.crossOrgAccess) {
+        // Non-system users can only see their own org. `crossOrgAccess` comes
+        // from the client, so it cannot widen this.
+        if (!actor.isSystemUser) {
           if (service.orgId) {
             const org = await repo.findById(db, service.orgId);
             if (!org) {
@@ -342,7 +345,7 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
           return executePrivileged(getStats, db);
         }
 
-        if (input.orgId !== service.orgId && !actor.isSystemUser) {
+        if (namesForeignOrg(input.orgId, actor)) {
           throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
         }
 
@@ -709,7 +712,7 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
       repository: Repository,
       handler: async ({ input, service, actor, repo, db }: OrgHandlerContext<z.infer<typeof orgGetSettingsSchema>>) => {
         // Verify access to the organization
-        if (input.orgId !== service.orgId && !actor.isSystemUser) {
+        if (namesForeignOrg(input.orgId, actor)) {
           throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
         }
 
@@ -728,7 +731,7 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
       repository: Repository,
       handler: async ({ input, service, actor, repo, db }: OrgHandlerContext<z.infer<typeof orgUpdateSettingsSchema>>) => {
         // Verify access to the organization
-        if (input.orgId !== service.orgId && !actor.isSystemUser) {
+        if (namesForeignOrg(input.orgId, actor)) {
           throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
         }
 
@@ -790,7 +793,11 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
       invalidates: ['organizations'],
       entityType: 'organization',
       repository: Repository,
-      handler: async ({ input, repo, db }: OrgHandlerContext<z.infer<typeof orgUpdateCopilotStatusSchema>>) => {
+      handler: async ({ input, actor, repo, db }: OrgHandlerContext<z.infer<typeof orgUpdateCopilotStatusSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         return executePrivileged(async (privilegedDb) => {
           const existingOrg = await repo.findById(privilegedDb, input.orgId);
 
@@ -815,7 +822,7 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
       repository: Repository,
       handler: async ({ input, service, actor, repo, db }: OrgHandlerContext<z.infer<typeof orgAnalyticsSchema>>) => {
         // Verify access to the organization
-        if (input.orgId !== service.orgId && !actor.isSystemUser) {
+        if (namesForeignOrg(input.orgId, actor)) {
           throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization analytics');
         }
 
@@ -832,6 +839,10 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
       input: orgAuditLogsSchema,
       repository: Repository,
       handler: async ({ input, service, actor, repo, db }: OrgHandlerContext<z.infer<typeof orgAuditLogsSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         const targetOrgId = input.orgId || service.orgId;
 
         const getAuditLogs = async (targetDb: any) => {
@@ -905,7 +916,7 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
       repository: Repository,
       handler: async ({ input, service, actor, repo, db }: OrgHandlerContext<z.infer<typeof orgAddUserSchema>>) => {
         // Verify access to the organization
-        if (input.orgId !== service.orgId && !actor.isSystemUser && !input.crossOrgAccess) {
+        if (namesForeignOrg(input.orgId, actor)) {
           throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
         }
 
@@ -948,6 +959,17 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
           }
 
           const role = roleResult[0];
+
+          // The role is picked by name and shared roles are in reach, so a
+          // system role can match. Only platform staff may hand one out.
+          const roleRefusal = roleAssignmentRefusal(
+            actor,
+            input.orgId,
+            actor?.isSystemUser === true ? null : await loadRoleAssignability(targetDb, role.id),
+          );
+          if (roleRefusal) {
+            throw new OrgRouterError('FORBIDDEN', roleRefusal);
+          }
 
           // Check if user already has this role in this org
           const existingAssignment = await targetDb
@@ -1020,7 +1042,7 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
       repository: Repository,
       handler: async ({ input, service, actor, repo, db }: OrgHandlerContext<z.infer<typeof orgRemoveUserSchema>>) => {
         // Verify access to the organization
-        if (input.orgId !== service.orgId && !actor.isSystemUser && !input.crossOrgAccess) {
+        if (namesForeignOrg(input.orgId, actor)) {
           throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
         }
 
@@ -1085,7 +1107,7 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
       repository: Repository,
       handler: async ({ input, service, actor, repo, db }: OrgHandlerContext<z.infer<typeof orgUpdateUserRoleSchema>>) => {
         // Verify access to the organization
-        if (input.orgId !== service.orgId && !actor.isSystemUser && !input.crossOrgAccess) {
+        if (namesForeignOrg(input.orgId, actor)) {
           throw new OrgRouterError('FORBIDDEN', 'Access denied to this organization');
         }
 
@@ -1124,6 +1146,15 @@ export function createOrgRouterConfig(deps: OrgRouterDeps) {
           }
 
           const newRole = roleResult[0];
+
+          const roleRefusal = roleAssignmentRefusal(
+            actor,
+            input.orgId,
+            actor?.isSystemUser === true ? null : await loadRoleAssignability(targetDb, newRole.id),
+          );
+          if (roleRefusal) {
+            throw new OrgRouterError('FORBIDDEN', roleRefusal);
+          }
 
           // First, deactivate all existing role assignments for this user in this org
           await targetDb

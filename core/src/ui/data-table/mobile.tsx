@@ -18,6 +18,7 @@ import type { Column, Row, Table } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import * as React from 'react';
 import { useSyncExternalStore } from 'react';
+import { useCoreLabels } from '../labels';
 
 // =============================================================================
 // CONFIG
@@ -299,6 +300,7 @@ export interface MobileSheetProps {
 
 /** Minimal bottom sheet (no portal / no extra dependency). Phones only. */
 export function MobileSheet({ open, onClose, title, children }: MobileSheetProps) {
+  const labels = useCoreLabels();
   React.useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -321,7 +323,7 @@ export function MobileSheet({ open, onClose, title, children }: MobileSheetProps
             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
             <CloseIcon className="h-4 w-4" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{labels.common.close}</span>
           </button>
         </div>
         <div className="space-y-4">{children}</div>

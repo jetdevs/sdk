@@ -47,6 +47,8 @@ import {
     validateOrgAccessSchema,
 } from './schemas';
 import { createUserOrgRepository } from './user-org.repository';
+import { namesForeignOrg } from '../organizations/org-scope';
+import { findRoleAssignmentRefusal } from '../rbac/assignable-role';
 
 /**
  * TRPCError-like constructor interface
@@ -229,7 +231,23 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       crossOrg: true, // Required to assign roles in organizations other than the current one
       repository: Repository,
       handler: async (context: HandlerContext<{ userId: number; orgId: number; roleId: number }>) => {
-        const { input, service, repo } = context;
+        const { input, service, actor, repo } = context;
+
+        // `crossOrg` lets platform staff assign in any org; everyone else
+        // assigns only in their own.
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Access denied to this organization',
+          });
+        }
+
+        // An org-level caller may not hand out a system role or a role that
+        // carries a platform permission.
+        const refusal = await findRoleAssignmentRefusal(context.db, actor, input.orgId, input.roleId);
+        if (refusal) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: refusal });
+        }
 
         // P2-SR-005: Validate role is not a service role
         // Service roles are intended for API keys, not user assignments
@@ -294,7 +312,15 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       crossOrg: true, // Required to remove roles from organizations other than the current one
       repository: Repository,
       handler: async (context: HandlerContext<{ userId: number; orgId: number; roleId: number }>) => {
-        const { input, repo } = context;
+        const { input, actor, repo } = context;
+
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Access denied to this organization',
+          });
+        }
+
         const deleted = await repo!.deleteRoleAssignment(
           input.userId,
           input.roleId,

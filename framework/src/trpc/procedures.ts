@@ -64,7 +64,11 @@ export interface AdminOnlyProcedureOptions {
   getPrivilegedDb: () => Promise<any>;
   /** List of admin permissions that grant admin access */
   adminPermissions?: string[];
-  /** Function to check if a role is a system/super user role */
+  /**
+   * @deprecated Ignored. A role NAME never grants platform access: only a role
+   * flagged `isSystemRole` (or an admin permission) does. Kept so existing
+   * callers still compile.
+   */
   isSystemRole?: (roleName: string) => boolean;
 }
 
@@ -84,9 +88,16 @@ export interface WithPermissionOptions {
 export interface OrgProtectedProcedureOptions {
   /** Function to get privileged DB access (bypasses RLS) */
   getPrivilegedDb: (callback: (db: any) => Promise<any>) => Promise<any>;
-  /** Function to set RLS context in database */
+  /**
+   * Function to set RLS context in database. Receives the transaction that
+   * runs the `dbWithRLS` callback; use `set_config(..., true)` (transaction-local).
+   */
   setOrgContext?: (db: any, orgId: number) => Promise<void>;
-  /** Function to set superuser flag in database */
+  /**
+   * Function to set superuser flag in database. Called on the transaction that
+   * runs the `dbWithRLS` callback, with `true` for platform staff and `false`
+   * for everyone else; use `set_config(..., true)` (transaction-local).
+   */
   setSuperuserFlag?: (db: any, isSuperuser: boolean) => Promise<void>;
 }
 
@@ -268,7 +279,7 @@ export function createProtectedProcedure<T extends { procedure: any; middleware:
  *
  * This procedure:
  * 1. Requires authentication
- * 2. Checks for admin:* permissions or super user role
+ * 2. Checks for a system role (`isSystemRole`) or admin:* permissions
  * 3. Uses privileged DB for permission lookup to bypass RLS
  *
  * @example
@@ -276,7 +287,6 @@ export function createProtectedProcedure<T extends { procedure: any; middleware:
  * const adminOnlyProcedure = createAdminOnlyProcedure(t, {
  *   getPrivilegedDb: async () => privilegedDb,
  *   adminPermissions: ['admin:full_access', 'admin:manage_users'],
- *   isSystemRole: (name) => name === 'Super User',
  * });
  * ```
  */
@@ -284,14 +294,7 @@ export function createAdminOnlyProcedure<T extends { procedure: any; middleware:
   t: T,
   options: AdminOnlyProcedureOptions
 ) {
-  const {
-    getPrivilegedDb,
-    adminPermissions = ['admin:full_access'],
-    isSystemRole = (name: string) => {
-      const normalized = name.trim().toLowerCase();
-      return normalized === 'super user' || normalized === 'superuser' || normalized === 'super_user';
-    },
-  } = options;
+  const { getPrivilegedDb, adminPermissions = ['admin:full_access'] } = options;
 
   return t.procedure.use(async ({ ctx, next }: any) => {
     if (!ctx.session) {
@@ -307,9 +310,7 @@ export function createAdminOnlyProcedure<T extends { procedure: any; middleware:
     // Fast path: Check session roles first
     const sessionRoles: Array<{ name?: string; isSystemRole?: boolean }> =
       (ctx.session?.user as any)?.roles || [];
-    const sessionHasSuper = sessionRoles.some((r) => {
-      return r?.isSystemRole === true || isSystemRole(r?.name || '');
-    });
+    const sessionHasSuper = sessionRoles.some((r) => r?.isSystemRole === true);
 
     if (sessionHasSuper) {
       return next({ ctx: { session: ctx.session } });
@@ -325,27 +326,28 @@ export function createAdminOnlyProcedure<T extends { procedure: any; middleware:
     try {
       const privilegedDb = await getPrivilegedDb();
 
-      // Check for super user role in database
+      // Assignments that count here: the current org's, plus org-less
+      // (platform) ones. A role assigned in another org grants nothing.
+      const relevantAssignments = (userRoles: any, { and, eq, or, isNull }: any) =>
+        and(
+          eq(userRoles.userId, userId),
+          eq(userRoles.isActive, true),
+          or(
+            currentOrgId ? eq(userRoles.orgId, currentOrgId) : undefined,
+            isNull(userRoles.orgId),
+            eq(userRoles.orgId, -1)
+          )
+        );
+
+      // Check for a system role in database
       const userRolesData = await privilegedDb.query.userRoles.findMany({
-        where: (userRoles: any, { and, eq, or }: any) => {
-          const conditions = [eq(userRoles.userId, userId), eq(userRoles.isActive, true)];
-
-          if (currentOrgId) {
-            conditions.push(or(eq(userRoles.orgId, currentOrgId), eq(userRoles.orgId, -1)));
-          } else {
-            conditions.push(eq(userRoles.orgId, -1));
-          }
-
-          return and(...conditions);
-        },
+        where: relevantAssignments,
         with: {
           role: true,
         },
       });
 
-      const isSuperUser = userRolesData.some((ur: any) => {
-        return ur.role.isSystemRole === true || isSystemRole(ur.role.name || '');
-      });
+      const isSuperUser = userRolesData.some((ur: any) => ur.role.isSystemRole === true);
 
       if (isSuperUser) {
         return next({ ctx: { session: ctx.session } });
@@ -353,13 +355,7 @@ export function createAdminOnlyProcedure<T extends { procedure: any; middleware:
 
       // Check for admin permissions
       const userRolesWithPerms = await privilegedDb.query.userRoles.findMany({
-        where: (userRoles: any, { and, eq }: any) => {
-          const conditions = [eq(userRoles.userId, userId)];
-          if (currentOrgId) {
-            conditions.push(eq(userRoles.orgId, currentOrgId));
-          }
-          return and(...conditions);
-        },
+        where: relevantAssignments,
         with: {
           role: {
             with: {
@@ -439,22 +435,20 @@ export function createWithPermission<T extends { procedure: any; middleware: Fun
       try {
         const privilegedDb = await getPrivilegedDb();
 
-        // Check for super user first
+        // Check for a system role first (by flag, never by name)
         const userRolesData = await privilegedDb.query.userRoles.findMany({
-          where: (userRoles: any, { and, eq, or }: any) =>
+          where: (userRoles: any, { and, eq, or, isNull }: any) =>
             and(
               eq(userRoles.userId, userId),
               eq(userRoles.isActive, true),
-              or(eq(userRoles.orgId, currentOrgId), eq(userRoles.orgId, -1))
+              or(eq(userRoles.orgId, currentOrgId), isNull(userRoles.orgId), eq(userRoles.orgId, -1))
             ),
           with: {
             role: true,
           },
         });
 
-        const isSuperUser = userRolesData.some(
-          (ur: any) => ur.role.name === 'Super User' || ur.role.isSystemRole === true
-        );
+        const isSuperUser = userRolesData.some((ur: any) => ur.role.isSystemRole === true);
 
         if (isSuperUser) {
           return next({ ctx: { session: ctx.session } });
@@ -463,7 +457,11 @@ export function createWithPermission<T extends { procedure: any; middleware: Fun
         // Check for required permission
         const userRolesWithPerms = await privilegedDb.query.userRoles.findMany({
           where: (userRoles: any, { and, eq }: any) =>
-            and(eq(userRoles.userId, userId), eq(userRoles.orgId, currentOrgId)),
+            and(
+              eq(userRoles.userId, userId),
+              eq(userRoles.isActive, true),
+              eq(userRoles.orgId, currentOrgId)
+            ),
           with: {
             role: {
               with: {
@@ -555,7 +553,9 @@ export function createOrgProtectedProcedure<T extends { procedure: any; middlewa
 
     const userId = ctx.session.user.id;
 
-    // Check if user is a system user
+    // Platform staff only: `isSystemRole`. A GLOBAL role (Owner, Admin) is a
+    // role template every org can assign, not platform access — counting it
+    // set `app.is_superuser` for every Owner and bypassed org-isolation RLS.
     const isSystemUser = await getPrivilegedDb(async (db: any) => {
       const allUserRoles = await db.query.userRoles.findMany({
         where: (userRoles: any, { and, eq }: any) =>
@@ -565,9 +565,7 @@ export function createOrgProtectedProcedure<T extends { procedure: any; middlewa
         },
       });
 
-      return allUserRoles.some(
-        (ur: any) => ur.role.isSystemRole === true || ur.role.isGlobalRole === true
-      );
+      return allUserRoles.some((ur: any) => ur.role.isSystemRole === true);
     });
 
     // Non-system users require org context
@@ -601,22 +599,36 @@ export function createOrgProtectedProcedure<T extends { procedure: any; middlewa
         activeOrgId: currentOrgId ?? undefined,
         isSystemUser,
         dbWithRLS: async (callback: (db: any) => Promise<any>) => {
-          try {
-            if (currentOrgId != null) {
-              await setOrgContext(ctx.db, currentOrgId);
+          const setContext = async (db: any, inTransaction: boolean) => {
+            try {
+              if (currentOrgId != null) {
+                await setOrgContext(db, currentOrgId);
+              }
+              // Only inside the transaction: on a bare pooled connection the
+              // flag outlives this request. Always set it, so a value left on
+              // the connection never reaches this callback.
+              if (inTransaction) {
+                await setSuperuserFlag(db, isSystemUser);
+              }
+            } catch (err: any) {
+              // If RLS functions don't exist, warn but continue
+              if (err?.message?.includes('function') || err?.message?.includes('does not exist')) {
+                console.warn('RLS context function not found. Proceeding without RLS context.');
+              } else {
+                console.warn('Failed to set RLS context:', err?.message);
+              }
             }
-            if (isSystemUser) {
-              await setSuperuserFlag(ctx.db, true);
-            }
-          } catch (err: any) {
-            // If RLS functions don't exist, warn but continue
-            if (err?.message?.includes('function') || err?.message?.includes('does not exist')) {
-              console.warn('RLS context function not found. Proceeding without RLS context.');
-            } else {
-              console.warn('Failed to set RLS context:', err?.message);
-            }
+          };
+
+          if (typeof ctx.db?.transaction === 'function') {
+            return ctx.db.transaction(async (tx: any) => {
+              await setContext(tx, true);
+              return callback(tx);
+            });
           }
 
+          // No transaction support: org-scoped only, never superuser.
+          await setContext(ctx.db, false);
           return await callback(ctx.db);
         },
       },
@@ -657,22 +669,20 @@ export function createOrgProtectedProcedureWithPermission<
       try {
         const privilegedDb = await getPrivilegedDb();
 
-        // Check for super user first
+        // Check for a system role first (by flag, never by name)
         const userRolesData = await privilegedDb.query.userRoles.findMany({
-          where: (userRoles: any, { and, eq, or }: any) =>
+          where: (userRoles: any, { and, eq, or, isNull }: any) =>
             and(
               eq(userRoles.userId, userId),
               eq(userRoles.isActive, true),
-              or(eq(userRoles.orgId, currentOrgId), eq(userRoles.orgId, -1))
+              or(eq(userRoles.orgId, currentOrgId), isNull(userRoles.orgId), eq(userRoles.orgId, -1))
             ),
           with: {
             role: true,
           },
         });
 
-        const isSuperUser = userRolesData.some(
-          (ur: any) => ur.role.name === 'Super User' || ur.role.isSystemRole === true
-        );
+        const isSuperUser = userRolesData.some((ur: any) => ur.role.isSystemRole === true);
 
         if (isSuperUser) {
           return next({ ctx });

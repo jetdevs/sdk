@@ -1,0 +1,45 @@
+# Secret scan config. Extends the gitleaks default rule set with two rules
+# that the defaults miss: database URLs carrying a password, and
+# `process.env.X || "literal"` fallbacks for credential-named variables.
+title = "jetdevs secret scan"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "db-url-with-password"
+description = "Database connection URL with an inline password"
+regex = '''(?i)\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|rediss?|amqps?)://[^:/\s"'`@]+:([^@\s"'`$<{]{6,})@([a-z0-9.-]+)'''
+secretGroup = 1
+keywords = ["postgres", "mysql", "mongodb", "redis", "amqp"]
+  [[rules.allowlists]]
+  description = "local and placeholder databases"
+  regexTarget = "match"
+  regexes = [
+    '''@(?:localhost|127\.0\.0\.1|0\.0\.0\.0|host\.docker\.internal|postgres|db|redis|mysql|host|hostname|example\.com|your-host|HOST)(?:[:/"'`\s]|$)''',
+    '''(?i)://[^:]+:(?:password|pass|postgres|secret|changeme|test|testpass|example|xxx+|\*+|your[_-]?password|<[^>]*>|\$\{[^}]*\})@''',
+  ]
+
+[[rules]]
+id = "credential-env-fallback"
+description = "Credential-named env var with a literal fallback value"
+regex = '''(?i)process\.env\.[A-Z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_KEY|APIKEY|PRIVATE_KEY|VERIFY_TOKEN|AUTH_KEY)[A-Z0-9_]*\s*(?:\|\||\?\?)\s*["'`]([^"'`\s]{6,})["'`]'''
+secretGroup = 1
+keywords = ["process.env"]
+  [[rules.allowlists]]
+  description = "obvious placeholders"
+  regexTarget = "secret"
+  regexes = [
+    '''(?i)^(?:test|dummy|fake|mock|placeholder|example|changeme|your[-_]|xxx|dev[-_]|local[-_]|sk_test_|pk_test_)''',
+    '''(?i)(?:placeholder|example|changeme|not[-_]?set|missing|unset|dummy|fake)''',
+  ]
+
+[allowlist]
+description = "Paths that never hold live credentials"
+paths = [
+  '''(?:^|/)node_modules/''',
+  '''(?:^|/)pnpm-lock\.yaml$''',
+  '''(?:^|/)package-lock\.json$''',
+  '''(?:^|/)\.next/''',
+  '''(?:^|/)dist/''',
+]

@@ -110,7 +110,7 @@ describe('StandardListToolbar', () => {
 });
 
 describe('BaseListTable standardToolbar', () => {
-  it('replaces the legacy toolbar and drops count, refresh, columns and page size', async () => {
+  it('replaces the legacy toolbar and drops count and refresh (Columns menu + page size stay)', async () => {
     mockViewport(1280);
     const { container } = render(
       <Base<Person>
@@ -127,8 +127,8 @@ describe('BaseListTable standardToolbar', () => {
     expect(container.querySelector('[data-slot="standard-list-toolbar"]')).not.toBeNull();
     expect(container.querySelector('input[placeholder="Search people…"]')).not.toBeNull();
     expect(container.textContent).not.toContain('3 people');
-    expect(container.textContent).not.toContain('Columns');
-    expect(container.querySelector('select')).toBeNull();
+    expect(container.querySelector('[data-testid="list-columns"]')).not.toBeNull();
+    expect(container.querySelector('select')).not.toBeNull();
     expect(container.textContent).toContain('Alice');
   });
 
@@ -168,7 +168,7 @@ describe('DataTableWithToolbar standardToolbar', () => {
     >[0]['ui'],
   });
 
-  it('moves the column filters into the search box and drops export / count / rows-per-page', async () => {
+  it('moves the column filters into the search box and drops export / count', async () => {
     mockViewport(1280);
     const { container } = render(<Dt data={PEOPLE} columns={personColumns} onRefresh={() => {}} standardToolbar={{}} />);
     await flush();

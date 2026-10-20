@@ -40,10 +40,11 @@ export { createBaseListTable } from './BaseListTable';
 export { createDataTableColumnHeader } from './DataTableColumnHeader';
 export { createDataTablePagination } from './DataTablePagination';
 export { createDataTableWithToolbar } from './DataTableWithToolbar';
-export { createStandardListToolbar, hasActiveFilter, shouldShowChips } from './standard-toolbar';
+export { createStandardListToolbar, getToolbarColumns, hasActiveFilter, shouldShowChips } from './standard-toolbar';
 export { StatusText, STATUS_TONE_CLASS } from './status-text';
 export type {
     StandardToolbarChips,
+    StandardToolbarColumn,
     StandardToolbarConfig,
     StandardToolbarFilter,
     StandardToolbarUIComponents,

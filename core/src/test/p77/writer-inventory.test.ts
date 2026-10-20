@@ -29,10 +29,7 @@ export const ALLOWLIST: AllowEntry[] = [
   { kind: 'writer', file: 'core/src/modules/users/repository.ts', contains: 'async updatePassword(db: PostgresJsDatabase<any>, userId: number, hashedPassword: string)', role: 'sdk-seam', why: 'the repository write — called only on the seam transaction' },
   { kind: 'set-block', file: 'core/src/modules/users/repository.ts', contains: '.set({', role: 'sdk-seam', why: 'its UPDATE (multi-line .set)' },
   { kind: 'writer', file: 'core/src/modules/users/repository.ts', contains: 'password: hashedPassword,', role: 'sdk-seam', why: 'its UPDATE' },
-  { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'const hashedPassword = input.password', role: 'sdk-seam', why: `users create / invite — ${SEAM}` },
-  { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: '? await deps.hashPassword(input.password, 10)', role: 'sdk-seam', why: 'their hashes' },
-  { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'password: hashedPassword,', role: 'sdk-seam', why: 'their inserts' },
-  { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'if (hashedPassword) {', role: 'sdk-seam', why: 'the credential-written announcement' },
+  // users create / invite: no hash, no insert of a verifier, no announcement — invite-only (YMS-494 S6).
   { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'finalUpdateData.password = await deps.hashPassword(password, 10);', role: 'sdk-seam', why: `users update with a password — ${SEAM}` },
   { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'const hashedPassword = await deps.hashPassword(input.newPassword, 10);', role: 'sdk-seam', why: `users changePassword — ${SEAM}` },
   { kind: 'writer', file: 'core/src/modules/users/router-config.ts', contains: 'await repo.updatePassword(tx, userId, hashedPassword);', role: 'sdk-seam', why: 'its write, on the seam tx' },
@@ -45,6 +42,7 @@ export const ALLOWLIST: AllowEntry[] = [
   { kind: 'writer', file: 'core/src/modules/users/service.ts', contains: 'const hashedPassword = await hooks.hashPassword(newPassword, 12);', role: 'sdk-seam', why: `service changePassword — ${SEAM}` },
   { kind: 'writer', file: 'core/src/modules/users/service.ts', contains: 'const result = await getRepo(tx).updatePassword(tx, userId, hashedPassword);', role: 'sdk-seam', why: 'its write, on the seam tx' },
   { kind: 'writer', file: 'core/src/modules/users/service.ts', contains: "'Example: createUserService({ hooks: { hashPassword: (p) => bcrypt.hash(p, 12)", role: 'non-credential', why: 'an error-message example string' },
+  { kind: 'writer', file: 'core/src/modules/users/user-output.ts', contains: "const SECRET_USER_KEYS = new Set(['password', 'passwordHash', 'hashedPassword']);", role: 'non-credential', why: 'the output-strip denylist (CAD-443): names the keys removed from responses, writes nothing' },
   { kind: 'writer', file: 'connect/src/server/provisioning.ts', contains: 'setCredentialAndLoginRole(args: { sub: string; password?: string; orgId?: number }) {', role: 'gated', why: "the provisioning client's credentials/set call — the IdP answers 503 maintenance while the switch is on (STORY-010/f); each app's caller asks the switch first" },
 ];
 

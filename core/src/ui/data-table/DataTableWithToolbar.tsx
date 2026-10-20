@@ -18,7 +18,9 @@ import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { PaginationConfig } from './BaseListTable';
 import { getAlignCellClass } from './column-meta';
+import { useCoreLabels } from '../labels';
 import {
+    collectHeaderLabels,
     FilterIcon,
     MobileRowList,
     MobileSheet,
@@ -28,6 +30,7 @@ import {
 } from './mobile';
 import {
     createStandardListToolbar,
+    getToolbarColumns,
     type StandardToolbarConfig,
     type StandardToolbarFilter,
 } from './standard-toolbar';
@@ -383,13 +386,16 @@ export interface DataTableWithToolbarProps<TData> {
 
   /**
    * The standard list toolbar (p90): search with the filter menu INSIDE it,
-   * status chips, list/grid toggle. When set it REPLACES the built-in toolbar
-   * and also drops export, the View (columns/density) menu, refresh, the result
-   * count and the "Rows per page" select. Every field is optional:
+   * status chips, a Columns menu, list/grid toggle. When set it REPLACES the
+   * built-in toolbar and drops export, the density menu, refresh and the
+   * result count; the footer "Rows per page" select stays. Every field is
+   * optional:
    *   - `search` defaults to the table's own search (server `search` if set,
    *     else the client-side global filter);
    *   - `filters` defaults to `serverFilters` + the config's `filterColumns`,
-   *     moved into the search box's filter menu.
+   *     moved into the search box's filter menu;
+   *   - `columns` defaults to the table's hideable columns (off when the
+   *     config's `enableColumnVisibility` is false; pass `false` to hide it).
    * Opt-in; unset → the table renders exactly as before.
    */
   standardToolbar?: Partial<StandardToolbarConfig>;
@@ -637,6 +643,9 @@ export function createDataTableWithToolbar<TData>(
     standardToolbar,
     hideTable = false,
   }: DataTableWithToolbarProps<TData>) {
+    const labels = useCoreLabels();
+    const t = labels.dataTable;
+    const tp = labels.pagination;
     // Phone layout (p90). Always false on the server and ≥ md, so desktop
     // takes exactly the pre-p90 path below.
     const mobile = propMobile !== undefined ? propMobile : configMobile;
@@ -914,14 +923,14 @@ export function createDataTableWithToolbar<TData>(
     const renderSearchInput = (className: string) =>
       serverSearch ? (
         <Input
-          placeholder={serverSearch.placeholder ?? `Search ${entityName}...`}
+          placeholder={serverSearch.placeholder ?? t.searchPlaceholder(entityName)}
           value={searchInput}
           onChange={(event) => setSearchInput(String(event.target.value))}
           className={className}
         />
       ) : (
         <Input
-          placeholder={`Search ${entityName}...`}
+          placeholder={t.searchPlaceholder(entityName)}
           value={globalFilter ?? ''}
           onChange={(event) => setGlobalFilter(String(event.target.value))}
           className={className}
@@ -940,7 +949,7 @@ export function createDataTableWithToolbar<TData>(
         </div>
         {isFetching && (
           <span
-            aria-label="Loading"
+            aria-label={labels.common.loading}
             className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
           />
         )}
@@ -952,14 +961,14 @@ export function createDataTableWithToolbar<TData>(
             onClick={() => setFilterSheetOpen(true)}
           >
             <FilterIcon className="h-4 w-4" />
-            <span className="sr-only">Filters</span>
+            <span className="sr-only">{labels.common.filters}</span>
             {(columnFilters.length > 0 || serverFilters?.some((f) => f.value !== 'all')) && (
               <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary" />
             )}
           </Button>
         )}
         {hasMobileFilters && (
-          <MobileSheet open={filterSheetOpen} onClose={closeFilterSheet} title="Filters">
+          <MobileSheet open={filterSheetOpen} onClose={closeFilterSheet} title={labels.common.filters}>
             {serverFilters?.map((filterConfig) => (
               <MobileSheetField key={filterConfig.id} label={filterConfig.label}>
                 <Select value={filterConfig.value} onValueChange={filterConfig.onChange}>
@@ -1006,11 +1015,11 @@ export function createDataTableWithToolbar<TData>(
             <div className="flex items-center justify-end gap-2 pt-2">
               {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  Clear
+                  {labels.common.clear}
                 </Button>
               )}
               <Button size="sm" onClick={closeFilterSheet}>
-                Done
+                {labels.common.done}
               </Button>
             </div>
           </MobileSheet>
@@ -1025,8 +1034,8 @@ export function createDataTableWithToolbar<TData>(
         search={
           standardToolbar.search ??
           (serverSearch
-            ? { value: searchInput, onChange: setSearchInput, placeholder: serverSearch.placeholder ?? `Search ${entityName}...` }
-            : { value: globalFilter ?? '', onChange: setGlobalFilter, placeholder: `Search ${entityName}...` })
+            ? { value: searchInput, onChange: setSearchInput, placeholder: serverSearch.placeholder ?? t.searchPlaceholder(entityName) }
+            : { value: globalFilter ?? '', onChange: setGlobalFilter, placeholder: t.searchPlaceholder(entityName) })
         }
         filters={
           standardToolbar.filters ?? [
@@ -1047,6 +1056,12 @@ export function createDataTableWithToolbar<TData>(
             ),
           ]
         }
+        columns={
+          standardToolbar.columns ??
+          (enableColumnVisibility
+            ? getToolbarColumns(table, collectHeaderLabels(columns as Array<{ id?: string; header?: unknown; accessorKey?: unknown }>))
+            : false)
+        }
       />
     ) : null;
 
@@ -1065,14 +1080,14 @@ export function createDataTableWithToolbar<TData>(
               <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               {serverSearch ? (
                 <Input
-                  placeholder={serverSearch.placeholder ?? `Search ${entityName}...`}
+                  placeholder={serverSearch.placeholder ?? t.searchPlaceholder(entityName)}
                   value={searchInput}
                   onChange={(event) => setSearchInput(String(event.target.value))}
                   className="pl-8 max-w-sm"
                 />
               ) : (
                 <Input
-                  placeholder={`Search ${entityName}...`}
+                  placeholder={t.searchPlaceholder(entityName)}
                   value={globalFilter ?? ''}
                   onChange={(event) => setGlobalFilter(String(event.target.value))}
                   className="pl-8 max-w-sm"
@@ -1107,7 +1122,7 @@ export function createDataTableWithToolbar<TData>(
             {/* Background refetch indicator (server-side mode). */}
             {isFetching && !isLoading && (
               <span
-                aria-label="Loading"
+                aria-label={labels.common.loading}
                 className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
               />
             )}
@@ -1145,7 +1160,7 @@ export function createDataTableWithToolbar<TData>(
                 className="h-8 px-2 lg:px-3"
               >
                 <XIcon className="h-4 w-4 mr-1" />
-                Clear
+                {labels.common.clear}
               </Button>
             )}
           </div>
@@ -1155,7 +1170,7 @@ export function createDataTableWithToolbar<TData>(
                 misleading under server pagination; `resultLabel` overrides it. */}
             <div className="text-sm text-muted-foreground">
               {resultLabel ??
-                `${table.getFilteredRowModel().rows.length} of ${data.length} ${entityName}`}
+                t.resultCount(table.getFilteredRowModel().rows.length, data.length, entityName)}
             </div>
 
             {/* Refresh */}
@@ -1176,17 +1191,17 @@ export function createDataTableWithToolbar<TData>(
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8">
                     <DownloadIcon className="h-4 w-4 mr-1" />
-                    Export
+                    {t.export}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                  <DropdownMenuLabel>{t.exportOptions}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={exportToCSV}>
-                    Export as CSV
+                    {t.exportCsv}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={exportToJSON}>
-                    Export as JSON
+                    {t.exportJson}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1198,13 +1213,13 @@ export function createDataTableWithToolbar<TData>(
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8">
                     <SettingsIcon className="h-4 w-4 mr-1" />
-                    View
+                    {t.view}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[200px]">
                   {enableColumnVisibility && (
                     <>
-                      <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
+                      <DropdownMenuLabel>{t.toggleColumns}</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       {table
                         .getAllColumns()
@@ -1227,15 +1242,15 @@ export function createDataTableWithToolbar<TData>(
                   {enableDensity && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuLabel>Table Density</DropdownMenuLabel>
+                      <DropdownMenuLabel>{t.tableDensity}</DropdownMenuLabel>
                       <DropdownMenuItem onClick={() => setDensity('compact')}>
-                        {density === 'compact' && '* '}Compact
+                        {density === 'compact' && '* '}{t.densityCompact}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setDensity('comfortable')}>
-                        {density === 'comfortable' && '* '}Comfortable
+                        {density === 'comfortable' && '* '}{t.densityComfortable}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setDensity('spacious')}>
-                        {density === 'spacious' && '* '}Spacious
+                        {density === 'spacious' && '* '}{t.densitySpacious}
                       </DropdownMenuItem>
                     </>
                   )}
@@ -1257,7 +1272,7 @@ export function createDataTableWithToolbar<TData>(
           >
             <div className="flex items-center space-x-2">
               <Badge variant="secondary">
-                {selectedRows.length} selected
+                {t.selected(selectedRows.length)}
               </Badge>
               {renderSelectionInfo ? (
                 renderSelectionInfo(selectedData)
@@ -1284,7 +1299,7 @@ export function createDataTableWithToolbar<TData>(
                 size="sm"
                 onClick={() => setRowSelection({})}
               >
-                Clear Selection
+                {t.clearSelection}
               </Button>
             </div>
           </div>
@@ -1299,7 +1314,7 @@ export function createDataTableWithToolbar<TData>(
           <MobileRowList
             table={table}
             config={mobileConfig}
-            empty={<div className="text-sm text-muted-foreground">No {entityName} found.</div>}
+            empty={<div className="text-sm text-muted-foreground">{t.noResults(entityName)}</div>}
           />
         ) : renderRow && rowLayout === 'cards' ? (
           <div className="space-y-2">
@@ -1326,7 +1341,7 @@ export function createDataTableWithToolbar<TData>(
               })
             ) : (
               <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
-                No {entityName} found.
+                {t.noResults(entityName)}
               </div>
             )}
           </div>
@@ -1399,7 +1414,7 @@ export function createDataTableWithToolbar<TData>(
                       colSpan={table.getVisibleLeafColumns().length || 1}
                       className="h-24 text-center"
                     >
-                      No {entityName} found.
+                      {t.noResults(entityName)}
                     </TableCell>
                   </TableRow>
                 )
@@ -1426,7 +1441,7 @@ export function createDataTableWithToolbar<TData>(
               ) : (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center">
-                    No {entityName} found.
+                    {t.noResults(entityName)}
                   </TableCell>
                 </TableRow>
               )}
@@ -1444,11 +1459,11 @@ export function createDataTableWithToolbar<TData>(
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
             >
-              <span className="sr-only">Go to previous page</span>
+              <span className="sr-only">{tp.previousPage}</span>
               <ChevronLeftIcon className="h-4 w-4" />
             </Button>
             <span className="text-sm text-muted-foreground">
-              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+              {tp.pageOf(table.getState().pagination.pageIndex + 1, table.getPageCount())}
             </span>
             <Button
               variant="outline"
@@ -1456,15 +1471,15 @@ export function createDataTableWithToolbar<TData>(
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
             >
-              <span className="sr-only">Go to next page</span>
+              <span className="sr-only">{tp.nextPage}</span>
               <ChevronRightIcon className="h-4 w-4" />
             </Button>
           </div>
         )}
         {!hidePagination && !isMobile && (
         <div className="flex items-center justify-between space-x-2 py-4">
-          <div className={standardToolbar ? 'hidden' : 'flex items-center space-x-2'}>
-            <p className="text-sm font-medium">Rows per page</p>
+          <div className="flex items-center space-x-2">
+            <p className="text-sm font-medium">{tp.rowsPerPage}</p>
             <Select
               value={`${table.getState().pagination.pageSize}`}
               onValueChange={(value) => {
@@ -1485,8 +1500,7 @@ export function createDataTableWithToolbar<TData>(
           </div>
           <div className="flex items-center space-x-6 lg:space-x-8">
             <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-              Page {table.getState().pagination.pageIndex + 1} of{' '}
-              {table.getPageCount()}
+              {tp.pageOf(table.getState().pagination.pageIndex + 1, table.getPageCount())}
             </div>
             <div className="flex items-center space-x-2">
               <Button
@@ -1495,7 +1509,7 @@ export function createDataTableWithToolbar<TData>(
                 onClick={() => table.setPageIndex(0)}
                 disabled={!table.getCanPreviousPage()}
               >
-                <span className="sr-only">Go to first page</span>
+                <span className="sr-only">{tp.firstPage}</span>
                 <ChevronsLeftIcon className="h-4 w-4" />
               </Button>
               <Button
@@ -1504,7 +1518,7 @@ export function createDataTableWithToolbar<TData>(
                 onClick={() => table.previousPage()}
                 disabled={!table.getCanPreviousPage()}
               >
-                <span className="sr-only">Go to previous page</span>
+                <span className="sr-only">{tp.previousPage}</span>
                 <ChevronLeftIcon className="h-4 w-4" />
               </Button>
               <Button
@@ -1513,7 +1527,7 @@ export function createDataTableWithToolbar<TData>(
                 onClick={() => table.nextPage()}
                 disabled={!table.getCanNextPage()}
               >
-                <span className="sr-only">Go to next page</span>
+                <span className="sr-only">{tp.nextPage}</span>
                 <ChevronRightIcon className="h-4 w-4" />
               </Button>
               <Button
@@ -1522,7 +1536,7 @@ export function createDataTableWithToolbar<TData>(
                 onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                 disabled={!table.getCanNextPage()}
               >
-                <span className="sr-only">Go to last page</span>
+                <span className="sr-only">{tp.lastPage}</span>
                 <ChevronsRightIcon className="h-4 w-4" />
               </Button>
             </div>

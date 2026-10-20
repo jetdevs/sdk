@@ -8,7 +8,7 @@
  */
 
 import type { Actor, DbAccessOptions } from '../auth/actor';
-import { AuthError } from '../auth/actor';
+import { AuthError, mayAccessForeignOrg } from '../auth/actor';
 
 /**
  * Database context result
@@ -24,6 +24,33 @@ export interface DbContext<TDb = any> {
  */
 export interface SqlTemplate {
   (strings: TemplateStringsArray, ...values: any[]): any;
+}
+
+/**
+ * Resolve the org a database context runs in.
+ *
+ * `targetOrgId` often starts life as a value the client named. It is honoured
+ * for a platform system user, when it is the actor's own session org, or when
+ * the caller verified it server-side (`targetOrgVerified`). Any other actor
+ * stays in its session org, and one with no session org is refused: falling
+ * back to "no org" would widen the scope instead of narrowing it.
+ */
+function resolveEffectiveOrgId(actor: Actor, options: DbAccessOptions): number | null {
+  const { targetOrgId, targetOrgVerified = false } = options;
+
+  // undefined: not provided, use actor.orgId
+  // null: explicitly null (global/system roles), keep as null
+  // number: use the provided number
+  if (targetOrgId === undefined) {
+    return actor.orgId;
+  }
+  if (mayAccessForeignOrg(actor) || targetOrgVerified || targetOrgId === actor.orgId) {
+    return targetOrgId;
+  }
+  if (actor.orgId == null) {
+    throw new AuthError('FORBIDDEN', 'Access denied to this organization');
+  }
+  return actor.orgId;
 }
 
 /**
@@ -47,16 +74,11 @@ export function getDbContext<TDb = any>(
   const {
     crossOrgAccess = false,
     bypassRLS = false,
-    targetOrgId,
     allowNullOrgContext = false
   } = options;
 
-  // Determine the effective org ID
-  // Use nullish coalescing (??) to distinguish between:
-  // - undefined: not provided, use actor.orgId
-  // - null: explicitly null (global/system roles), keep as null
-  // - number: use the provided number
-  const effectiveOrgId = targetOrgId !== undefined ? targetOrgId : actor.orgId;
+  // Determine the effective org ID (never a foreign org for a non-system actor)
+  const effectiveOrgId = resolveEffectiveOrgId(actor, options);
 
   // System users requesting cross-org access or bypass RLS
   if (actor.isSystemUser && (crossOrgAccess || bypassRLS)) {
@@ -169,13 +191,11 @@ export async function createServiceContextWithDb<TDb = any>(
   withRLS: DbContext<TDb>;
 }> {
   const dbExecutor = getDbContext(ctx, actor, options, sql);
-  // Use same logic as getDbContext for consistency
-  const effectiveOrgId = options.targetOrgId !== undefined ? options.targetOrgId : actor.orgId;
 
   return {
     db: ctx.db,
     actor,
-    orgId: effectiveOrgId,
+    orgId: dbExecutor.effectiveOrgId,
     isCrossOrg: options.crossOrgAccess || false,
     withRLS: dbExecutor
   };

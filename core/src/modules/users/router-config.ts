@@ -11,6 +11,9 @@
 import { and, ilike, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { IUserRepository } from './repository';
+import { omitUserSecrets } from './user-output';
+import { namesForeignOrg } from '../organizations/org-scope';
+import { findRoleAssignmentRefusal } from '../rbac/assignable-role';
 import type { LocalCredentialWriteGuard } from '../auth/local-credential-policy';
 import {
   askCredentialOwner,
@@ -43,6 +46,8 @@ import {
     userCreateSchema,
     userFiltersSchema,
     userUpdateSchema,
+    ADMIN_SET_PASSWORD_REFUSED,
+    carriesPassword,
 } from './schemas';
 
 // =============================================================================
@@ -85,8 +90,8 @@ export interface UserRouterDeps {
 
   /**
    * Optional resolver consulted before any procedure here writes a local
-   * verifier — `invite` and `create` (a new user), `update` (a password on an
-   * existing user) and `changePassword`. It answers WHERE the credential
+   * verifier — `invite` and `create` (a new user, no password), `update` (a
+   * password on the caller's own user) and `changePassword`. It answers WHERE the credential
    * lives; the SDK has no opinion of its own. Per kind:
    *
    * - `local`: write.
@@ -113,8 +118,9 @@ export interface UserRouterDeps {
 
   /**
    * Optional hook fired ONCE after a procedure here has successfully stored a
-   * local verifier — `invite` and `create` when the input CARRIED a password
-   * (`firstSet: true`), `update` with a password, and `changePassword`. It is
+   * local verifier — `update` with a password (the caller's OWN user only,
+   * YMS-494 S6) and `changePassword`. `invite`/`create` never write one: they
+   * refuse any password with BAD_REQUEST (invite-only). It is
    * never fired on a refusal (`external` → redirect, `frozen` → FORBIDDEN,
    * `none` → NOT_FOUND), on a wrong current password, on an invite that only
    * added an existing user to an org, or on an invite/create with no password:
@@ -173,6 +179,49 @@ export class UserRouterError extends Error {
   }
 }
 
+/** Most users one org's user list is read for when checking a target. */
+const ORG_USER_LIST_LIMIT = 5000;
+
+/**
+ * The users among `userIds` that the caller may NOT act on.
+ *
+ * The users table has no row security: a user id alone says nothing about
+ * which org the user belongs to. A caller that is not a platform system user
+ * may act on itself and on the users its own org's user list shows, read
+ * through the same repository call the list uses, so an app that widens or
+ * narrows its list (a hierarchy of orgs, invited members) widens or narrows
+ * this check with it.
+ *
+ * A role assignment alone does not make a user a member: the caller can write
+ * one itself. In the SDK repository the list is the org_members table.
+ */
+async function usersOutsideCallerOrg(
+  { service, actor, repo, db }: Pick<UserHandlerContext, 'service' | 'actor' | 'repo' | 'db'>,
+  userIds: number[],
+): Promise<number[]> {
+  if (actor?.isSystemUser === true) {
+    return [];
+  }
+  const selfId = parseInt(service.userId);
+  const others = [...new Set(userIds)].filter((id) => id !== selfId);
+  if (others.length === 0) {
+    return [];
+  }
+  const orgId = service.orgId;
+  if (!orgId) {
+    return others;
+  }
+
+  const listed = await repo.findAll(db, {
+    limit: ORG_USER_LIST_LIMIT,
+    offset: 0,
+    filters: { orgId },
+  });
+  const inOrg = new Set(listed.map((u: any) => u.id));
+
+  return others.filter((id) => !inOrg.has(id));
+}
+
 /**
  * Ask where the credential lives and refuse `frozen` in this module's error
  * shape. `external` and `none` are returned for the caller to route, since
@@ -218,7 +267,7 @@ async function ownerOrFrozen(
 export function createUserRouterConfig(deps: UserRouterDeps) {
   const resolveOwner = selectCredentialOwnerResolver(deps);
 
-  return {
+  return withSafeUserOutput({
     // -------------------------------------------------------------------------
     // GET ALL USERS WITH STATS (org-scoped)
     // -------------------------------------------------------------------------
@@ -227,8 +276,17 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       permission: 'user:read',
       input: userFiltersSchema,
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userFiltersSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userFiltersSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         const effectiveOrgId = input.orgId ?? (service.orgId ?? undefined);
+
+        // With no org to filter by, the list would be every user.
+        if (!effectiveOrgId && actor?.isSystemUser !== true) {
+          throw new UserRouterError('BAD_REQUEST', 'Organization context required');
+        }
 
         const users = await repo.findAll(db, {
           limit: input.limit,
@@ -290,7 +348,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       type: 'query' as const,
       permission: 'user:read',
       repository: deps.Repository,
-      handler: async ({ service, repo, db }: UserHandlerContext) => {
+      handler: async ({ service, actor, repo, db }: UserHandlerContext) => {
+        if (!service.orgId && actor?.isSystemUser !== true) {
+          throw new UserRouterError('BAD_REQUEST', 'Organization context required');
+        }
+
         return repo.findAll(db, {
           limit: 100,
           offset: 0,
@@ -377,7 +439,12 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       permission: 'user:read',
       input: z.number(),
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<number>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<number>) => {
+        // A user of another org reads as "not found", the same as a missing id.
+        if ((await usersOutsideCallerOrg({ service, actor, repo, db }, [input])).length > 0) {
+          throw new UserRouterError('NOT_FOUND', `User with ID ${input} not found`);
+        }
+
         const user = await repo.findById(db, input);
         if (!user) {
           throw new UserRouterError('NOT_FOUND', `User with ID ${input} not found`);
@@ -398,7 +465,25 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users'],
       entityType: 'user',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userCreateSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userCreateSchema>>) => {
+        // Invite-only (YMS-494 S6): nobody hands another person a password.
+        // The schema already refuses one; this holds for direct handler calls.
+        if (carriesPassword(input)) {
+          throw new UserRouterError('BAD_REQUEST', ADMIN_SET_PASSWORD_REFUSED);
+        }
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
+        // The caller picks the role. An org-level caller may not hand out a
+        // system role or a role that carries a platform permission.
+        if (input.roleId) {
+          const refusal = await findRoleAssignmentRefusal(db, actor, service.orgId, input.roleId);
+          if (refusal) {
+            throw new UserRouterError('FORBIDDEN', refusal);
+          }
+        }
+
         /**
          * Find the global "Standard User" role.
          *
@@ -464,7 +549,13 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             }
           }
           await deps.onUserInvited?.({ user: existing, orgId: service.orgId ?? null, db });
-          return existing;
+
+          // The person was found by email and may belong to another org. The
+          // caller gets back what it sent, not that person's stored record.
+          if (actor?.isSystemUser === true) {
+            return existing;
+          }
+          return { id: existing.id, email: existing.email } as typeof existing;
         }
 
         // Server-side closure: a new user is a new identity, and may carry a
@@ -495,10 +586,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         // p77 seam: allocating a user goes through the gate, and the hash,
         // the insert, the role and the announcement share one bounded tx.
         const newUser = await withCredentialWrite(deps, { operation: 'invite', db }, async (tx) => {
-          const hashedPassword = input.password
-            ? await deps.hashPassword(input.password, 10)
-            : undefined;
-
+          // No verifier: the invitee sets their own password.
           const created = await repo.create(tx, {
             name: derivedName,
             firstName: input.firstName,
@@ -506,7 +594,6 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             email: input.email,
             phone: input.phone,
             username: input.username,
-            password: hashedPassword,
             isActive: input.isActive,
             currentOrgId: service.orgId,
           });
@@ -520,17 +607,6 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             });
           }
 
-          // Only an invite that CARRIED a password stored a verifier.
-          if (hashedPassword) {
-            await announceCredentialWritten(deps.onCredentialWritten, {
-              db: tx,
-              userId: created.id,
-              operation: 'invite',
-              actorUserId: parseInt(service.userId),
-              firstSet: true,
-              at: new Date(),
-            });
-          }
           return created;
         });
 
@@ -550,7 +626,23 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users'],
       entityType: 'user',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userCreateSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userCreateSchema>>) => {
+        // Invite-only (YMS-494 S6): nobody hands another person a password.
+        // The schema already refuses one; this holds for direct handler calls.
+        if (carriesPassword(input)) {
+          throw new UserRouterError('BAD_REQUEST', ADMIN_SET_PASSWORD_REFUSED);
+        }
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
+        if (input.roleId) {
+          const refusal = await findRoleAssignmentRefusal(db, actor, input.orgId ?? service.orgId, input.roleId);
+          if (refusal) {
+            throw new UserRouterError('FORBIDDEN', refusal);
+          }
+        }
+
         // Check if user with email already exists
         const existing = await repo.findByEmail(db, input.email);
         if (existing) {
@@ -576,10 +668,7 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         // p77 seam: gate, then hash + insert + announcement + role in one
         // bounded transaction.
         return withCredentialWrite(deps, { operation: 'create', db }, async (tx) => {
-          const hashedPassword = input.password
-            ? await deps.hashPassword(input.password, 10)
-            : undefined;
-
+          // No verifier: the new user sets their own password.
           const newUser = await repo.create(tx, {
             name: derivedName,
             firstName: input.firstName,
@@ -587,22 +676,9 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
             email: input.email,
             phone: input.phone,
             username: input.username,
-            password: hashedPassword,
             isActive: input.isActive,
             currentOrgId: input.orgId,
           });
-
-          // Only a create that CARRIED a password stored a verifier.
-          if (hashedPassword) {
-            await announceCredentialWritten(deps.onCredentialWritten, {
-              db: tx,
-              userId: newUser.id,
-              operation: 'create',
-              actorUserId: parseInt(service.userId),
-              firstSet: true,
-              at: new Date(),
-            });
-          }
 
           // Assign role if provided
           if (input.roleId && input.orgId) {
@@ -628,23 +704,30 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users'],
       entityType: 'user',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userUpdateSchema>>) => {
-        // DEBUG: Log incoming input to trace password flow
-        console.log('[SDK User Update] Input received:', JSON.stringify({
-          id: input.id,
-          hasPassword: !!input.password,
-          passwordLength: input.password?.length,
-          allKeys: Object.keys(input),
-        }));
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userUpdateSchema>>) => {
+        // Invite-only (YMS-494 S6): a password is only ever set by its owner.
+        // Nobody — org admin or platform system user — sets ANOTHER user's
+        // password here; that person uses their invitation / reset link.
+        // Checked first: no lookup happens for a refused request.
+        if (input.password && input.id !== parseInt(service.userId)) {
+          throw new UserRouterError('FORBIDDEN', ADMIN_SET_PASSWORD_REFUSED);
+        }
+
+        // This route checks no permission in the router, so a user can edit
+        // its own profile. Editing someone else needs `user:update`, and the
+        // target must belong to the caller's org.
+        if (actor?.isSystemUser !== true && input.id !== parseInt(service.userId)) {
+          const permissions: string[] = actor?.permissions ?? [];
+          if (!permissions.includes('user:update')) {
+            throw new UserRouterError('FORBIDDEN', 'Permission required: user:update');
+          }
+          if ((await usersOutsideCallerOrg({ service, actor, repo, db }, [input.id])).length > 0) {
+            throw new UserRouterError('NOT_FOUND', `User with ID ${input.id} not found`);
+          }
+        }
 
         const { id, password, ...updateData } = input;
 
-        // DEBUG: Log after destructuring
-        console.log('[SDK User Update] After destructuring:', JSON.stringify({
-          hasPassword: !!password,
-          passwordLength: password?.length,
-          updateDataKeys: Object.keys(updateData),
-        }));
 
         // Verify user exists
         const existing = await repo.findById(db, id);
@@ -702,7 +785,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users'],
       entityType: 'user',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<number>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<number>) => {
+        if ((await usersOutsideCallerOrg({ service, actor, repo, db }, [input])).length > 0) {
+          throw new UserRouterError('NOT_FOUND', `User with ID ${input} not found`);
+        }
+
         // Verify user exists
         const existing = await repo.findById(db, input);
         if (!existing) {
@@ -727,9 +814,13 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users'],
       entityType: 'user',
       repository: deps.Repository,
-      handler: async ({ input, repo, db }: UserHandlerContext<z.infer<typeof userBulkUpdateSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userBulkUpdateSchema>>) => {
         if (input.userIds.length === 0) {
           return { updated: 0 };
+        }
+
+        if ((await usersOutsideCallerOrg({ service, actor, repo, db }, input.userIds)).length > 0) {
+          throw new UserRouterError('FORBIDDEN', 'Some users are not in this organization');
         }
 
         const updated = await repo.bulkUpdate(db, input.userIds, {
@@ -749,12 +840,16 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users'],
       entityType: 'user',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof userBulkDeleteSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof userBulkDeleteSchema>>) => {
         // Filter out self-deletion
         const userIds = input.userIds.filter(id => id !== parseInt(service.userId));
 
         if (userIds.length === 0) {
           return { deleted: 0 };
+        }
+
+        if ((await usersOutsideCallerOrg({ service, actor, repo, db }, userIds)).length > 0) {
+          throw new UserRouterError('FORBIDDEN', 'Some users are not in this organization');
         }
 
         const deleted = await repo.bulkUpdate(db, userIds, { isActive: false });
@@ -909,11 +1004,20 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users', 'roles'],
       entityType: 'user_role',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof assignRoleSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof assignRoleSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         const orgId = input.orgId || service.orgId;
 
         if (!orgId) {
           throw new UserRouterError('BAD_REQUEST', 'Organization context required for role assignment');
+        }
+
+        const refusal = await findRoleAssignmentRefusal(db, actor, orgId, input.roleId);
+        if (refusal) {
+          throw new UserRouterError('FORBIDDEN', refusal);
         }
 
         // Check if already has role
@@ -942,7 +1046,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users', 'roles'],
       entityType: 'user_role',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof removeRoleSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof removeRoleSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         const orgId = input.orgId || service.orgId;
 
         if (!orgId) {
@@ -968,7 +1076,11 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
       invalidates: ['users', 'roles'],
       entityType: 'user_role',
       repository: deps.Repository,
-      handler: async ({ input, service, repo, db }: UserHandlerContext<z.infer<typeof removeFromOrgSchema>>) => {
+      handler: async ({ input, service, actor, repo, db }: UserHandlerContext<z.infer<typeof removeFromOrgSchema>>) => {
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new UserRouterError('FORBIDDEN', 'Access denied to this organization');
+        }
+
         const orgId = input.orgId || service.orgId;
 
         if (!orgId) {
@@ -979,7 +1091,20 @@ export function createUserRouterConfig(deps: UserRouterDeps) {
         return { removed };
       },
     },
-  };
+  });
+}
+
+/**
+ * Every procedure's result passes through `omitUserSecrets`: a users row must
+ * never reach a client with its password verifier, whichever repository (SDK
+ * or an app subclass) produced it.
+ */
+function withSafeUserOutput<C extends Record<string, { handler: (...args: any[]) => any }>>(config: C): C {
+  for (const procedure of Object.values(config)) {
+    const handler = procedure.handler;
+    procedure.handler = (async (...args: any[]) => omitUserSecrets(await handler(...args))) as typeof handler;
+  }
+  return config;
 }
 
 // =============================================================================

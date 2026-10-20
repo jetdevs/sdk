@@ -10,7 +10,8 @@
 import { z } from "zod";
 import { SDKRoleRepository } from "./role.repository";
 import type { RoleService } from "./role.service";
-import { SDKRoleService } from "./role.service";
+import { RbacError, SDKRoleService } from "./role.service";
+import { namesForeignOrg } from "../organizations/org-scope";
 import {
     assignPermissionsSchema,
     bulkDeleteRolesSchema,
@@ -61,7 +62,7 @@ interface RoleHandlerContext<TInput = any> {
 export interface CreateRoleRouterConfigOptions {
   /**
    * RoleService instance to use for operations
-   * @default SDKRoleService (uses "admin:full_access" for system role checks)
+   * @default SDKRoleService (system roles: platform system user only)
    */
   Service?: RoleService;
 
@@ -105,8 +106,21 @@ export const defaultCreateServiceContext: CreateServiceContext = (
   orgId,
   userId: actor.userId,
   permissions: actor.permissions || [],
-  isSystemUser: actor.permissions?.some((p) => p.startsWith("admin:")) || false,
+  // Platform staff only (a role flagged isSystemRole, set on the actor). Not
+  // admin:* — the global Owner/Admin template every org assigns carries it.
+  isSystemUser: actor.isSystemUser === true,
 });
+
+/**
+ * These routes are `crossOrg` so platform staff can reach system roles and
+ * other orgs' roles. A caller that is not a platform system user may name
+ * only its own org.
+ */
+function assertOwnOrg(inputOrgId: number | null | undefined, actor: Actor): void {
+  if (namesForeignOrg(inputOrgId, actor)) {
+    throw new RbacError("Access denied to this organization", "FORBIDDEN");
+  }
+}
 
 // =============================================================================
 // ROUTER CONFIG FACTORY
@@ -268,6 +282,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
         crossOrgAccess?: boolean;
         orgId?: number;
       }>) => {
+        assertOwnOrg(input.orgId, actor);
         const effectiveOrgId = input.crossOrgAccess
           ? input.orgId ?? null
           : service.orgId;
@@ -303,6 +318,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
         crossOrgAccess?: boolean;
         orgId?: number;
       }>) => {
+        assertOwnOrg(input.orgId, actor);
         const effectiveOrgId = input.crossOrgAccess
           ? (input.orgId ?? null)
           : service.orgId;
@@ -431,6 +447,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
         crossOrgAccess?: boolean;
         orgId?: number;
       }>) => {
+        assertOwnOrg(input.orgId, actor);
         const effectiveOrgId = input.crossOrgAccess
           ? (input.orgId ?? null)
           : service.orgId;
@@ -467,6 +484,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
         crossOrgAccess?: boolean;
         orgId?: number;
       }>) => {
+        assertOwnOrg(input.orgId, actor);
         const effectiveOrgId = input.crossOrgAccess
           ? (input.orgId ?? null)
           : service.orgId;
@@ -571,6 +589,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
         targetOrgId: number;
         newName?: string;
       }>) => {
+        assertOwnOrg(input.targetOrgId, actor);
         const serviceCtx = createServiceContext(db, actor, input.targetOrgId);
 
         return Service.copyRole(
@@ -592,7 +611,7 @@ export function createRoleRouterConfig(options: CreateRoleRouterConfigOptions = 
  * Pre-built role router configuration using SDK defaults.
  *
  * Uses:
- * - SDKRoleService (checks for "admin:full_access" permission)
+ * - SDKRoleService (system roles: platform system user only)
  * - SDKRoleRepository (uses SDK schema tables)
  * - defaultCreateServiceContext
  *

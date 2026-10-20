@@ -445,10 +445,34 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;`,
 };
 
 /**
- * SQL to create/ensure RLS roles exist
+ * Env var that holds the app_user login password.
+ * Only read when the app_user role does not exist yet; an existing role's
+ * password is never changed here (rotation is an explicit admin step).
  */
-export const RLS_ROLES_SQL = `
-DO $$
+export const APP_USER_PASSWORD_ENV = 'APP_USER_DB_PASSWORD';
+
+const ROLES_SQL_TAG = '$rls_roles$';
+
+/**
+ * SQL to create/ensure RLS roles exist.
+ *
+ * With `appUserPassword`, a missing app_user is created with that password.
+ * Without it, a missing app_user is created with LOGIN but no password, so it
+ * cannot sign in until an admin sets one. No password is ever built in.
+ */
+export function getRlsRolesSql(appUserPassword?: string): string {
+  let createAppUser = 'CREATE ROLE app_user WITH LOGIN;';
+  let notice = `RAISE NOTICE 'Created app_user role without a password (set ${APP_USER_PASSWORD_ENV} to give it one)';`;
+  if (appUserPassword) {
+    if (appUserPassword.includes(ROLES_SQL_TAG)) {
+      throw new Error(`${APP_USER_PASSWORD_ENV} must not contain "${ROLES_SQL_TAG}"`);
+    }
+    createAppUser = `CREATE ROLE app_user WITH LOGIN PASSWORD '${appUserPassword.replace(/'/g, "''")}';`;
+    notice = "RAISE NOTICE 'Created app_user role';";
+  }
+
+  return `
+DO ${ROLES_SQL_TAG}
 DECLARE
     db_name TEXT;
 BEGIN
@@ -457,8 +481,8 @@ BEGIN
 
     -- Create app_user role if it doesn't exist
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_user') THEN
-        CREATE ROLE app_user WITH LOGIN PASSWORD 'app-user-password';
-        RAISE NOTICE 'Created app_user role';
+        ${createAppUser}
+        ${notice}
     END IF;
 
     -- Create internal_api_user role if it doesn't exist
@@ -470,7 +494,14 @@ BEGIN
     -- Grant database connection privileges using dynamic SQL
     EXECUTE format('GRANT CONNECT ON DATABASE %I TO app_user, internal_api_user', db_name);
 END
-$$;`;
+${ROLES_SQL_TAG};`;
+}
+
+/**
+ * @deprecated Use getRlsRolesSql(password). Creates a missing app_user
+ * without a password.
+ */
+export const RLS_ROLES_SQL = getRlsRolesSql();
 
 /**
  * SQL statements to grant RLS function permissions to app_user

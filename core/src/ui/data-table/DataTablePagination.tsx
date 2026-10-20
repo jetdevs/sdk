@@ -2,6 +2,7 @@
 
 import type { Table } from '@tanstack/react-table';
 import * as React from 'react';
+import { useCoreLabels } from '../labels';
 
 // =============================================================================
 // UI COMPONENT TYPES
@@ -77,6 +78,7 @@ export function createDataTablePagination(ui: PaginationUIComponents) {
     showSelectedCount = true,
     className,
   }: DataTablePaginationProps<TData>) {
+    const tp = useCoreLabels().pagination;
     // Nothing to page through: no rows on the first page. Without this the
     // pager reads "Page 1 of 0" under an empty state.
     if (
@@ -91,14 +93,16 @@ export function createDataTablePagination(ui: PaginationUIComponents) {
         <div className="flex-1 text-sm text-muted-foreground">
           {showSelectedCount && (
             <>
-              {table.getFilteredSelectedRowModel().rows.length} of{' '}
-              {table.getFilteredRowModel().rows.length} row(s) selected.
+              {tp.rowsSelected(
+                table.getFilteredSelectedRowModel().rows.length,
+                table.getFilteredRowModel().rows.length,
+              )}
             </>
           )}
         </div>
         <div className="flex items-center space-x-6 lg:space-x-8">
           <div className="flex items-center space-x-2">
-            <p className="text-sm font-medium">Rows per page</p>
+            <p className="text-sm font-medium">{tp.rowsPerPage}</p>
             <select
               value={`${table.getState().pagination.pageSize}`}
               onChange={(e) => {
@@ -114,7 +118,7 @@ export function createDataTablePagination(ui: PaginationUIComponents) {
             </select>
           </div>
           <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            {tp.pageOf(table.getState().pagination.pageIndex + 1, table.getPageCount())}
           </div>
           <div className="flex items-center space-x-2">
             <Button
@@ -123,7 +127,7 @@ export function createDataTablePagination(ui: PaginationUIComponents) {
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
             >
-              <span className="sr-only">Go to first page</span>
+              <span className="sr-only">{tp.firstPage}</span>
               <ChevronsLeftIcon className="h-4 w-4" />
             </Button>
             <Button
@@ -132,7 +136,7 @@ export function createDataTablePagination(ui: PaginationUIComponents) {
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
             >
-              <span className="sr-only">Go to previous page</span>
+              <span className="sr-only">{tp.previousPage}</span>
               <ChevronLeftIcon className="h-4 w-4" />
             </Button>
             <Button
@@ -141,7 +145,7 @@ export function createDataTablePagination(ui: PaginationUIComponents) {
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
             >
-              <span className="sr-only">Go to next page</span>
+              <span className="sr-only">{tp.nextPage}</span>
               <ChevronRightIcon className="h-4 w-4" />
             </Button>
             <Button
@@ -150,7 +154,7 @@ export function createDataTablePagination(ui: PaginationUIComponents) {
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
             >
-              <span className="sr-only">Go to last page</span>
+              <span className="sr-only">{tp.lastPage}</span>
               <ChevronsRightIcon className="h-4 w-4" />
             </Button>
           </div>

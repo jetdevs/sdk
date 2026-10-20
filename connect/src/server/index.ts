@@ -15,6 +15,13 @@ export {
   ConnectIdentityRegisterError,
   isConnectIdentityRegisterError,
   isIdentityRefConflict,
+  InvitesClient,
+  ConnectInvitesError,
+  type InvitesClientConfig,
+  type CreateConnectInviteArgs,
+  type CreateConnectInviteResult,
+  type ConnectInvite,
+  type ConnectInviteStatus,
 } from './provisioning.js'
 export { isSourceSystemKey, SOURCE_SYSTEM_KEY_RE } from '../adapter/index.js'
 

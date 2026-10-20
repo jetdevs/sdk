@@ -16,12 +16,16 @@ export default defineConfig({
     environmentMatchGlobs: [
       // Only the data-table DOM render tests get happy-dom.
       ['src/ui/data-table/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
+      // Core UI labels (i18n) provider.
+      ['src/ui/labels/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
       // p79 STORY-047: the shared auth page UI render tests.
       ['src/ui/auth-pages/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
       // p90 batch 3d: the shared app header + brand mark.
       ['src/ui/app-header/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
       // p90: THE searchable dropdown.
       ['src/ui/select/__tests__/*.dom.test.{ts,tsx}', 'happy-dom'],
+      // p131 INV-002: the invite accept page.
+      ['src/modules/invites/ui/*.dom.test.{ts,tsx}', 'happy-dom'],
     ],
     globals: true,
   },

@@ -1,6 +1,6 @@
 {
   "name": "@jetdevs/core",
-  "version": "0.1.50-dev",
+  "version": "0.1.57-dev",
   "description": "Core SDK components, UI primitives, and utilities for Core SaaS",
   "type": "module",
   "publishConfig": {
@@ -78,6 +78,11 @@
       "types": "./dist/ui/index.d.ts",
       "import": "./dist/ui/index.js",
       "require": "./dist/ui/index.js"
+    },
+    "./ui/labels": {
+      "types": "./dist/ui/labels/index.d.ts",
+      "import": "./dist/ui/labels/index.js",
+      "require": "./dist/ui/labels/index.js"
     },
     "./ui/primitives": {
       "types": "./dist/ui/primitives/index.d.ts",
@@ -193,6 +198,21 @@
       "types": "./dist/api-keys/index.d.ts",
       "import": "./dist/api-keys/index.js",
       "require": "./dist/api-keys/index.js"
+    },
+    "./access": {
+      "types": "./dist/access/index.d.ts",
+      "import": "./dist/access/index.js",
+      "require": "./dist/access/index.js"
+    },
+    "./invites": {
+      "types": "./dist/invites/index.d.ts",
+      "import": "./dist/invites/index.js",
+      "require": "./dist/invites/index.js"
+    },
+    "./invites/ui": {
+      "types": "./dist/invites/ui/index.d.ts",
+      "import": "./dist/invites/ui/index.js",
+      "require": "./dist/invites/ui/index.js"
     },
     "./system-config": {
       "types": "./dist/system-config/index.d.ts",

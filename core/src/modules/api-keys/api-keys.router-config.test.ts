@@ -108,3 +108,53 @@ describe('apiKeys create handler — permission resolution', () => {
     expect(repo.create.mock.calls[0][0].permissions).toEqual(['agents:read']);
   });
 });
+
+describe('apiKeys — platform permissions on a key (YMS-297)', () => {
+  const orgAdmin = { isSystemUser: false, isSuperUser: false, permissions: ['api_keys:manage'] };
+  const staff = { isSystemUser: true, isSuperUser: true, permissions: ['admin:full_access'] };
+  const base = { name: 'k', environment: 'test' as const, permissions: [] as string[] };
+  const call = (cfg: any, proc: string, input: any, actor: any) =>
+    cfg[proc].handler({
+      input,
+      service: { orgId: 1, userId: '7' },
+      actor,
+      db: undefined,
+      repo: makeRepo(),
+      ctx: {},
+    } as any);
+
+  for (const permission of ['admin:full_access', 'admin:manage', 'org:cross_org_access', '*']) {
+    it(`create refuses ${permission} listed by an org-level caller`, async () => {
+      const cfg = createApiKeysRouterConfig({});
+      await expect(call(cfg, 'create', { ...base, permissions: ['user:read', permission] }, orgAdmin)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+    });
+  }
+
+  it('update refuses a platform permission listed by an org-level caller', async () => {
+    const cfg = createApiKeysRouterConfig({});
+    await expect(call(cfg, 'update', { id: 1, permissions: ['admin:full_access'] }, orgAdmin)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('create still accepts ordinary permissions from an org-level caller', async () => {
+    const cfg = createApiKeysRouterConfig({});
+    await expect(call(cfg, 'create', { ...base, permissions: ['user:read'] }, orgAdmin)).resolves.toMatchObject({
+      key: expect.any(String),
+    });
+  });
+
+  it('create accepts a platform permission from a caller with full platform access', async () => {
+    const cfg = createApiKeysRouterConfig({});
+    await expect(call(cfg, 'create', { ...base, permissions: ['admin:full_access'] }, staff)).resolves.toMatchObject({
+      key: expect.any(String),
+    });
+  });
+
+  it('the app’s own default permissions are not the caller’s choice and still apply', async () => {
+    const cfg = createApiKeysRouterConfig({ defaultPermissions: ['*'] });
+    await expect(call(cfg, 'create', base, orgAdmin)).resolves.toMatchObject({ key: expect.any(String) });
+  });
+});

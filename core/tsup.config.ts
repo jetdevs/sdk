@@ -17,6 +17,7 @@ const clientEntries = [
   'ui/auth-pages/index',
   'ui/app-header/index',
   'ui/select/index',
+  'ui/labels/index',
   'hooks/index',
   'stores/index',
   'providers/index',
@@ -26,6 +27,8 @@ const clientEntries = [
   'features/themes/ui/index',
   'features/api-keys/ui/index',
   'features/rbac/ui/index',
+  // p131: invite accept page (source lives in the invites module)
+  'invites/ui/index',
 ]
 
 // Server-only entry points (no React hooks)
@@ -49,6 +52,8 @@ const serverEntries = {
   'cli/db': 'src/cli/db.ts',
   'config/index': 'src/config/index.ts',
   'api-keys/index': 'src/modules/api-keys/index.ts',
+  'access/index': 'src/modules/access/index.ts',
+  'invites/index': 'src/modules/invites/index.ts',
   'system-config/index': 'src/modules/system-config/index.ts',
   'users/index': 'src/modules/users/index.ts',
   'organizations/index': 'src/modules/organizations/index.ts',
@@ -72,8 +77,13 @@ const serverEntries = {
 }
 
 // Client entry points with their source paths
+// Client entries whose source is not at `src/<entry>.ts`
+const clientEntrySources: Record<string, string> = {
+  'invites/ui/index': 'src/modules/invites/ui/index.ts',
+}
+
 const clientEntryPaths = clientEntries.reduce((acc, entry) => {
-  acc[entry] = `src/${entry}.ts`
+  acc[entry] = clientEntrySources[entry] ?? `src/${entry}.ts`
   return acc
 }, {} as Record<string, string>)
 

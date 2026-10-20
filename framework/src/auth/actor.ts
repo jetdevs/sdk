@@ -93,8 +93,15 @@ export interface DbAccessOptions {
   // Whether to bypass RLS entirely (dangerous - only for system operations)
   bypassRLS?: boolean;
 
-  // The specific org context to use (defaults to actor's orgId)
+  // The specific org context to use (defaults to actor's orgId).
+  // Honoured for a platform system user, or when `targetOrgVerified` is set;
+  // any other actor stays in its own session org.
   targetOrgId?: number;
+
+  // Set ONLY by server code that has itself established the actor may run in
+  // `targetOrgId` (an org locked by a custom domain, a verified membership).
+  // Never derive it from request input.
+  targetOrgVerified?: boolean;
 
   // Whether to allow null org context (for system users in backoffice)
   allowNullOrgContext?: boolean;
@@ -208,31 +215,20 @@ export function createActor(ctx: ActorContext): Actor {
   // Debug logging to see what we're working with
   console.log('🔍 [Framework SDK] createActor - Session Roles:', JSON.stringify(sessionRoles, null, 2));
 
-  // Check for system user status
-  // BEST PRACTICE: Use permissions as source of truth, not database flags
-  // Users with any admin:* permissions get system-level access
   const permissions: string[] = user.permissions || [];
-  const hasAdminPermissions = permissions.some(p => p.startsWith('admin:'));
 
-  // Fallback: Check isSystemRole flag for backward compatibility
-  const hasSystemRoleFlag = sessionRoles.some((role: any) => {
-    if (typeof role === 'object') {
-      return role?.isSystemRole === true;
-    }
-    return false;
-  });
+  // Platform staff only: an active role flagged `isSystemRole`. Never a
+  // permission or a role name — the global Owner/Admin role template every
+  // org assigns carries `admin:full_access` and all of `admin:*`, so reading
+  // status off permissions made every org Owner/Admin platform staff.
+  const hasSystemRoleFlag = sessionRoles.some((role: any) =>
+    typeof role === 'object' && role?.isSystemRole === true && role?.isActive !== false
+  );
 
-  const isSystemUser = hasAdminPermissions || hasSystemRoleFlag;
+  const isSystemUser = hasSystemRoleFlag;
+  const isSuperUser = hasSystemRoleFlag;
 
-  console.log('🔍 [Framework SDK] createActor result:', {
-    isSystemUser,
-    hasAdminPermissions,
-    hasSystemRoleFlag,
-    adminPermissions: permissions.filter(p => p.startsWith('admin:'))
-  });
-
-  // Super user check: admin:full_access permission
-  const isSuperUser = permissions.includes('admin:full_access') || hasSystemRoleFlag;
+  console.log('🔍 [Framework SDK] createActor result:', { isSystemUser });
 
   return {
     userId,
@@ -286,6 +282,20 @@ export function requirePermission(actor: Actor, permission: string): void {
 }
 
 /**
+ * Whether an actor may run in an org other than its own session org.
+ *
+ * True only for a platform system user. The `org:cross_org_access` permission
+ * is deliberately not consulted: a permission can be granted to an org-level
+ * role by mistake, and this rule decides which tenant's rows a request reads
+ * and writes.
+ *
+ * @param actor - The actor to check
+ */
+export function mayAccessForeignOrg(actor: Pick<Actor, 'isSystemUser'>): boolean {
+  return actor.isSystemUser === true;
+}
+
+/**
  * Checks if an actor can access a specific organization
  *
  * @param actor - The actor to check
@@ -293,17 +303,12 @@ export function requirePermission(actor: Actor, permission: string): void {
  * @returns Boolean indicating if access is allowed
  */
 export function canAccessOrg(actor: Actor, targetOrgId: number): boolean {
-  // System users can access any org
-  if (actor.isSystemUser) {
+  // Only platform system users reach other orgs; see mayAccessForeignOrg for
+  // why `org:cross_org_access` is not consulted.
+  if (mayAccessForeignOrg(actor)) {
     return true;
   }
 
-  // Users with cross-org permission can access any org
-  if (actor.permissions.includes("org:cross_org_access")) {
-    return true;
-  }
-
-  // Otherwise, can only access their own org
   return actor.orgId === targetOrgId;
 }
 
