@@ -231,9 +231,11 @@ export class ConnectProvisioningClient {
    * outcome throws ConnectIdentityDisconnectError with a stable code/status.
    */
   async disconnectApplicationIdentity(args: DisconnectApplicationIdentityArgs): Promise<DisconnectApplicationIdentityResult> {
+    const sub = args?.sub
+    const sourceUserRef = args?.sourceUserRef
     if (
-      !args || typeof args.sub !== 'string' || !/^[1-9]\d*$/.test(args.sub) || Number(args.sub) > 2_147_483_647 ||
-      typeof args.sourceUserRef !== 'string' || !args.sourceUserRef.trim() || args.sourceUserRef.length > 64
+      typeof sub !== 'string' || !/^[1-9]\d*$/.test(sub) || Number(sub) > 2_147_483_647 ||
+      typeof sourceUserRef !== 'string' || !sourceUserRef.trim() || sourceUserRef.length > 64
     ) {
       throw new ConnectIdentityDisconnectError('invalid_body', 0)
     }
@@ -248,7 +250,7 @@ export class ConnectProvisioningClient {
           Accept: 'application/json',
           'X-Internal-API-Key': this.key,
         },
-        body: JSON.stringify({ sub: args.sub, sourceUserRef: args.sourceUserRef }),
+        body: JSON.stringify({ sub, sourceUserRef }),
         signal,
       })
     } catch {
@@ -264,7 +266,7 @@ export class ConnectProvisioningClient {
     const counts = body.counts
     if (
       res.status === 200 && (body.status === 'disconnected' || body.status === 'already_disconnected') &&
-      body.sub === args.sub && body.sourceUserRef === args.sourceUserRef && body.canonicalIdentityPreserved === true &&
+      body.sub === sub && body.sourceUserRef === sourceUserRef && body.canonicalIdentityPreserved === true &&
       counts && [counts.grantsRevoked, counts.clientBindingsCleared, counts.mappingsRetired].every(
         (count) => typeof count === 'number' && Number.isSafeInteger(count) && count >= 0,
       )

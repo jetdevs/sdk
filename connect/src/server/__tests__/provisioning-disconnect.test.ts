@@ -76,6 +76,28 @@ describe('ConnectProvisioningClient.disconnectApplicationIdentity', () => {
     await expect(client().disconnectApplicationIdentity(input)).resolves.toEqual(result)
   })
 
+  it.each([
+    ['accepts the original receipt', { sub: '42', sourceUserRef: 'merchant-user-7' }, true],
+    ['rejects a receipt for the mutated input', { sub: '43', sourceUserRef: 'different-ref' }, false],
+  ] as const)('%s when caller input changes while fetch is pending', async (_name, receipt, accepted) => {
+    let respond!: (response: Response) => void
+    let sentBody: unknown
+    const sdk = client({
+      fetchImpl: (_url, options) => {
+        sentBody = JSON.parse(String(options?.body))
+        return new Promise<Response>((resolve) => (respond = resolve))
+      },
+    })
+    const args = { ...input }
+    const pending = sdk.disconnectApplicationIdentity(args)
+    expect(sentBody).toEqual({ sub: '42', sourceUserRef: 'merchant-user-7' })
+    args.sub = '43'
+    args.sourceUserRef = 'different-ref'
+    respond(Response.json({ ...success, ...receipt }))
+    if (accepted) await expect(pending).resolves.toEqual(success)
+    else await expect(pending).rejects.toMatchObject({ code: 'unexpected', status: 200 })
+  })
+
   it('accepts valid input boundaries without trimming the reference', async () => {
     const args = { sub: '2147483647', sourceUserRef: ` ${'a'.repeat(62)} ` }
     next.body = JSON.stringify({ ...success, ...args })
