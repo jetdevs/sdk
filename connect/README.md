@@ -71,3 +71,50 @@ id-token verification, introspection, and revocation.
 canonical directory via its internal API (carries an `X-Internal-API-Key` — never
 import from browser code). Each RP identifies itself with a free-form `sourceSystem`
 key.
+
+### Application disconnect and onboarding identity
+
+Use these methods only on the server with the relying party's internal API key:
+
+```ts
+import { ConnectProvisioningClient } from '@jetdevs/connect/server'
+
+const provisioning = new ConnectProvisioningClient({
+  baseUrl: process.env.CONNECT_ISSUER_URL!,
+  internalApiKey: process.env.CONNECT_INTERNAL_API_KEY!,
+})
+
+const receipt = await provisioning.disconnectApplicationIdentity({
+  sub: storedConnectSub,
+  sourceUserRef: String(localUserId),
+})
+const binding = await provisioning.getClientOrgBinding({ sub: storedConnectSub })
+// For an independently verified signup/invitation flow:
+const request = await provisioning.prepareOnboardingIdentity({ state, nonce, codeChallenge })
+// After the browser returns a proof code to the configured callback:
+const identity = await provisioning.exchangeOnboardingIdentity({
+  code, codeVerifier, nonce, state, redirectUri,
+})
+```
+
+The RP key requires `identity:disconnect` for disconnect, `onboarding:identity`
+for prepare/exchange, and `provisioning` for the caller's selected-org binding
+read. Disconnect confirms only this application's grants, client bindings and
+identity mapping retirement; the receipt preserves the canonical identity and
+does not claim global credential, membership or session deletion.
+
+Each method has a 10-second request budget and no automatic retries.
+`disconnectTimeoutMs` and `onboardingTimeoutMs` override their respective budgets;
+`getClientOrgBinding` always uses 10 seconds. Errors use the exported
+`ConnectIdentityDisconnectError`, `ConnectOnboardingIdentityError`, or
+`ConnectClientOrgBindingError` classes with stable `code` and `status` fields.
+
+Prepare returns either `not_required` for an eligible preflight, or `required`
+with an authorization URL. Exchange consumes a one-use proof: never retry it.
+Generate and retain state, nonce and PKCE values on the server, enforce the
+browser/callback binding, and verify the returned `clientId` against your RP.
+The exchange result is identity evidence only: it grants no business session,
+roles, organization access or tokens. The caller must still enforce independent
+mailbox proof, local lifecycle and authorization rules. A binding read is only
+this caller's current selected organization (`orgId` may be null), not an
+access grant.
