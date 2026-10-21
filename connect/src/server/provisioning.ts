@@ -6,7 +6,7 @@
  * This is the "app-driven, synced" provisioning model (Approach 1): when an RP
  * creates a user / org / invite locally, it mirrors that into the canonical
  * directory so returning logins via Connect SSO resolve a stable
- * `org_id` claim. All endpoints are idempotent — safe to retry.
+ * `org_id` claim. Onboarding proof exchange is one-use; never retry it.
  *
  * SERVER ONLY — never import from client/browser code (it carries the internal
  * API key). Lives in `@jetdevs/connect/server`.
@@ -94,6 +94,165 @@ export function isIdentityRefConflict(err: unknown): boolean {
   return isConnectIdentityRegisterError(err) && err.code === 'ref_conflict'
 }
 
+/** Retire this RP's exact local reference while preserving the canonical identity. */
+export interface DisconnectApplicationIdentityArgs {
+  /** Canonical positive signed 32-bit Connect subject, without leading zeroes. */
+  sub: string
+  /** Nonblank RP-local user reference, at most 64 characters; never normalized. */
+  sourceUserRef: string
+}
+
+export interface DisconnectApplicationIdentityResult {
+  status: 'disconnected' | 'already_disconnected'
+  sub: string
+  sourceUserRef: string
+  canonicalIdentityPreserved: true
+  counts: {
+    grantsRevoked: number
+    clientBindingsCleared: number
+    mappingsRetired: number
+  }
+}
+
+export type DisconnectApplicationIdentityErrorCode =
+  | RegisterIdentityErrorCode
+  | 'mapping_unknown'
+  | 'client_mismatch'
+  | 'maintenance'
+  | 'timeout'
+
+const DISCONNECT_ERROR_CODES: ReadonlySet<string> = new Set([
+  ...REGISTER_ERROR_CODES,
+  'mapping_unknown',
+  'client_mismatch',
+  'maintenance',
+])
+
+export class ConnectIdentityDisconnectError extends Error {
+  readonly kind = 'connect_identity_disconnect_error' as const
+  constructor(
+    readonly code: DisconnectApplicationIdentityErrorCode,
+    /** HTTP status; 0 when no HTTP response was received or input is invalid. */
+    readonly status: number,
+  ) {
+    super(`[connect-provisioning] identity/disconnect refused: ${status} ${code}`)
+    this.name = 'ConnectIdentityDisconnectError'
+  }
+}
+
+/** Duck-typed for independently bundled server entrypoints, like register errors. */
+export function isConnectIdentityDisconnectError(err: unknown): err is ConnectIdentityDisconnectError {
+  return (err as { kind?: unknown } | null)?.kind === 'connect_identity_disconnect_error'
+}
+
+export interface PrepareOnboardingIdentityArgs {
+  state: string
+  nonce: string
+  codeChallenge: string
+  expectedEmail?: string
+  method?: 'password' | 'google'
+  preflight?: boolean
+}
+
+export type PrepareOnboardingIdentityResult =
+  | { kind: 'not_required' }
+  | { kind: 'required'; authorizationUrl: string; expiresIn: number }
+
+export interface ExchangeOnboardingIdentityArgs {
+  code: string
+  codeVerifier: string
+  nonce: string
+  state: string
+  redirectUri: string
+}
+
+/** Identity evidence only: no OIDC tokens, roles or organization claims. */
+export interface ExchangeOnboardingIdentityResult {
+  issuer: string
+  sub: string
+  email: string
+  emailVerified: boolean
+  name?: string
+  nonce: string
+  state: string
+  clientId: string
+}
+
+export type OnboardingIdentityErrorCode =
+  | 'invalid_body' | 'unauthorized' | 'scope_not_permitted' | 'source_system_not_permitted'
+  | 'client_mismatch' | 'subject_unknown' | 'subject_inactive' | 'email_mismatch'
+  | 'identity_changed' | 'invalid_proof' | 'request_expired' | 'already_used'
+  | 'request_mismatch' | 'maintenance' | 'db_unavailable'
+  | 'timeout' | 'unreachable' | 'unexpected'
+
+const ONBOARDING_ERROR_CODES: ReadonlySet<string> = new Set<OnboardingIdentityErrorCode>([
+  'invalid_body', 'unauthorized', 'scope_not_permitted', 'source_system_not_permitted',
+  'client_mismatch', 'subject_unknown', 'subject_inactive', 'email_mismatch',
+  'identity_changed', 'invalid_proof', 'request_expired', 'already_used',
+  'request_mismatch', 'maintenance', 'db_unavailable',
+])
+
+export class ConnectOnboardingIdentityError extends Error {
+  readonly kind = 'connect_onboarding_identity_error' as const
+  constructor(
+    readonly code: OnboardingIdentityErrorCode,
+    /** HTTP status; 0 for invalid local input or no HTTP response. */
+    readonly status: number,
+  ) {
+    super(`[connect-provisioning] onboarding identity refused: ${status} ${code}`)
+    this.name = 'ConnectOnboardingIdentityError'
+  }
+}
+
+/** Duck-typed for independently bundled server entrypoints. */
+export function isConnectOnboardingIdentityError(err: unknown): err is ConnectOnboardingIdentityError {
+  return (err as { kind?: unknown } | null)?.kind === 'connect_onboarding_identity_error'
+}
+
+function isOnboardingToken(value: unknown, min: number, max: number): value is string {
+  return typeof value === 'string' && value.length >= min && value.length <= max && !/[^A-Za-z0-9_-]/u.test(value)
+}
+
+function isOnboardingEmail(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 254 && !/[\u0000-\u001f\u007f]/u.test(value) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(value)
+}
+
+function onboardingUrl(value: unknown): URL | undefined {
+  if (typeof value !== 'string' || !/^https?:\/\//u.test(value) || /[\s\u0000-\u001f\u007f]/u.test(value) || value.includes('#')) return undefined
+  try {
+    const url = new URL(value)
+    if (url.username || url.password) return undefined
+    return url
+  } catch {
+    return undefined
+  }
+}
+
+export interface GetClientOrgBindingArgs {
+  sub: string
+}
+
+export interface GetClientOrgBindingResult {
+  sub: string
+  orgId: number | null
+}
+
+export type ClientOrgBindingErrorCode =
+  | 'invalid_body' | 'unauthorized' | 'scope_not_permitted' | 'unknown_client'
+  | 'db_unavailable' | 'timeout' | 'unreachable' | 'unexpected'
+
+const BINDING_ERROR_CODES: ReadonlySet<string> = new Set([
+  'invalid_body', 'unauthorized', 'scope_not_permitted', 'unknown_client', 'db_unavailable',
+])
+
+export class ConnectClientOrgBindingError extends Error {
+  readonly kind = 'connect_client_org_binding_error' as const
+  constructor(readonly code: ClientOrgBindingErrorCode, readonly status: number) {
+    super(`[connect-provisioning] client-org-binding/get refused: ${status} ${code}`)
+    this.name = 'ConnectClientOrgBindingError'
+  }
+}
+
 export interface ConnectProvisioningConfig {
   /** Base URL of the Connect IdP (no trailing slash required). */
   baseUrl: string
@@ -103,6 +262,10 @@ export interface ConnectProvisioningConfig {
   fetchImpl?: typeof fetch
   /** Per-request budget for `registerIdentity`, ms (default 10 000). */
   registerTimeoutMs?: number
+  /** Per-request budget for `disconnectApplicationIdentity`, ms (default 10 000). */
+  disconnectTimeoutMs?: number
+  /** Per-request budget for the two onboarding identity methods, ms (default 10 000). */
+  onboardingTimeoutMs?: number
 }
 
 export class ConnectProvisioningClient {
@@ -111,12 +274,16 @@ export class ConnectProvisioningClient {
   private readonly fetchImpl: typeof fetch
 
   private readonly registerTimeoutMs: number
+  private readonly disconnectTimeoutMs: number
+  private readonly onboardingTimeoutMs: number
 
   constructor(config: ConnectProvisioningConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, '')
     this.key = config.internalApiKey
     this.fetchImpl = config.fetchImpl ?? fetch
     this.registerTimeoutMs = config.registerTimeoutMs ?? 10_000
+    this.disconnectTimeoutMs = config.disconnectTimeoutMs ?? 10_000
+    this.onboardingTimeoutMs = config.onboardingTimeoutMs ?? 10_000
   }
 
   /**
@@ -170,6 +337,145 @@ export class ConnectProvisioningClient {
     throw new ConnectIdentityRegisterError(code, res.status)
   }
 
+  /**
+   * Requires the RP key's `identity:disconnect` scope. No automatic retries.
+   * Resolves only for HTTP 200 with a validated exact sub/ref echo; every other
+   * outcome throws ConnectIdentityDisconnectError with a stable code/status.
+   */
+  async disconnectApplicationIdentity(args: DisconnectApplicationIdentityArgs): Promise<DisconnectApplicationIdentityResult> {
+    const sub = args?.sub
+    const sourceUserRef = args?.sourceUserRef
+    if (
+      typeof sub !== 'string' || !/^[1-9]\d*$/.test(sub) || Number(sub) > 2_147_483_647 ||
+      typeof sourceUserRef !== 'string' || !sourceUserRef.trim() || sourceUserRef.length > 64
+    ) {
+      throw new ConnectIdentityDisconnectError('invalid_body', 0)
+    }
+    let res: Response
+    let signal: AbortSignal | undefined
+    try {
+      signal = AbortSignal.timeout(this.disconnectTimeoutMs)
+      res = await this.fetchImpl(`${this.baseUrl}/api/internal/connect/identity/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Internal-API-Key': this.key,
+        },
+        body: JSON.stringify({ sub, sourceUserRef }),
+        redirect: 'error',
+        signal,
+      })
+    } catch {
+      throw new ConnectIdentityDisconnectError(signal?.aborted ? 'timeout' : 'unreachable', 0)
+    }
+    let json: unknown
+    try {
+      json = await res.json()
+    } catch {
+      throw new ConnectIdentityDisconnectError(signal.aborted ? 'timeout' : 'unexpected', res.status)
+    }
+    const body = (json ?? {}) as Partial<DisconnectApplicationIdentityResult> & { error?: unknown }
+    const counts = body.counts
+    if (
+      res.status === 200 && (body.status === 'disconnected' || body.status === 'already_disconnected') &&
+      body.sub === sub && body.sourceUserRef === sourceUserRef && body.canonicalIdentityPreserved === true &&
+      counts && [counts.grantsRevoked, counts.clientBindingsCleared, counts.mappingsRetired].every(
+        (count) => typeof count === 'number' && Number.isSafeInteger(count) && count >= 0,
+      )
+    ) {
+      return body as DisconnectApplicationIdentityResult
+    }
+    const code =
+      !(res.status >= 200 && res.status < 300) && typeof body.error === 'string' && DISCONNECT_ERROR_CODES.has(body.error)
+        ? (body.error as DisconnectApplicationIdentityErrorCode)
+        : 'unexpected'
+    throw new ConnectIdentityDisconnectError(code, res.status)
+  }
+
+  /** Requires the RP key's `onboarding:identity` scope. No automatic retries. */
+  async prepareOnboardingIdentity(args: PrepareOnboardingIdentityArgs): Promise<PrepareOnboardingIdentityResult> {
+    const state = args?.state
+    const nonce = args?.nonce
+    const codeChallenge = args?.codeChallenge
+    const expectedEmail = args?.expectedEmail
+    const method = args?.method
+    const preflight = args?.preflight
+    if (
+      !args || typeof args !== 'object' || Array.isArray(args) || !isOnboardingToken(state, 32, 128) || !isOnboardingToken(nonce, 32, 128) ||
+      !isOnboardingToken(codeChallenge, 43, 43) || (expectedEmail !== undefined && !isOnboardingEmail(expectedEmail)) ||
+      (method !== undefined && method !== 'password' && method !== 'google') ||
+      (preflight !== undefined && typeof preflight !== 'boolean') || (preflight === true && expectedEmail === undefined)
+    ) throw new ConnectOnboardingIdentityError('invalid_body', 0)
+    const body = await this.callOnboardingIdentity('prepare', { state, nonce, codeChallenge, expectedEmail, method, preflight })
+    if (body.kind === 'not_required' && preflight === true) return { kind: 'not_required' }
+    const url = onboardingUrl(body.authorizationUrl)
+    if (
+      body.kind === 'required' && url && url.origin === new URL(this.baseUrl).origin &&
+      url.pathname === '/api/connect/onboarding/authorize' &&
+      Array.from(url.searchParams.keys()).length === 1 && !!url.searchParams.get('request')?.trim() &&
+      typeof body.expiresIn === 'number' && Number.isSafeInteger(body.expiresIn) && body.expiresIn >= 1 && body.expiresIn <= 600
+    ) return { kind: 'required', authorizationUrl: body.authorizationUrl as string, expiresIn: body.expiresIn }
+    throw new ConnectOnboardingIdentityError('unexpected', 200)
+  }
+
+  /** Consumes a one-use proof; returns sanitized identity evidence, never business tokens. */
+  async exchangeOnboardingIdentity(args: ExchangeOnboardingIdentityArgs): Promise<ExchangeOnboardingIdentityResult> {
+    const code = args?.code
+    const codeVerifier = args?.codeVerifier
+    const nonce = args?.nonce
+    const state = args?.state
+    const redirectUri = args?.redirectUri
+    const callback = onboardingUrl(redirectUri)
+    if (
+      !args || typeof args !== 'object' || Array.isArray(args) || typeof code !== 'string' || code.length !== 64 || /[^a-fA-F0-9]/u.test(code) ||
+      !isOnboardingToken(codeVerifier, 43, 128) || !isOnboardingToken(nonce, 32, 128) || !isOnboardingToken(state, 32, 128) ||
+      !callback || (callback.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(callback.hostname))
+    ) throw new ConnectOnboardingIdentityError('invalid_body', 0)
+    const body = await this.callOnboardingIdentity('exchange', { code, codeVerifier, nonce, state, redirectUri })
+    if (
+      body.issuer === this.baseUrl && typeof body.sub === 'string' && /^[1-9][0-9]*$/u.test(body.sub) &&
+      !/\s/u.test(body.sub) && Number(body.sub) <= 2_147_483_647 && isOnboardingEmail(body.email) &&
+      typeof body.emailVerified === 'boolean' && body.nonce === nonce && body.state === state &&
+      typeof body.clientId === 'string' && !!body.clientId.trim() && (body.name === undefined || typeof body.name === 'string')
+    ) {
+      return {
+        issuer: body.issuer, sub: body.sub, email: body.email, emailVerified: body.emailVerified,
+        ...(body.name === undefined ? {} : { name: body.name }), nonce, state, clientId: body.clientId,
+      }
+    }
+    throw new ConnectOnboardingIdentityError('unexpected', 200)
+  }
+
+  private async callOnboardingIdentity(path: 'prepare' | 'exchange', input: object): Promise<Record<string, unknown>> {
+    let res: Response
+    let signal: AbortSignal | undefined
+    try {
+      signal = AbortSignal.timeout(this.onboardingTimeoutMs)
+      res = await this.fetchImpl(`${this.baseUrl}/api/internal/connect/onboarding/${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Internal-API-Key': this.key },
+        body: JSON.stringify(input),
+        signal,
+        redirect: 'error',
+      })
+    } catch {
+      throw new ConnectOnboardingIdentityError(signal?.aborted ? 'timeout' : 'unreachable', 0)
+    }
+    let json: unknown
+    try {
+      json = await res.json()
+    } catch {
+      throw new ConnectOnboardingIdentityError(signal.aborted ? 'timeout' : 'unexpected', res.status)
+    }
+    if (!json || typeof json !== 'object' || Array.isArray(json)) throw new ConnectOnboardingIdentityError('unexpected', res.status)
+    const body = json as Record<string, unknown>
+    if (res.status === 200) return body
+    const code = !(res.status >= 200 && res.status < 300) && typeof body.error === 'string' && ONBOARDING_ERROR_CODES.has(body.error)
+      ? body.error as OnboardingIdentityErrorCode : 'unexpected'
+    throw new ConnectOnboardingIdentityError(code, res.status)
+  }
+
   private async post<T>(path: string, body: unknown): Promise<T> {
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method: 'POST',
@@ -213,9 +519,44 @@ export class ConnectProvisioningClient {
     )
   }
 
+  /** Reads only this caller's selected-org binding; requires `provisioning`. No retries. */
+  async getClientOrgBinding(args: GetClientOrgBindingArgs): Promise<GetClientOrgBindingResult> {
+    const sub = args?.sub
+    if (typeof sub !== 'string' || !/^[1-9][0-9]{0,9}$/u.test(sub) || /\s/u.test(sub) || Number(sub) > 2_147_483_647) {
+      throw new ConnectClientOrgBindingError('invalid_body', 0)
+    }
+    let res: Response
+    let signal: AbortSignal | undefined
+    try {
+      signal = AbortSignal.timeout(10_000)
+      res = await this.fetchImpl(`${this.baseUrl}/api/internal/client-org-binding/get`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Internal-API-Key': this.key },
+        body: JSON.stringify({ sub }), signal, redirect: 'error',
+      })
+    } catch {
+      throw new ConnectClientOrgBindingError(signal?.aborted ? 'timeout' : 'unreachable', 0)
+    }
+    let json: unknown
+    try {
+      json = await res.json()
+    } catch {
+      throw new ConnectClientOrgBindingError(signal.aborted ? 'timeout' : 'unexpected', res.status)
+    }
+    if (!json || typeof json !== 'object' || Array.isArray(json)) throw new ConnectClientOrgBindingError('unexpected', res.status)
+    const body = json as Record<string, unknown>
+    if (res.status === 200 && body.sub === sub && (body.orgId === null || (
+      typeof body.orgId === 'number' && Number.isInteger(body.orgId) && body.orgId > 0 && body.orgId <= 2_147_483_647
+    ))) return { sub, orgId: body.orgId }
+    const code = !(res.status >= 200 && res.status < 300) && typeof body.error === 'string' && BINDING_ERROR_CODES.has(body.error)
+      ? body.error as ClientOrgBindingErrorCode : 'unexpected'
+    throw new ConnectClientOrgBindingError(code, res.status)
+  }
+
   // C4: clientId is NOT sent — the caller is identified by its per-RP key.
   // Called at ACCEPTANCE / first login (Task 20), never at invite time (C2).
-  setClientOrgBinding(args: { sub: string; orgId: number }) {
+  // After application retirement Auth requires the current RP-local reference.
+  setClientOrgBinding(args: { sub: string; orgId: number; sourceUserRef?: string }) {
     return this.post<{ ok: boolean }>(
       '/api/internal/client-org-binding/set',
       args,
