@@ -363,6 +363,7 @@ export class ConnectProvisioningClient {
           'X-Internal-API-Key': this.key,
         },
         body: JSON.stringify({ sub, sourceUserRef }),
+        redirect: 'error',
         signal,
       })
     } catch {
@@ -554,7 +555,8 @@ export class ConnectProvisioningClient {
 
   // C4: clientId is NOT sent — the caller is identified by its per-RP key.
   // Called at ACCEPTANCE / first login (Task 20), never at invite time (C2).
-  setClientOrgBinding(args: { sub: string; orgId: number }) {
+  // After application retirement Auth requires the current RP-local reference.
+  setClientOrgBinding(args: { sub: string; orgId: number; sourceUserRef?: string }) {
     return this.post<{ ok: boolean }>(
       '/api/internal/client-org-binding/set',
       args,

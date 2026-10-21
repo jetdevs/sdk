@@ -64,3 +64,13 @@ it.each([false, true])('uses a fixed 10000ms budget covering headers and body (b
   expect(timeout).toHaveBeenCalledWith(10000)
   expect(fetchImpl).toHaveBeenCalledTimes(1)
 })
+
+it.each([undefined, '201'])('keeps the set binding argument additive and serializes ref %s', async sourceUserRef => {
+  const fetchImpl = vi.fn(async () => Response.json({ ok: true }))
+  const legacy: Parameters<ConnectProvisioningClient['setClientOrgBinding']>[0] = { sub: '7', orgId: 31 }
+  const args = sourceUserRef === undefined ? legacy : { ...legacy, sourceUserRef }
+  await expect(make(fetchImpl).setClientOrgBinding(args)).resolves.toEqual({ ok: true })
+  expect(fetchImpl).toHaveBeenCalledWith('https://connect.example/api/internal/client-org-binding/set', expect.objectContaining({
+    method: 'POST', body: JSON.stringify(args),
+  }))
+})

@@ -118,3 +118,30 @@ roles, organization access or tokens. The caller must still enforce independent
 mailbox proof, local lifecycle and authorization rules. A binding read is only
 this caller's current selected organization (`orgId` may be null), not an
 access grant.
+
+For every selected-organization **write**, pass the authoritative RP-local user ID:
+
+```ts
+await provisioning.setClientOrgBinding({
+  sub: storedConnectSub,
+  orgId: selectedCanonicalOrgId,
+  sourceUserRef: String(localUserId),
+})
+```
+
+The extra argument is optional for existing callers whose application has never
+been disconnected. After an application-scoped retirement, Auth refuses writes
+without it (`source_user_ref_required`, HTTP 409), including old requests already
+in flight during upgrade. An explicitly deleted local reference is permanently
+refused (`ref_conflict`, HTTP 409), even after fresh re-entry. Upgrade **all**
+binding writers before enabling scoped retirement. A fresh local reference may
+select its organization before `registerIdentity`; a currently registered reference
+may change that selection while active canonical membership remains required.
+Credential-source `retired_at` is independent of `application_deleted_at`: retiring
+password ownership alone does not prohibit a current application's binding write.
+These are server checks; never derive the reference from email or browser input.
+The existing generic provisioning error contract for this write is unchanged.
+
+Disconnect rejects HTTP redirects, including cross-origin 307/308, before sending
+its internal key or identifiers to the destination. Other provisioning methods
+retain their existing transport behavior.
