@@ -5,6 +5,10 @@ import { randomBytes } from 'crypto'
 export {
   ConnectProvisioningClient,
   type ConnectProvisioningConfig,
+  type GetClientOrgBindingArgs,
+  type GetClientOrgBindingResult,
+  type ClientOrgBindingErrorCode,
+  ConnectClientOrgBindingError,
   type OrgPlatformRole,
   type MembershipStatus,
   type SourceSystem,

@@ -228,6 +228,31 @@ function onboardingUrl(value: unknown): URL | undefined {
   }
 }
 
+export interface GetClientOrgBindingArgs {
+  sub: string
+}
+
+export interface GetClientOrgBindingResult {
+  sub: string
+  orgId: number | null
+}
+
+export type ClientOrgBindingErrorCode =
+  | 'invalid_body' | 'unauthorized' | 'scope_not_permitted' | 'unknown_client'
+  | 'db_unavailable' | 'timeout' | 'unreachable' | 'unexpected'
+
+const BINDING_ERROR_CODES: ReadonlySet<string> = new Set([
+  'invalid_body', 'unauthorized', 'scope_not_permitted', 'unknown_client', 'db_unavailable',
+])
+
+export class ConnectClientOrgBindingError extends Error {
+  readonly kind = 'connect_client_org_binding_error' as const
+  constructor(readonly code: ClientOrgBindingErrorCode, readonly status: number) {
+    super(`[connect-provisioning] client-org-binding/get refused: ${status} ${code}`)
+    this.name = 'ConnectClientOrgBindingError'
+  }
+}
+
 export interface ConnectProvisioningConfig {
   /** Base URL of the Connect IdP (no trailing slash required). */
   baseUrl: string
@@ -491,6 +516,40 @@ export class ConnectProvisioningClient {
       '/api/internal/memberships/upsert',
       args,
     )
+  }
+
+  /** Reads only this caller's selected-org binding; requires `provisioning`. No retries. */
+  async getClientOrgBinding(args: GetClientOrgBindingArgs): Promise<GetClientOrgBindingResult> {
+    const sub = args?.sub
+    if (typeof sub !== 'string' || !/^[1-9][0-9]{0,9}$/u.test(sub) || /\s/u.test(sub) || Number(sub) > 2_147_483_647) {
+      throw new ConnectClientOrgBindingError('invalid_body', 0)
+    }
+    let res: Response
+    let signal: AbortSignal | undefined
+    try {
+      signal = AbortSignal.timeout(10_000)
+      res = await this.fetchImpl(`${this.baseUrl}/api/internal/client-org-binding/get`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Internal-API-Key': this.key },
+        body: JSON.stringify({ sub }), signal, redirect: 'error',
+      })
+    } catch {
+      throw new ConnectClientOrgBindingError(signal?.aborted ? 'timeout' : 'unreachable', 0)
+    }
+    let json: unknown
+    try {
+      json = await res.json()
+    } catch {
+      throw new ConnectClientOrgBindingError(signal.aborted ? 'timeout' : 'unexpected', res.status)
+    }
+    if (!json || typeof json !== 'object' || Array.isArray(json)) throw new ConnectClientOrgBindingError('unexpected', res.status)
+    const body = json as Record<string, unknown>
+    if (res.status === 200 && body.sub === sub && (body.orgId === null || (
+      typeof body.orgId === 'number' && Number.isInteger(body.orgId) && body.orgId > 0 && body.orgId <= 2_147_483_647
+    ))) return { sub, orgId: body.orgId }
+    const code = !(res.status >= 200 && res.status < 300) && typeof body.error === 'string' && BINDING_ERROR_CODES.has(body.error)
+      ? body.error as ClientOrgBindingErrorCode : 'unexpected'
+    throw new ConnectClientOrgBindingError(code, res.status)
   }
 
   // C4: clientId is NOT sent — the caller is identified by its per-RP key.
