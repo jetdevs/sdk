@@ -371,9 +371,12 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
     // -------------------------------------------------------------------------
     // GET USERS BY ROLE IN ORGANIZATION
     // -------------------------------------------------------------------------
+    // Lists members' names and emails: the Users & roles admin screen only.
+    // Without a permission any org member could read it.
     getUsersByRole: {
       type: 'query' as const,
       input: getUsersByRoleSchema,
+      permission: 'user:read',
       repository: Repository,
       handler: async (context: HandlerContext<{ roleId: number }>) => {
         const { input, service, repo } = context;
@@ -393,11 +396,17 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
     getAvailableRoles: {
       type: 'query' as const,
       input: getAvailableRolesSchema,
+      // Role picker on the admin user screens. Needs role:read, and the org
+      // in the input must be the caller's own unless it is platform staff.
+      permission: 'role:read',
       cache: { ttl: 300, tags: ['roles'] },
       crossOrg: true, // Required to see global roles (orgId = null)
       repository: Repository,
       handler: async (context: HandlerContext<{ orgId: number; category?: 'user' | 'service' }>) => {
-        const { input, repo } = context;
+        const { input, repo, actor } = context;
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Access denied to this organization' });
+        }
         // Default to 'user' category for backwards compatibility
         return repo!.getAvailableRolesForOrg(input.orgId, { category: input.category });
       },
@@ -409,11 +418,17 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
     getAvailableServiceRoles: {
       type: 'query' as const,
       input: getAvailableServiceRolesSchema,
+      // Role picker on the admin user screens. Needs role:read, and the org
+      // in the input must be the caller's own unless it is platform staff.
+      permission: 'role:read',
       cache: { ttl: 300, tags: ['roles', 'service-roles'] },
       crossOrg: true, // Required to see global service roles (orgId = null)
       repository: Repository,
       handler: async (context: HandlerContext<{ orgId: number }>) => {
-        const { input, repo } = context;
+        const { input, repo, actor } = context;
+        if (namesForeignOrg(input.orgId, actor)) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Access denied to this organization' });
+        }
         return repo!.getAvailableServiceRoles(input.orgId);
       },
     },
