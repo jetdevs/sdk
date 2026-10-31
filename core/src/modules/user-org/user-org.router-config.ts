@@ -283,6 +283,18 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
           throw new TRPCError({ code: 'FORBIDDEN', message: refusal });
         }
 
+        // System roles are never per company: a system role is held
+        // platform-wide (orgId null) or not at all.
+        if (input.orgId !== null) {
+          const assignability = await loadRoleAssignability(context.db, input.roleId);
+          if (assignability?.isSystemRole) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'System roles are platform-wide',
+            });
+          }
+        }
+
         // P2-SR-005: Validate role is not a service role
         // Service roles are intended for API keys, not user assignments
         const role = await repo!.getRoleById(input.roleId);
@@ -363,12 +375,27 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
         // An org-level caller may not take away a system role (Super User).
         // Other roles, including Owner/Admin that carry admin:* permissions,
         // stay removable by the org's own admins.
-        if (!isPlatformStaff(actor)) {
-          const role = await loadRoleAssignability(context.db, input.roleId);
-          if (role?.isSystemRole) {
+        const role = await loadRoleAssignability(context.db, input.roleId);
+        if (role?.isSystemRole) {
+          if (!isPlatformStaff(actor)) {
             throw new TRPCError({
               code: 'FORBIDDEN',
               message: 'This role can only be removed by platform staff',
+            });
+          }
+          // Removing your own system role locks you out of the platform.
+          if (Number((actor as any)?.userId) === input.userId) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: "You can't remove your own system role",
+            });
+          }
+          // Someone must keep the role, or nobody can hand it out again.
+          const others = await repo!.countActiveRoleHolders(input.roleId, input.userId);
+          if (others === 0) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: "Can't remove the last holder of this role",
             });
           }
         }

@@ -13,7 +13,7 @@
  */
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { and, eq, or, isNull, asc, sql, inArray } from 'drizzle-orm';
+import { and, eq, ne, or, isNull, asc, sql, inArray } from 'drizzle-orm';
 import type {
   UserRoleData,
   UserOrgContext,
@@ -588,6 +588,9 @@ export function createUserOrgRepository(
             orgName: orgs.name,
             assignedAt: userRoles.assignedAt,
             assignedById: userRoles.assignedBy,
+            // Core's users table has no last-seen column; an app whose
+            // users table does (e.g. last_seen_at) gets it, others get null.
+            ...(users.lastSeenAt ? { lastSeenAt: users.lastSeenAt } : {}),
           })
           .from(userRoles)
           .innerJoin(users, eq(users.id, userRoles.userId))
@@ -617,11 +620,39 @@ export function createUserOrgRepository(
             orgId: r.orgId ?? null,
             orgName: r.orgName ?? null,
             assignedAt: r.assignedAt ?? null,
+            lastSeenAt: r.lastSeenAt ?? null,
             assignedById: r.assignedById ?? null,
             assignedByName: a?.name ?? null,
             assignedByEmail: a?.email ?? null,
           };
         });
+      });
+    }
+
+    /**
+     * How many active users hold a role through an active assignment, in any
+     * org or platform-wide, leaving out `excludeUserId` when given. The caller
+     * must run this on a database that sees all orgs.
+     */
+    async countActiveRoleHolders(
+      roleId: number,
+      excludeUserId?: number
+    ): Promise<number> {
+      return withTelemetry('user-org-repo.countActiveRoleHolders', async () => {
+        const conditions = [
+          eq(userRoles.roleId, roleId),
+          eq(userRoles.isActive, true),
+          eq(users.isActive, true),
+        ];
+        if (excludeUserId !== undefined) {
+          conditions.push(ne(userRoles.userId, excludeUserId));
+        }
+        const [row] = await this.db
+          .select({ count: sql<number>`count(distinct ${userRoles.userId})` })
+          .from(userRoles)
+          .innerJoin(users, eq(users.id, userRoles.userId))
+          .where(and(...conditions));
+        return Number(row?.count ?? 0);
       });
     }
 

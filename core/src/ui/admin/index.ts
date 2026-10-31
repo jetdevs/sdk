@@ -110,3 +110,23 @@ export type {
     ManagePermissionsDialogUIComponents, RoleWithStatsForDialog
 } from './ManagePermissionsDialog';
 
+
+// =============================================================================
+// ROLE USERS PAGE (Users tab of a role)
+// =============================================================================
+
+export {
+    createRoleUsersPage
+} from './RoleUsersPage';
+
+export type {
+    RoleUsersApi, RoleUsersInviteArgs, RoleUsersPageFactoryConfig, RoleUsersPageProps, RoleUsersPageRole, RoleUsersUIComponents
+} from './RoleUsersPage';
+
+export {
+    NOT_ACTIVE_DAYS, filterRoleUsers, groupRoleHolders, isNotActiveFor30Days, roleUserCompanies, sortRoleUsersByLastSeen
+} from './role-users';
+
+export type {
+    RoleHolderInput, RoleUserFilter, RoleUserHolding, RoleUserRow, RoleUserStatusFilter
+} from './role-users';

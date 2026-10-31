@@ -107,6 +107,11 @@ export interface RoleHolder extends OrgUser {
   orgId: number | null;
   orgName: string | null;
   assignedAt: Date | null;
+  /**
+   * When the user was last seen. Null when the app's users table has no
+   * `lastSeenAt` column (core's does not) or the user was never seen.
+   */
+  lastSeenAt: Date | null;
   assignedById: number | null;
   assignedByName: string | null;
   assignedByEmail: string | null;
