@@ -1,6 +1,6 @@
 {
   "name": "@jetdevs/core",
-  "version": "0.1.55-dev-sec.2",
+  "version": "0.1.55-dev-sec.3",
   "description": "Core SDK components, UI primitives, and utilities for Core SaaS",
   "type": "module",
   "publishConfig": {
