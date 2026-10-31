@@ -360,11 +360,17 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
           });
         }
 
-        // Same rule as assigning: an org-level caller may not take away a
-        // system role or a role that carries a platform permission.
-        const refusal = await findRoleAssignmentRefusal(context.db, actor, input.orgId, input.roleId);
-        if (refusal) {
-          throw new TRPCError({ code: 'FORBIDDEN', message: refusal });
+        // An org-level caller may not take away a system role (Super User).
+        // Other roles, including Owner/Admin that carry admin:* permissions,
+        // stay removable by the org's own admins.
+        if (!isPlatformStaff(actor)) {
+          const role = await loadRoleAssignability(context.db, input.roleId);
+          if (role?.isSystemRole) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'This role can only be removed by platform staff',
+            });
+          }
         }
 
         const deleted = await repo!.deleteRoleAssignment(

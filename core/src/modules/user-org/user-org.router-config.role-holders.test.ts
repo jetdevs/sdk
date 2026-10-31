@@ -121,6 +121,17 @@ describe('platform-wide (org NULL) grants', () => {
 });
 
 describe('removeRole by an org-level caller', () => {
+  it('still removes an org role that carries a platform permission (Admin)', async () => {
+    const { cfg, calls, Repo } = build();
+    const c = ctx(Repo, { userId: 50, roleId: 3, orgId: OWN_ORG }, {}, ORG_ROLE);
+    // every role lookup answers "has a platform permission"
+    const q: any = { from: () => q, innerJoin: () => q, where: () => q, limit: async () => [{ id: 9 }] };
+    let call = 0;
+    c.db = { select: () => (call++ === 0 ? { ...q, limit: async () => [ORG_ROLE] } : q) };
+    await expect(cfg.removeRole.handler(c)).resolves.toMatchObject({ success: true });
+    expect(calls).toEqual([`delete:${OWN_ORG}`]);
+  });
+
   it('refuses to take away a system role in their own org', async () => {
     const { cfg, calls, Repo } = build();
     await expect(
