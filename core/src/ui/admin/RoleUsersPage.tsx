@@ -225,7 +225,8 @@ export function createRoleUsersPage(config: RoleUsersPageFactoryConfig) {
     }, [allRows, search, status, orgId, sortDir, now, role.isSystemRole]);
 
     const selectable = rows.filter((r) => r.userId !== currentUserId);
-    const selectedRows = allRows.filter((r) => selected.has(r.userId));
+    // Only rows the current filter shows can be removed: hidden rows stay.
+    const selectedRows = selectable.filter((r) => selected.has(r.userId));
     const allTicked = selectable.length > 0 && selectable.every((r) => selected.has(r.userId));
     const someTicked = selectable.some((r) => selected.has(r.userId));
 
@@ -283,7 +284,12 @@ export function createRoleUsersPage(config: RoleUsersPageFactoryConfig) {
     };
 
     const requestRemove = (targets: RoleUserRow[]) => {
-      const allowed = targets.filter((r) => r.userId !== currentUserId);
+      const companyFilter = !role.isSystemRole && orgId !== undefined && orgId !== null ? orgId : undefined;
+      // With a company filter on, remove the role in that company only.
+      const allowed = targets
+        .filter((r) => r.userId !== currentUserId)
+        .map((r) => (companyFilter === undefined ? r : { ...r, holdings: r.holdings.filter((h) => h.orgId === companyFilter) }))
+        .filter((r) => r.holdings.length > 0);
       if (allowed.length === 0) return;
       if (role.isSystemRole) {
         setConfirmRows(allowed);

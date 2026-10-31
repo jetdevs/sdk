@@ -28,7 +28,7 @@ class TRPCError extends Error {
 function build(otherHolders = 2) {
   const calls: string[] = [];
   class Repo {
-    async countActiveRoleHolders(roleId: number, excludeUserId?: number) { calls.push(`count:${roleId}:${excludeUserId}`); return otherHolders; }
+    async countActiveRoleHolders(roleId: number, ex?: { userId: number; orgId: number | null }) { calls.push(`count:${roleId}:${ex?.userId}`); return otherHolders; }
     constructor(public db: any) {}
     async getRoleById() { return { id: 1, roleCategory: 'user' }; }
     async findRoleAssignment() { return null; }
@@ -217,7 +217,7 @@ describe('removeRole keeps someone holding a system role', () => {
 });
 
 describe('countActiveRoleHolders', () => {
-  it('counts distinct active users holding the role, leaving one out', async () => {
+  it('counts active holdings other than the one being removed', async () => {
     const Repo = createUserOrgRepository({ tables: { userRoles, users, roles, orgs } });
     let where: any;
     let fields: any;
@@ -227,10 +227,13 @@ describe('countActiveRoleHolders', () => {
       where: async (w: any) => { where = w; return [{ count: '3' }]; },
     };
     const db: any = { select: (f: any) => { fields = f; return q; } };
-    await expect(new Repo(db).countActiveRoleHolders(1, 50)).resolves.toBe(3);
+    await expect(new Repo(db).countActiveRoleHolders(1, { userId: 50, orgId: null })).resolves.toBe(3);
     const dialect = new PgDialect();
-    expect(dialect.sqlToQuery(fields.count).sql).toMatch(/count\(distinct/i);
-    expect(dialect.sqlToQuery(where).sql).toContain('<>');
+    expect(dialect.sqlToQuery(fields.count).sql).toMatch(/count\(\*\)/i);
+    const w = dialect.sqlToQuery(where).sql;
+    // another user, or the same user's holding in a company (not the platform-wide one)
+    expect(w).toContain('<>');
+    expect(w).toMatch(/is not null/i);
   });
 });
 
@@ -267,5 +270,20 @@ describe('getRoleHolders lastSeenAt', () => {
     const [holder] = await new Repo(c.db).getRoleHolders(1, null);
     expect(c.fields()).toHaveProperty('lastSeenAt', appUsers.lastSeenAt);
     expect(holder!.lastSeenAt).toEqual(new Date(0));
+  });
+});
+
+describe('getRoleHolders lastSeenAt from app config', () => {
+  it('selects the column the app passes as lastSeenAtColumn', async () => {
+    const { sql } = await import('drizzle-orm');
+    let fields: any;
+    const q: any = { from: () => q, innerJoin: () => q, leftJoin: () => q, where: () => q, orderBy: async () => [] };
+    const db: any = { select: (f: any) => { fields = f; return q; } };
+    const Repo = createUserOrgRepository({
+      tables: { userRoles, users, roles, orgs },
+      lastSeenAtColumn: sql`"users"."last_seen_at"`,
+    } as any);
+    await new Repo(db).getRoleHolders(1, null);
+    expect(fields.lastSeenAt).toBeDefined();
   });
 });

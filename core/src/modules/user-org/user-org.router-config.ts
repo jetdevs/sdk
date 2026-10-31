@@ -391,7 +391,10 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
             });
           }
           // Someone must keep the role, or nobody can hand it out again.
-          const others = await repo!.countActiveRoleHolders(input.roleId, input.userId);
+          const others = await repo!.countActiveRoleHolders(input.roleId, {
+            userId: input.userId,
+            orgId: input.orgId,
+          });
           if (others === 0) {
             throw new TRPCError({
               code: 'BAD_REQUEST',

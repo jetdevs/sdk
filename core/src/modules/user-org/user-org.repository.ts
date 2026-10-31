@@ -77,6 +77,13 @@ export interface UserOrgRepositoryConfig {
     type: string,
     options?: { tags?: Record<string, string> }
   ) => Promise<void>;
+
+  /**
+   * Optional last-seen column for apps whose users table is core's (no
+   * lastSeenAt field) but whose database has one, e.g.
+   * sql`"users"."last_seen_at"`. Used by getRoleHolders.
+   */
+  lastSeenAtColumn?: any;
 }
 
 /**
@@ -91,6 +98,7 @@ export function createUserOrgRepository(
     auditLog = async () => {},
     publishEvent = async () => {},
     trackMetric = async () => {},
+    lastSeenAtColumn,
   } = config;
 
   const { userRoles, users, roles, orgs } = tables;
@@ -590,7 +598,9 @@ export function createUserOrgRepository(
             assignedById: userRoles.assignedBy,
             // Core's users table has no last-seen column; an app whose
             // users table does (e.g. last_seen_at) gets it, others get null.
-            ...(users.lastSeenAt ? { lastSeenAt: users.lastSeenAt } : {}),
+            ...((lastSeenAtColumn ?? users.lastSeenAt)
+              ? { lastSeenAt: lastSeenAtColumn ?? users.lastSeenAt }
+              : {}),
           })
           .from(userRoles)
           .innerJoin(users, eq(users.id, userRoles.userId))
@@ -636,7 +646,7 @@ export function createUserOrgRepository(
      */
     async countActiveRoleHolders(
       roleId: number,
-      excludeUserId?: number
+      exclude?: { userId: number; orgId: number | null }
     ): Promise<number> {
       return withTelemetry('user-org-repo.countActiveRoleHolders', async () => {
         const conditions = [
@@ -644,11 +654,20 @@ export function createUserOrgRepository(
           eq(userRoles.isActive, true),
           eq(users.isActive, true),
         ];
-        if (excludeUserId !== undefined) {
-          conditions.push(ne(userRoles.userId, excludeUserId));
+        // Leave out only the holding being removed, so a stray extra
+        // holding of the sole holder can still be cleaned up.
+        if (exclude) {
+          conditions.push(
+            or(
+              ne(userRoles.userId, exclude.userId),
+              exclude.orgId === null
+                ? sql`${userRoles.orgId} IS NOT NULL`
+                : or(isNull(userRoles.orgId), ne(userRoles.orgId, exclude.orgId))
+            )!
+          );
         }
         const [row] = await this.db
-          .select({ count: sql<number>`count(distinct ${userRoles.userId})` })
+          .select({ count: sql<number>`count(*)` })
           .from(userRoles)
           .innerJoin(users, eq(users.id, userRoles.userId))
           .where(and(...conditions));
