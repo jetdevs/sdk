@@ -97,6 +97,11 @@ export interface UserOrgServiceContext {
 /**
  * Factory dependencies for createUserOrgRouterConfig
  */
+/** Platform staff (system user): may see and manage platform-wide grants. */
+function isPlatformStaff(actor: { isSystemUser?: boolean } | null | undefined): boolean {
+  return actor?.isSystemUser === true;
+}
+
 export interface UserOrgRouterFactoryDeps {
   /** Repository class to instantiate (required) */
   Repository: new (db: any) => any;
@@ -276,7 +281,21 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       crossOrg: true, // Required to remove roles from organizations other than the current one
       repository: Repository,
       handler: async (context: HandlerContext<{ userId: number; orgId: number; roleId: number }>) => {
-        const { input, repo } = context;
+        const { input, actor, repo } = context;
+
+        // An org-level caller may not take away a system role (Super User).
+        // Other roles, including Owner/Admin that carry admin:* permissions,
+        // stay removable by the org's own admins.
+        if (!isPlatformStaff(actor)) {
+          const role = await repo!.getRoleById(input.roleId);
+          if (role?.isSystemRole) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'This role can only be removed by platform staff',
+            });
+          }
+        }
+
         const deleted = await repo!.deleteRoleAssignment(
           input.userId,
           input.roleId,
@@ -327,19 +346,34 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
     // -------------------------------------------------------------------------
     // GET USERS BY ROLE IN ORGANIZATION
     // -------------------------------------------------------------------------
+    // Lists members' names and emails: the Users & roles admin screen only.
+    // Without a permission any org member could read it.
+    //
+    // Returns one row per holding (user + org + assigned at/by).
+    // Platform staff see every org, including platform-wide (org NULL)
+    // holdings such as Super User. Everyone else sees their own org only.
+    // `crossOrg` gives the handler a database that sees all orgs, so the
+    // org filter below is the scope for non-staff callers.
     getUsersByRole: {
       type: 'query' as const,
       input: getUsersByRoleSchema,
+      permission: 'user:read',
+      crossOrg: true,
       repository: Repository,
       handler: async (context: HandlerContext<{ roleId: number }>) => {
-        const { input, service, repo } = context;
-        if (!service.orgId) {
+        const { input, service, actor, repo } = context;
+        if (isPlatformStaff(actor)) {
+          return repo!.getRoleHolders(input.roleId, null);
+        }
+        const ownOrgId =
+          (actor as any)?.effectiveOrgId ?? (actor as any)?.orgId ?? service.orgId ?? null;
+        if (!ownOrgId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'No current organization context',
           });
         }
-        return repo!.getUsersByRoleInOrg(input.roleId, service.orgId);
+        return repo!.getRoleHolders(input.roleId, ownOrgId);
       },
     },
 
