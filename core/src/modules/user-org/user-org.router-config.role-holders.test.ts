@@ -8,7 +8,7 @@
  * - An org-level caller cannot take away a system role, and removing a role
  *   in one org never deletes the platform-wide grant.
  */
-import { PgDialect } from 'drizzle-orm/pg-core';
+import { PgDialect, boolean, integer, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 
 import { orgs, roles, userRoles, users } from '../../db/schema';
@@ -25,9 +25,10 @@ class TRPCError extends Error {
   }
 }
 
-function build() {
+function build(otherHolders = 2) {
   const calls: string[] = [];
   class Repo {
+    async countActiveRoleHolders(roleId: number, excludeUserId?: number) { calls.push(`count:${roleId}:${excludeUserId}`); return otherHolders; }
     constructor(public db: any) {}
     async getRoleById() { return { id: 1, roleCategory: 'user' }; }
     async findRoleAssignment() { return null; }
@@ -116,7 +117,7 @@ describe('platform-wide (org NULL) grants', () => {
     await expect(
       cfg.removeRole.handler(ctx(Repo, { userId: 50, roleId: 1, orgId: null }, { isSystemUser: true })),
     ).resolves.toMatchObject({ success: true });
-    expect(calls).toEqual(['delete:null']);
+    expect(calls).toEqual(['count:1:50', 'delete:null']);
   });
 });
 
@@ -168,5 +169,103 @@ describe('deleteRoleAssignment matches the org exactly', () => {
   it('null deletes the platform-wide grant only', async () => {
     const sql = await whereSql(null);
     expect(sql).toMatch(/"org_id" is null/i);
+  });
+});
+
+describe('system roles are never per company', () => {
+  it('assignRole refuses a system role in a numeric org, even for platform staff', async () => {
+    const { cfg, calls, Repo } = build();
+    await expect(
+      cfg.assignRole.handler(ctx(Repo, { userId: 50, roleId: 1, orgId: OWN_ORG }, { isSystemUser: true })),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'System roles are platform-wide' });
+    expect(calls).toEqual([]);
+  });
+
+  it('assignRole still assigns an org role in a numeric org', async () => {
+    const { cfg, calls, Repo } = build();
+    await expect(
+      cfg.assignRole.handler(ctx(Repo, { userId: 50, roleId: 3, orgId: OWN_ORG }, { isSystemUser: true }, ORG_ROLE)),
+    ).resolves.toMatchObject({ success: true });
+    expect(calls).toEqual([`create:${OWN_ORG}`]);
+  });
+});
+
+describe('removeRole keeps someone holding a system role', () => {
+  it('refuses removing your own system role', async () => {
+    const { cfg, calls, Repo } = build();
+    await expect(
+      cfg.removeRole.handler(ctx(Repo, { userId: 7, roleId: 1, orgId: null }, { isSystemUser: true })),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: "You can't remove your own system role" });
+    expect(calls).toEqual([]);
+  });
+
+  it('refuses removing the last active holder', async () => {
+    const { cfg, calls, Repo } = build(0);
+    await expect(
+      cfg.removeRole.handler(ctx(Repo, { userId: 50, roleId: 1, orgId: null }, { isSystemUser: true })),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: "Can't remove the last holder of this role" });
+    expect(calls).toEqual(['count:1:50']);
+  });
+
+  it('does not count holders when removing an org role', async () => {
+    const { cfg, calls, Repo } = build(0);
+    await expect(
+      cfg.removeRole.handler(ctx(Repo, { userId: 7, roleId: 3, orgId: OWN_ORG }, {}, ORG_ROLE)),
+    ).resolves.toMatchObject({ success: true });
+    expect(calls).toEqual([`delete:${OWN_ORG}`]);
+  });
+});
+
+describe('countActiveRoleHolders', () => {
+  it('counts distinct active users holding the role, leaving one out', async () => {
+    const Repo = createUserOrgRepository({ tables: { userRoles, users, roles, orgs } });
+    let where: any;
+    let fields: any;
+    const q: any = {
+      from: () => q,
+      innerJoin: () => q,
+      where: async (w: any) => { where = w; return [{ count: '3' }]; },
+    };
+    const db: any = { select: (f: any) => { fields = f; return q; } };
+    await expect(new Repo(db).countActiveRoleHolders(1, 50)).resolves.toBe(3);
+    const dialect = new PgDialect();
+    expect(dialect.sqlToQuery(fields.count).sql).toMatch(/count\(distinct/i);
+    expect(dialect.sqlToQuery(where).sql).toContain('<>');
+  });
+});
+
+describe('getRoleHolders lastSeenAt', () => {
+  function capture() {
+    let fields: any;
+    const row = { assignmentId: 1, id: 50, email: 'a@x', name: 'A', isActive: true, orgId: null, orgName: null, assignedAt: null, assignedById: null };
+    const q: any = {
+      from: () => q, innerJoin: () => q, leftJoin: () => q, where: () => q,
+      orderBy: async () => [fields.lastSeenAt ? { ...row, lastSeenAt: new Date(0) } : row],
+    };
+    const db: any = { select: (f: any) => { fields = f; return q; } };
+    return { db, fields: () => fields };
+  }
+
+  it('is null when the users table has no lastSeenAt column (core)', async () => {
+    const Repo = createUserOrgRepository({ tables: { userRoles, users, roles, orgs } });
+    const c = capture();
+    const [holder] = await new Repo(c.db).getRoleHolders(1, null);
+    expect(c.fields()).not.toHaveProperty('lastSeenAt');
+    expect(holder!.lastSeenAt).toBeNull();
+  });
+
+  it("comes from the app's users.lastSeenAt when the column exists", async () => {
+    const appUsers = pgTable('users', {
+      id: integer('id').primaryKey(),
+      email: varchar('email', { length: 255 }),
+      name: text('name'),
+      isActive: boolean('is_active'),
+      lastSeenAt: timestamp('last_seen_at'),
+    });
+    const Repo = createUserOrgRepository({ tables: { userRoles, users: appUsers, roles, orgs } });
+    const c = capture();
+    const [holder] = await new Repo(c.db).getRoleHolders(1, null);
+    expect(c.fields()).toHaveProperty('lastSeenAt', appUsers.lastSeenAt);
+    expect(holder!.lastSeenAt).toEqual(new Date(0));
   });
 });
