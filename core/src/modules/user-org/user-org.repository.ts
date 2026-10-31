@@ -13,7 +13,7 @@
  */
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { and, eq, or, isNull, asc, sql } from 'drizzle-orm';
+import { and, eq, or, isNull, asc, sql, inArray } from 'drizzle-orm';
 import type {
   UserRoleData,
   UserOrgContext,
@@ -21,6 +21,7 @@ import type {
   UserOrgMembership,
   UserOrgPermission,
   OrgUser,
+  RoleHolder,
   AssignableRole,
   AssignableOrganization,
   UserRoleAllOrgs,
@@ -485,15 +486,20 @@ export function createUserOrgRepository(
     async deleteRoleAssignment(
       userId: number,
       roleId: number,
-      orgId: number
+      orgId: number | null
     ): Promise<boolean> {
       return withTelemetry('user-org-repo.deleteRoleAssignment', async () => {
+        // Exact org match. `null` removes the platform-wide assignment only;
+        // a number removes that org's assignment only. Matching "org OR NULL"
+        // let removing a role in one org also delete a platform-wide grant.
         const deletedAssignment = await this.db
           .delete(userRoles)
           .where(
             and(
               eq(userRoles.userId, userId),
-              or(eq(userRoles.orgId, orgId), isNull(userRoles.orgId)),
+              orgId === null
+                ? isNull(userRoles.orgId)
+                : eq(userRoles.orgId, orgId),
               eq(userRoles.roleId, roleId)
             )
           )
@@ -548,6 +554,75 @@ export function createUserOrgRepository(
           );
         }
       );
+    }
+
+    /**
+     * Who holds a role, with the org and who assigned it.
+     *
+     * `orgId` number: assignments in that org only.
+     * `orgId` null: every active assignment in every org, including the
+     * platform-wide (org NULL) ones. Only for platform staff: the caller must
+     * run this on a database that sees all orgs.
+     */
+    async getRoleHolders(
+      roleId: number,
+      orgId: number | null
+    ): Promise<RoleHolder[]> {
+      return withTelemetry('user-org-repo.getRoleHolders', async () => {
+        const conditions = [
+          eq(userRoles.roleId, roleId),
+          eq(userRoles.isActive, true),
+        ];
+        if (orgId !== null) {
+          conditions.push(eq(userRoles.orgId, orgId));
+        }
+
+        const rows = await this.db
+          .select({
+            assignmentId: userRoles.id,
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            isActive: users.isActive,
+            orgId: userRoles.orgId,
+            orgName: orgs.name,
+            assignedAt: userRoles.assignedAt,
+            assignedById: userRoles.assignedBy,
+          })
+          .from(userRoles)
+          .innerJoin(users, eq(users.id, userRoles.userId))
+          .leftJoin(orgs, eq(orgs.id, userRoles.orgId))
+          .where(and(...conditions))
+          .orderBy(asc(users.name), asc(users.email));
+
+        const assignerIds = [
+          ...new Set(
+            rows
+              .map((r: any) => r.assignedById)
+              .filter((v: number | null): v is number => v != null)
+          ),
+        ] as number[];
+        const assigners = assignerIds.length
+          ? await this.db
+              .select({ id: users.id, name: users.name, email: users.email })
+              .from(users)
+              .where(inArray(users.id, assignerIds))
+          : [];
+        const byId = new Map(assigners.map((a: any) => [a.id, a]));
+
+        return rows.map((r: any) => {
+          const a: any = r.assignedById != null ? byId.get(r.assignedById) : undefined;
+          return {
+            ...r,
+            orgId: r.orgId ?? null,
+            orgName: r.orgName ?? null,
+            assignedAt: r.assignedAt ?? null,
+            assignedById: r.assignedById ?? null,
+            assignedByName: a?.name ?? null,
+            assignedByEmail: a?.email ?? null,
+          };
+        });
+      });
     }
 
     /**

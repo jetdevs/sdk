@@ -48,7 +48,7 @@ import {
 } from './schemas';
 import { createUserOrgRepository } from './user-org.repository';
 import { namesForeignOrg } from '../organizations/org-scope';
-import { findRoleAssignmentRefusal } from '../rbac/assignable-role';
+import { findRoleAssignmentRefusal, isPlatformStaff, loadRoleAssignability } from '../rbac/assignable-role';
 
 /**
  * TRPCError-like constructor interface
@@ -135,6 +135,34 @@ export interface UserOrgRouterFactoryDeps {
  * }));
  * ```
  */
+/**
+ * A platform-wide assignment (orgId null) applies in every org, so only
+ * platform staff may add or remove one, and only for a system role (Super
+ * User). Returns the error to throw, or null when the call may go on. A
+ * numeric orgId is not this function's concern.
+ */
+export async function refusePlatformWideAssignment(
+  db: any,
+  actor: { isSystemUser?: boolean } | null | undefined,
+  orgId: number | null,
+  roleId: number,
+): Promise<{ code: 'FORBIDDEN' | 'BAD_REQUEST' | 'NOT_FOUND'; message: string } | null> {
+  if (orgId !== null) {
+    return null;
+  }
+  if (!isPlatformStaff(actor)) {
+    return { code: 'FORBIDDEN', message: 'Only platform staff can change a platform-wide role' };
+  }
+  const role = await loadRoleAssignability(db, roleId);
+  if (!role) {
+    return { code: 'NOT_FOUND', message: 'Role not found' };
+  }
+  if (!role.isSystemRole) {
+    return { code: 'BAD_REQUEST', message: 'Only a system role can be held platform-wide' };
+  }
+  return null;
+}
+
 export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
   const { Repository, TRPCError = DefaultTRPCError, getPrivilegedDb } = deps;
 
@@ -230,8 +258,14 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       entityType: 'user_role',
       crossOrg: true, // Required to assign roles in organizations other than the current one
       repository: Repository,
-      handler: async (context: HandlerContext<{ userId: number; orgId: number; roleId: number }>) => {
+      handler: async (context: HandlerContext<{ userId: number; orgId: number | null; roleId: number }>) => {
         const { input, service, actor, repo } = context;
+
+        // A platform-wide (org NULL) assignment: platform staff, system roles only.
+        const platformRefusal = await refusePlatformWideAssignment(context.db, actor, input.orgId, input.roleId);
+        if (platformRefusal) {
+          throw new TRPCError(platformRefusal);
+        }
 
         // `crossOrg` lets platform staff assign in any org; everyone else
         // assigns only in their own.
@@ -311,14 +345,26 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
       entityType: 'user_role',
       crossOrg: true, // Required to remove roles from organizations other than the current one
       repository: Repository,
-      handler: async (context: HandlerContext<{ userId: number; orgId: number; roleId: number }>) => {
+      handler: async (context: HandlerContext<{ userId: number; orgId: number | null; roleId: number }>) => {
         const { input, actor, repo } = context;
+
+        const platformRefusal = await refusePlatformWideAssignment(context.db, actor, input.orgId, input.roleId);
+        if (platformRefusal) {
+          throw new TRPCError(platformRefusal);
+        }
 
         if (namesForeignOrg(input.orgId, actor)) {
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'Access denied to this organization',
           });
+        }
+
+        // Same rule as assigning: an org-level caller may not take away a
+        // system role or a role that carries a platform permission.
+        const refusal = await findRoleAssignmentRefusal(context.db, actor, input.orgId, input.roleId);
+        if (refusal) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: refusal });
         }
 
         const deleted = await repo!.deleteRoleAssignment(
@@ -373,20 +419,32 @@ export function createUserOrgRouterConfig(deps: UserOrgRouterFactoryDeps) {
     // -------------------------------------------------------------------------
     // Lists members' names and emails: the Users & roles admin screen only.
     // Without a permission any org member could read it.
+    //
+    // Returns one row per holding (user + org + assigned at/by).
+    // Platform staff see every org, including platform-wide (org NULL)
+    // holdings such as Super User. Everyone else sees their own org only.
+    // `crossOrg` gives the handler a database that sees all orgs, so the
+    // org filter below is the scope for non-staff callers.
     getUsersByRole: {
       type: 'query' as const,
       input: getUsersByRoleSchema,
       permission: 'user:read',
+      crossOrg: true,
       repository: Repository,
       handler: async (context: HandlerContext<{ roleId: number }>) => {
-        const { input, service, repo } = context;
-        if (!service.orgId) {
+        const { input, service, actor, repo } = context;
+        if (isPlatformStaff(actor)) {
+          return repo!.getRoleHolders(input.roleId, null);
+        }
+        const ownOrgId =
+          (actor as any)?.effectiveOrgId ?? (actor as any)?.orgId ?? service.orgId ?? null;
+        if (!ownOrgId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'No current organization context',
           });
         }
-        return repo!.getUsersByRoleInOrg(input.roleId, service.orgId);
+        return repo!.getRoleHolders(input.roleId, ownOrgId);
       },
     },
 

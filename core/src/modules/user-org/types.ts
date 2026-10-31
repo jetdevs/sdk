@@ -96,6 +96,23 @@ export interface OrgUser {
 }
 
 /**
+ * One active holding of a role: a user plus the org the assignment is in.
+ * `orgId === null` is a platform-wide assignment (e.g. Super User), which
+ * applies in every org. A user holding the role in several orgs appears once
+ * per org.
+ */
+export interface RoleHolder extends OrgUser {
+  /** user_roles.id — unique per row, use it as the list key */
+  assignmentId: number;
+  orgId: number | null;
+  orgName: string | null;
+  assignedAt: Date | null;
+  assignedById: number | null;
+  assignedByName: string | null;
+  assignedByEmail: string | null;
+}
+
+/**
  * Available role for assignment
  */
 export interface AssignableRole {
