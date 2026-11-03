@@ -124,7 +124,7 @@ export type {
 } from './RoleUsersPage';
 
 export {
-    NOT_ACTIVE_DAYS, filterRoleUsers, groupRoleHolders, isNotActiveFor30Days, roleUserCompanies, sortRoleUsersByLastSeen
+    NOT_ACTIVE_DAYS, filterRoleUsers, groupRoleHolders, isNotActiveFor30Days, roleUserCompanies, sortRoleUsersByLastSeen, tracksLastSeen
 } from './role-users';
 
 export type {

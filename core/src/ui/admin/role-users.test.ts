@@ -5,6 +5,7 @@ import {
   groupRoleHolders,
   roleUserCompanies,
   sortRoleUsersByLastSeen,
+  tracksLastSeen,
   type RoleHolderInput,
 } from './role-users';
 
@@ -59,6 +60,13 @@ describe('filterRoleUsers', () => {
     expect(sortRoleUsersByLastSeen(rows, 'desc').map((r) => r.userId)).toEqual([10, 20, 30]);
     expect(sortRoleUsersByLastSeen(rows, 'asc').map((r) => r.userId)).toEqual([20, 10, 30]);
   });
+  it('tracks last seen only when some row has a date', () => {
+    expect(tracksLastSeen(groupRoleHolders(holders))).toBe(true);
+    const untracked = groupRoleHolders(holders.map((x) => ({ ...x, lastSeenAt: null })));
+    expect(tracksLastSeen(untracked)).toBe(false);
+    expect(tracksLastSeen([])).toBe(false);
+  });
+
   it('lists companies for the Company filter, sorted', () => {
     expect(roleUserCompanies(rows).map((c) => c.orgName)).toEqual(['Atelier', 'Bakery', 'Kopi']);
   });
