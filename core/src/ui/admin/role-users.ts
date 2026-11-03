@@ -120,6 +120,16 @@ export function filterRoleUsers(rows: RoleUserRow[], filter: RoleUserFilter = {}
   });
 }
 
+/**
+ * True when the app records a last-seen date: at least one row has one.
+ * When false, every lastSeenAt is null because the users table has no
+ * last-seen column, so the page hides Last active, its sort and the
+ * "Not active 30+ days" chip instead of showing "Never" for everyone.
+ */
+export function tracksLastSeen(rows: RoleUserRow[]): boolean {
+  return rows.some((r) => r.lastSeenAt !== null);
+}
+
 /** Sort by last active; never-seen users go last either way. */
 export function sortRoleUsersByLastSeen(rows: RoleUserRow[], dir: 'asc' | 'desc'): RoleUserRow[] {
   return [...rows].sort((a, b) => {

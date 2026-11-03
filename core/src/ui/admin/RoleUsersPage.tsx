@@ -37,6 +37,7 @@ import {
   groupRoleHolders,
   roleUserCompanies,
   sortRoleUsersByLastSeen,
+  tracksLastSeen,
   type RoleHolderInput,
   type RoleUserRow,
   type RoleUserStatusFilter,
@@ -212,8 +213,10 @@ export function createRoleUsersPage(config: RoleUsersPageFactoryConfig) {
     const now = useMemo(() => new Date(), [query.data]);
     const allRows = useMemo(() => groupRoleHolders(query.data ?? []), [query.data]);
     const companies = useMemo(() => roleUserCompanies(allRows), [allRows]);
-    // "Not active 30+ days" needs a last-seen date; apps without one get no chip.
-    const hasLastSeen = allRows.some((r) => r.lastSeenAt !== null);
+    // Apps whose users table has no last-seen column send null for everyone.
+    // Then there is no Last active column, sort or "Not active 30+ days" chip:
+    // showing "Never" for people who sign in daily would be false.
+    const hasLastSeen = tracksLastSeen(allRows);
     const rows = useMemo(() => {
       const filtered = filterRoleUsers(allRows, {
         search,
@@ -221,8 +224,8 @@ export function createRoleUsersPage(config: RoleUsersPageFactoryConfig) {
         orgId: role.isSystemRole ? undefined : orgId,
         now,
       });
-      return sortDir ? sortRoleUsersByLastSeen(filtered, sortDir) : filtered;
-    }, [allRows, search, status, orgId, sortDir, now, role.isSystemRole]);
+      return sortDir && hasLastSeen ? sortRoleUsersByLastSeen(filtered, sortDir) : filtered;
+    }, [allRows, search, status, orgId, sortDir, now, role.isSystemRole, hasLastSeen]);
 
     const selectable = rows.filter((r) => r.userId !== currentUserId);
     // Only rows the current filter shows can be removed: hidden rows stay.
@@ -298,7 +301,7 @@ export function createRoleUsersPage(config: RoleUsersPageFactoryConfig) {
       }
     };
 
-    const colCount = role.isSystemRole ? 6 : 7;
+    const colCount = (role.isSystemRole ? 6 : 7) - (hasLastSeen ? 0 : 1);
 
     return (
       <div className="space-y-4">
@@ -366,15 +369,17 @@ export function createRoleUsersPage(config: RoleUsersPageFactoryConfig) {
                 <th className="px-3 py-2 font-medium">Name</th>
                 {!role.isSystemRole && <th className="px-3 py-2 font-medium">Where</th>}
                 <th className="px-3 py-2 font-medium">Added</th>
-                <th className="px-3 py-2 font-medium">
-                  <button
-                    type="button"
-                    className="font-medium hover:text-foreground"
-                    onClick={() => setSortDir(sortDir === 'desc' ? 'asc' : 'desc')}
-                  >
-                    Last active {sortDir === 'desc' ? '↓' : sortDir === 'asc' ? '↑' : ''}
-                  </button>
-                </th>
+                {hasLastSeen && (
+                  <th className="px-3 py-2 font-medium">
+                    <button
+                      type="button"
+                      className="font-medium hover:text-foreground"
+                      onClick={() => setSortDir(sortDir === 'desc' ? 'asc' : 'desc')}
+                    >
+                      Last active {sortDir === 'desc' ? '↓' : sortDir === 'asc' ? '↑' : ''}
+                    </button>
+                  </th>
+                )}
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2" />
               </tr>
@@ -440,7 +445,7 @@ export function createRoleUsersPage(config: RoleUsersPageFactoryConfig) {
                       <div>{formatDate(r.addedAt)}</div>
                       {r.addedByName && <div className="text-xs text-muted-foreground">by {r.addedByName}</div>}
                     </td>
-                    <td className="px-3 py-2">{formatLastSeen(r.lastSeenAt, now)}</td>
+                    {hasLastSeen && <td className="px-3 py-2">{formatLastSeen(r.lastSeenAt, now)}</td>}
                     <td className="px-3 py-2">
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs ${
