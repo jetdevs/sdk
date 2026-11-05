@@ -69,6 +69,16 @@
       "import": "./dist/nextjs/index.mjs",
       "require": "./dist/nextjs/index.js"
     },
+    "./rate-limit": {
+      "types": "./dist/rate-limit/index.d.ts",
+      "import": "./dist/rate-limit/index.mjs",
+      "require": "./dist/rate-limit/index.js"
+    },
+    "./internal-auth": {
+      "types": "./dist/internal-auth/index.d.ts",
+      "import": "./dist/internal-auth/index.mjs",
+      "require": "./dist/internal-auth/index.js"
+    },
     "./tenant": {
       "types": "./dist/tenant/index.d.ts",
       "import": "./dist/tenant/index.mjs",
