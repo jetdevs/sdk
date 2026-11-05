@@ -14,6 +14,7 @@ export default defineConfig({
     'tenant/index': 'src/tenant/index.ts',
     // Tenant client module for React hooks (client-only)
     'tenant/client': 'src/tenant/client.ts',
+    'audit/index': 'src/audit/index.ts',
   },
   format: ['cjs', 'esm'],
   dts: {
@@ -34,6 +35,7 @@ export default defineConfig({
       'tenant/index': 'src/tenant/index.ts',
       // Tenant client module for React hooks (client-only)
       'tenant/client': 'src/tenant/client.ts',
+      'audit/index': 'src/audit/index.ts',
     },
   },
   sourcemap: true,
