@@ -51,3 +51,10 @@ export type {
     AdminOnlyProcedure, AdminOnlyProcedureOptions, AuthenticatedContext, OrgProtectedContext, OrgProtectedProcedure, OrgProtectedProcedureOptions, ProtectedProcedure, PublicProcedure, TRPCContext, WithPermissionOptions
 } from './procedures';
 
+
+// Procedure stack factory (p1 lane C)
+export { createProcedureStack, parsePositiveId } from './procedure-stack';
+export type {
+    AuditEvent, AuditWriter, CreateProcedureStackOptions, OrgProtectedCtxAdditions,
+    ProtectedCtxAdditions, StackPermissionChecker, StackSession, StackSessionUser
+} from './procedure-stack';
