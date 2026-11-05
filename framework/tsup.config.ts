@@ -8,6 +8,8 @@ export default defineConfig({
     'auth/index': 'src/auth/index.ts',
     'router/index': 'src/router/index.ts',
     'trpc/index': 'src/trpc/index.ts',
+    'rate-limit/index': 'src/rate-limit/index.ts',
+    'internal-auth/index': 'src/internal-auth/index.ts',
     // Tenant module for custom domain support (server-safe)
     'tenant/index': 'src/tenant/index.ts',
     // Tenant client module for React hooks (client-only)
@@ -24,6 +26,10 @@ export default defineConfig({
       'auth/index': 'src/auth/index.ts',
       'router/index': 'src/router/index.ts',
       'trpc/index': 'src/trpc/index.ts',
+      'rate-limit/index': 'src/rate-limit/index.ts',
+      'internal-auth/index': 'src/internal-auth/index.ts',
+    'rate-limit/index': 'src/rate-limit/index.ts',
+    'internal-auth/index': 'src/internal-auth/index.ts',
       // Tenant module for custom domain support (server-safe)
       'tenant/index': 'src/tenant/index.ts',
       // Tenant client module for React hooks (client-only)
@@ -50,5 +56,6 @@ export default defineConfig({
     'react',
     // Node.js built-in modules - keep external to avoid bundling issues
     'async_hooks',
+    'node:crypto',
   ],
 });
