@@ -315,3 +315,19 @@ export {
 } from './sql';
 
 export type { WritersClosedOptions } from './sql';
+
+// =============================================================================
+// AUTH ERROR HELPERS (ported from app src/lib/auth-errors.ts)
+// =============================================================================
+
+export {
+  createAuthError,
+  createAuthResponse,
+  AuthErrors,
+  AUTH_ERROR_MESSAGES,
+  getUserFriendlyMessage,
+  isRetryableError,
+  getRetryDelay,
+  formatErrorForLogging,
+  isValidAuthResponse,
+} from './auth-errors';
