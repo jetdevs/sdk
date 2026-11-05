@@ -1,6 +1,6 @@
 {
   "name": "@jetdevs/framework",
-  "version": "0.2.14-dev",
+  "version": "0.2.15-dev",
   "description": "Core infrastructure abstractions for Jetdevs Platform",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
