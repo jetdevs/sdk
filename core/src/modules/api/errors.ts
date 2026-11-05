@@ -31,6 +31,8 @@ export enum ApiErrorCode {
   NOT_FOUND = 'NOT_FOUND',
   CONFLICT = 'CONFLICT',
   GONE = 'GONE',
+  IDEMPOTENCY_IN_PROGRESS = 'IDEMPOTENCY_IN_PROGRESS',
+  IDEMPOTENCY_KEY_MISMATCH = 'IDEMPOTENCY_KEY_MISMATCH',
 
   // Rate Limiting (429)
   RATE_LIMITED = 'RATE_LIMITED',
@@ -52,6 +54,8 @@ export const API_ERROR_STATUS: Readonly<Record<ApiErrorCode, number>> = {
   [ApiErrorCode.NOT_FOUND]: 404,
   [ApiErrorCode.CONFLICT]: 409,
   [ApiErrorCode.GONE]: 410,
+  [ApiErrorCode.IDEMPOTENCY_IN_PROGRESS]: 409,
+  [ApiErrorCode.IDEMPOTENCY_KEY_MISMATCH]: 422,
   [ApiErrorCode.RATE_LIMITED]: 429,
   [ApiErrorCode.INTERNAL_ERROR]: 500,
   [ApiErrorCode.SERVICE_UNAVAILABLE]: 503,
@@ -143,6 +147,18 @@ export function conflict(message = 'Resource conflict', details?: ApiErrorDetail
 }
 export function gone(message = 'This endpoint has been retired', details?: ApiErrorDetails): ApiError {
   return new ApiError(ApiErrorCode.GONE, message, 410, details);
+}
+
+// Idempotency (409, 422)
+export function idempotencyInProgress(
+  message = 'A request with this Idempotency-Key is still being processed. Retry later.',
+): ApiError {
+  return new ApiError(ApiErrorCode.IDEMPOTENCY_IN_PROGRESS, message, 409);
+}
+export function idempotencyKeyMismatch(
+  message = 'This Idempotency-Key was already used with a different request body.',
+): ApiError {
+  return new ApiError(ApiErrorCode.IDEMPOTENCY_KEY_MISMATCH, message, 422);
 }
 
 // Rate limiting (429)

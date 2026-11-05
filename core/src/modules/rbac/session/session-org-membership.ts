@@ -34,7 +34,7 @@ export function sessionOrgAccessQuery(userId: number, orgId: number): SQL {
       ) AS member,
       EXISTS (
         SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id
-        WHERE ur.user_id = u.id AND ur.is_active = true AND r.is_system_role = true
+        WHERE ur.user_id = u.id AND ur.is_active = true AND r.is_active = true AND r.is_system_role = true
       ) AS system_user
     FROM users u
     WHERE u.id = ${userId}

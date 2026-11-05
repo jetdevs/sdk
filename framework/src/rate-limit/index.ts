@@ -62,7 +62,14 @@ export function buildRateLimitKey(...parts: Array<string | number | null | undef
     .join(':');
 }
 
-/** Client address from proxy headers (first x-forwarded-for hop, then x-real-ip). */
+/**
+ * Client address from proxy headers (first x-forwarded-for hop, then x-real-ip).
+ *
+ * The first XFF hop is client-supplied unless your edge OVERWRITES the header
+ * (Vercel does). Behind a proxy that APPENDS to x-forwarded-for, a caller can
+ * spoof this value and dodge per-IP limits: pass a trusted IP from your
+ * platform (e.g. the hop your own proxy added) as the key instead.
+ */
 export function getClientIp(headers: { get(name: string): string | null }): string {
   const forwarded = headers.get('x-forwarded-for');
   const first = forwarded?.split(',')[0]?.trim();

@@ -210,9 +210,12 @@ export function buildOpenApiDocument(
     if (seen.has(key)) throw new Error(`buildOpenApiDocument: duplicate route ${key}`);
     seen.add(key);
 
-    const security = route.auth.includes('none')
-      ? []
-      : route.auth.map((a) => ({ [SECURITY_SCHEME[a as Exclude<RouteAuth, 'none'>]]: [] as string[] }));
+    // ['none'] alone = public (`security: []`). 'none' plus a scheme = optional
+    // auth: the empty requirement `{}` lets the call through unauthenticated.
+    const schemes = route.auth.filter((a): a is Exclude<RouteAuth, 'none'> => a !== 'none');
+    const schemeReqs = schemes.map((a) => ({ [SECURITY_SCHEME[a]]: [] as string[] }));
+    const security: Array<Record<string, string[]>> =
+      schemes.length === 0 ? [] : route.auth.includes('none') ? [{}, ...schemeReqs] : schemeReqs;
 
     const responses: RouteConfig['responses'] = {
       [route.response.status ?? 200]: {

@@ -1,3 +1,4 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { OrgSwitchLookup, SessionOrgAccess, UserRoleRow } from './index';
@@ -13,6 +14,7 @@ import {
   needsRbacRefresh,
   parseSessionOrgAccess,
   refreshSessionClaims,
+  sessionOrgAccessQuery,
   SESSION_ORG_ACCESS_ENDED_MESSAGE,
   toSessionUser,
 } from './index';
@@ -95,6 +97,11 @@ describe('session invalidation', () => {
       member: true,
       systemUser: false,
     });
+  });
+
+  it('system_user only counts an ACTIVE system role (inactive role row does not grant staff bypass)', () => {
+    const text = new PgDialect().sqlToQuery(sessionOrgAccessQuery(7, 1)).sql.replace(/\s+/g, ' ');
+    expect(text).toContain('ur.is_active = true AND r.is_active = true AND r.is_system_role = true');
   });
 });
 
