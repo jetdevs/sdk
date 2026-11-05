@@ -36,6 +36,7 @@ const serverEntries = {
   index: 'src/index.ts',
   'db/index': 'src/db/index.ts',
   'db/schema/index': 'src/db/schema/index.ts',
+  'db/schema/platform-audit': 'src/db/schema/platform-audit.ts',
   'db/seeds/index': 'src/db/seeds/index.ts',
   'auth/index': 'src/modules/auth/index.ts',
   'auth/providers/index': 'src/modules/auth/providers/index.ts',

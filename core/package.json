@@ -24,6 +24,11 @@
       "import": "./dist/db/schema/index.js",
       "require": "./dist/db/schema/index.js"
     },
+    "./db/schema/platform-audit": {
+      "types": "./dist/db/schema/platform-audit.d.ts",
+      "import": "./dist/db/schema/platform-audit.js",
+      "require": "./dist/db/schema/platform-audit.js"
+    },
     "./db/seeds": {
       "types": "./dist/db/seeds/index.d.ts",
       "import": "./dist/db/seeds/index.js",
