@@ -45,6 +45,7 @@ const serverEntries = {
   'trpc/routers/index': 'src/trpc/routers/index.ts',
   'permissions/index': 'src/modules/permissions/index.ts',
   'rbac/index': 'src/modules/rbac/index.ts',
+  'rbac/session/index': 'src/modules/rbac/session/index.ts',
   'themes/index': 'src/modules/themes/index.ts',
   'lib/index': 'src/lib/index.ts',
   'rls/index': 'src/rls/index.ts',

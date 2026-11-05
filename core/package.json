@@ -69,6 +69,11 @@
       "import": "./dist/rbac/index.js",
       "require": "./dist/rbac/index.js"
     },
+    "./rbac/session": {
+      "types": "./dist/rbac/session/index.d.ts",
+      "import": "./dist/rbac/session/index.js",
+      "require": "./dist/rbac/session/index.js"
+    },
     "./themes": {
       "types": "./dist/themes/index.d.ts",
       "import": "./dist/themes/index.js",
