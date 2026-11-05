@@ -22,6 +22,8 @@
 import { TRPCError } from '@trpc/server';
 import type { TRPCProcedureBuilder, TRPCUnsetMarker } from '@trpc/server';
 import type { DbClients, TransactionalDb, TxOf } from '../db/clients';
+import type { AuditWriter, OrgAuditEvent } from '../audit/types';
+import { inferAuditAction, extractAuditEntityId, extractAuditEntityName } from '../audit/procedures';
 
 // =============================================================================
 // TYPES
@@ -56,21 +58,8 @@ export interface StackPermissionChecker<TSession extends StackSession = StackSes
   }): Promise<boolean>;
 }
 
-/** One successful audited mutation. */
-export interface AuditEvent {
-  path: string;
-  input: unknown;
-  result: unknown;
-  userId: number;
-  userEmail: string | null;
-  /** The effective org the mutation ran in. */
-  orgId: number;
-}
-
-/** Audit sink, injected (audit internals are owned elsewhere). */
-export interface AuditWriter {
-  write(event: AuditEvent): Promise<void>;
-}
+/** Audit sink: the single `AuditWriter` from `@jetdevs/framework/audit` (one way to write audit events). */
+export type { AuditWriter } from '../audit/types';
 
 export interface CreateProcedureStackOptions<
   TCtx extends object,
@@ -98,8 +87,8 @@ export interface CreateProcedureStackOptions<
   audit?: AuditWriter;
   /**
    * Await the audit write before returning (still never fails the mutation).
-   * Default false = fire-and-forget, the yobo-merchant behaviour. On Vercel an
-   * un-awaited promise can be dropped when the function freezes.
+   * Default true: on Vercel an un-awaited promise can be dropped when the
+   * function freezes. Set false for fire-and-forget (old yobo-merchant behaviour).
    */
   awaitAuditWrites?: boolean;
 }
@@ -196,7 +185,7 @@ export function createProcedureStack<
     resolveOrgId,
     rebindSession,
     audit,
-    awaitAuditWrites = false,
+    awaitAuditWrites = true,
   } = options;
 
   const publicProcedure = t.procedure;
@@ -297,15 +286,21 @@ export function createProcedureStack<
     if (result.ok && orgId !== undefined) {
       const write = async (): Promise<void> => {
         try {
-          const input = await getRawInput();
-          await audit.write({
-            path,
-            input,
-            result: result.data,
-            userId: ctx.userId,
-            userEmail: ctx.session.user.email ?? null,
+          const raw: unknown = await getRawInput();
+          const input = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+          const segments = path.split('.');
+          const procedureName = segments[segments.length - 1] ?? path;
+          const event: OrgAuditEvent = {
+            scope: 'org',
             orgId,
-          });
+            action: inferAuditAction(procedureName),
+            entityType: segments.length > 1 ? segments.slice(0, -1).join('.') : procedureName,
+            entityId: extractAuditEntityId(input, result.data),
+            entityName: extractAuditEntityName(input, result.data),
+            actor: { kind: 'user', userId: ctx.userId, email: ctx.session.user.email ?? null },
+            metadata: { path },
+          };
+          await audit.write(event);
         } catch (err: unknown) {
           console.error('[Audit] Failed to log mutation:', err);
         }

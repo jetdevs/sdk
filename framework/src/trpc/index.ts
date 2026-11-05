@@ -55,6 +55,6 @@ export type {
 // Procedure stack factory (p1 lane C)
 export { createProcedureStack, parsePositiveId } from './procedure-stack';
 export type {
-    AuditEvent, AuditWriter, CreateProcedureStackOptions, OrgProtectedCtxAdditions,
+    AuditWriter, CreateProcedureStackOptions, OrgProtectedCtxAdditions,
     ProtectedCtxAdditions, StackPermissionChecker, StackSession, StackSessionUser
 } from './procedure-stack';

@@ -188,7 +188,10 @@ describe('createProcedureStack — RLS and audit', () => {
     expect(audit.write).not.toHaveBeenCalled();
     await caller(user(5, ORG_A, ['items:create'])).create();
     expect(audit.write).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'create', orgId: ORG_A, userId: 5, result: { id: 7 } })
+      expect.objectContaining({
+        scope: 'org', orgId: ORG_A, action: 'CREATE', entityId: '7',
+        actor: expect.objectContaining({ kind: 'user', userId: 5 }), metadata: { path: 'create' },
+      })
     );
   });
 });
