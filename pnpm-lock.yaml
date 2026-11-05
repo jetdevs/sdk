@@ -93,9 +93,6 @@ importers:
       tailwind-merge:
         specifier: ^2.2.0
         version: 2.6.1
-      zod:
-        specifier: ^3.22.4
-        version: 3.25.76
     devDependencies:
       '@jetdevs/framework':
         specifier: workspace:*
@@ -199,6 +196,9 @@ importers:
       vitest:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.37)(happy-dom@14.12.3)
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
       zustand:
         specifier: ^5.0.9
         version: 5.0.11(@types/react@19.2.14)(immer@10.2.0)(react@19.2.4)
