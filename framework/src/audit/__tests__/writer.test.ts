@@ -46,8 +46,8 @@ describe('AuditWriter', () => {
     });
     expect(org).toHaveLength(0);
     expect(platform).toHaveLength(1);
-    expect(platform[0]).toMatchObject({ actorKind: 'user', actorId: '1', severity: 'WARN' });
-    expect('orgId' in (platform[0] as object)).toBe(false);
+    expect(platform[0]).toMatchObject({ orgId: null, userId: 1, resource: 'audit' });
+    expect(platform[0]?.details).toMatchObject({ actor: { kind: 'user', id: '1' }, severity: 'WARN' });
   });
 
   it('refuses events carrying a never-log PII field (nested too) and writes nothing', async () => {

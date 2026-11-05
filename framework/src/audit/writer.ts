@@ -23,18 +23,17 @@ export interface OrgAuditRow {
   userAgent: string | null;
 }
 
-/** Row shape for core `platformAuditLogs` (opt-in table). */
+/**
+ * Row shape for core `auditLogs` (table `audit_logs`) with org_id NULL.
+ * Actor kind/id, entity name, changes, severity, requestId live in `details`.
+ */
 export interface PlatformAuditRow {
-  actorKind: string;
-  actorId: string | null;
+  orgId: null;
+  userId: number | null;
   action: string;
-  severity: string;
-  entityType: string;
-  entityId: string | null;
-  entityName: string | null;
-  changes: Record<string, unknown> | null;
-  metadata: Record<string, unknown> | null;
-  requestId: string | null;
+  resource: string;
+  resourceId: string | null;
+  details: Record<string, unknown>;
   ipAddress: string | null;
   userAgent: string | null;
 }
@@ -45,7 +44,7 @@ export type PlatformAuditSink = (row: PlatformAuditRow, event: PlatformAuditEven
 export interface CreateAuditWriterOptions {
   /** Org events. Implement with the RLS-scoped db for `event.orgId` (dbWithRLS). Missing => org events fail. */
   orgSink?: OrgAuditSink;
-  /** Platform events. Missing => platform events fail. */
+  /** Platform events (org-less; written to core `audit_logs` with org_id NULL via a privileged writer, NOT the RLS db). Missing => platform events fail. */
   platformSink?: PlatformAuditSink;
   policy?: AuditPolicy | AuditPolicyOptions;
   /**
@@ -114,11 +113,21 @@ export function createAuditWriter(opts: CreateAuditWriterOptions): AuditWriter {
 
       if (!opts.platformSink) throw new Error('AuditWriter: platformSink not configured');
       const row: PlatformAuditRow = {
-        ...common,
-        actorKind: actor.kind,
-        actorId: actor.id,
-        severity: event.severity ?? 'INFO',
-        metadata,
+        orgId: null,
+        userId: actor.userId,
+        action: event.action,
+        resource: event.entityType,
+        resourceId: event.entityId ?? null,
+        details: {
+          ...(metadata ?? {}),
+          actor: { kind: actor.kind, id: actor.id },
+          entityName: event.entityName ?? null,
+          changes,
+          severity: event.severity ?? 'INFO',
+          requestId: event.request?.requestId ?? null,
+        },
+        ipAddress: event.request?.ipAddress ?? null,
+        userAgent: event.request?.userAgent ?? null,
       };
       await run(() => opts.platformSink!(row, event));
 
@@ -139,9 +148,9 @@ export interface DrizzleAuditWriterOptions extends Omit<CreateAuditWriterOptions
   withOrgDb: (orgId: number, fn: (db: AuditInsertDb) => Promise<void>) => Promise<void>;
   /** core `orgAuditLogs` table. */
   orgTable: unknown;
-  /** Admin/privileged db for org-less events. Omit to refuse platform events. */
+  /** Privileged db (bypasses RLS; no org context exists) for org-less events. Omit to refuse platform events. */
   platformDb?: AuditInsertDb;
-  /** core `platformAuditLogs` table (opt-in). */
+  /** core `auditLogs` table (org_id nullable). */
   platformTable?: unknown;
 }
 
