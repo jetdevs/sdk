@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import { checkRateLimit as frameworkCheckRateLimit, MemoryRateLimitStore } from '../../../../framework/src/rate-limit';
 import {
   ApiErrorCode,
   apiErrorResponseSchema,
@@ -109,12 +110,14 @@ describe('withApiAuth', () => {
     const limited = withApiAuth({
       resolveApiKey,
       keyPrefixes: [PREFIX],
-      checkRateLimit: async () => ({ allowed: false, limit: 10, remaining: 0, resetAt: Math.floor(Date.now() / 1000) + 30 }),
+      checkRateLimit: async () => ({ allowed: false, limit: 10, remaining: 0, resetAtMs: Date.now() + 30_000 }),
     });
     const r = await limited(req(`Bearer ${VALID_KEY}`), ok);
     expect(r.status).toBe(429);
     expect(r.headers.get('X-RateLimit-Limit')).toBe('10');
-    expect(r.headers.get('Retry-After')).not.toBeNull();
+    const retry = Number(r.headers.get('Retry-After'));
+    expect(retry).toBeGreaterThanOrEqual(29);
+    expect(retry).toBeLessThanOrEqual(30);
 
     const guard = withApiAuth({ resolveApiKey, keyPrefixes: [PREFIX] });
     const thrown = await guard(req(`Bearer ${VALID_KEY}`), async () => {
@@ -126,6 +129,30 @@ describe('withApiAuth', () => {
     });
     expect(crash.status).toBe(500);
     expect((await body(crash)).error?.message).not.toContain('db exploded');
+  });
+
+  it('rate-limit units: a blocked framework result yields Retry-After in seconds and X-RateLimit-Reset in unix seconds', async () => {
+    const store = new MemoryRateLimitStore();
+    const config = { limit: 1, windowMs: 60_000 };
+    const guard = withApiAuth({
+      resolveApiKey,
+      keyPrefixes: [PREFIX],
+      checkRateLimit: async (c: ApiContext) => {
+        const r = await frameworkCheckRateLimit(store, `api:${String(c.apiKeyId)}`, config);
+        return { ...r, resetAtMs: r.resetAt };
+      },
+    });
+    expect((await guard(req(`Bearer ${VALID_KEY}`), ok)).status).toBe(200);
+    const blocked = await guard(req(`Bearer ${VALID_KEY}`), ok);
+    expect(blocked.status).toBe(429);
+    const retry = Number(blocked.headers.get('Retry-After'));
+    expect(retry).toBeGreaterThanOrEqual(59);
+    expect(retry).toBeLessThanOrEqual(60);
+    const reset = Number(blocked.headers.get('X-RateLimit-Reset'));
+    const nowSec = Date.now() / 1000;
+    expect(reset).toBeGreaterThan(nowSec);
+    expect(reset).toBeLessThanOrEqual(Math.ceil(nowSec) + 60);
+    expect((await body(blocked)).error?.details).toMatchObject({ retryAfter: retry });
   });
 });
 
@@ -158,6 +185,77 @@ describe('idempotency', () => {
     await run(2);
     expect(calls).toBe(2);
   });
+  const post = (path: string, payload: unknown, key = 'k1'): Request =>
+    new Request(`https://hub.test${path}`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': key, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+  it('runs the handler once for two concurrent same-key requests; the loser gets 409 IN_PROGRESS', async () => {
+    const store = createMemoryIdempotencyStore();
+    let calls = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const handler = async (): Promise<Response> => {
+      calls += 1;
+      await gate;
+      return successResponse({ n: calls }, 201);
+    };
+    const a = withIdempotency(post('/api/v1/apps', { name: 'x' }), { store, orgId: 1 }, handler);
+    const b = withIdempotency(post('/api/v1/apps', { name: 'x' }), { store, orgId: 1 }, handler);
+    const second = await b;
+    expect(second.status).toBe(409);
+    expect((await body(second)).error?.code).toBe('IDEMPOTENCY_IN_PROGRESS');
+    release();
+    expect((await a).status).toBe(201);
+    expect(calls).toBe(1);
+    const replayed = await withIdempotency(post('/api/v1/apps', { name: 'x' }), { store, orgId: 1 }, handler);
+    expect(replayed.headers.get('Idempotent-Replayed')).toBe('true');
+    expect(calls).toBe(1);
+  });
+
+  it('binds the key to method + path and to the body (different body -> 422)', async () => {
+    const store = createMemoryIdempotencyStore();
+    let calls = 0;
+    const handler = async (): Promise<Response> => successResponse({ n: ++calls }, 201);
+    await withIdempotency(post('/api/v1/apps', { name: 'x' }), { store, orgId: 1 }, handler);
+    const mismatch = await withIdempotency(post('/api/v1/apps', { name: 'y' }), { store, orgId: 1 }, handler);
+    expect(mismatch.status).toBe(422);
+    expect((await body(mismatch)).error?.code).toBe('IDEMPOTENCY_KEY_MISMATCH');
+    const otherRoute = await withIdempotency(post('/api/v1/people', { name: 'x' }), { store, orgId: 1 }, handler);
+    expect(otherRoute.status).toBe(201);
+    expect(otherRoute.headers.get('Idempotent-Replayed')).toBeNull();
+    expect(calls).toBe(2);
+  });
+
+  it('releases the reservation when the handler throws or returns 5xx, so a retry runs', async () => {
+    const store = createMemoryIdempotencyStore();
+    const opts = { store, orgId: 1, onError: (): void => undefined };
+    await expect(
+      withIdempotency(post('/api/v1/apps', { name: 'x' }), opts, async () => {
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+    const five = await withIdempotency(post('/api/v1/apps', { name: 'x' }), opts, async () =>
+      new Response('down', { status: 503 }),
+    );
+    expect(five.status).toBe(503);
+    let ran = false;
+    const retry = await withIdempotency(post('/api/v1/apps', { name: 'x' }), opts, async () => {
+      ran = true;
+      return successResponse({ ok: true }, 201);
+    });
+    expect(ran).toBe(true);
+    expect(retry.status).toBe(201);
+  });
+
+  it('lets the handler read the request body after hashing', async () => {
+    const store = createMemoryIdempotencyStore();
+    const request = post('/api/v1/apps', { name: 'z' });
+    const res = await withIdempotency(request, { store, orgId: 1 }, async () => successResponse(await request.json(), 201));
+    expect(await body(res)).toMatchObject({ data: { name: 'z' } });
+  });
 });
 
 describe('openapi', () => {
@@ -180,6 +278,7 @@ describe('openapi', () => {
       response: z.object({ sub: z.string() }),
     }),
     defineRoute({ method: 'get', path: '/api/v1/openapi.json', auth: 'none', response: z.record(z.unknown()) }),
+    defineRoute({ method: 'get', path: '/api/v1/catalog', auth: ['none', 'apiKey'], response: z.array(app) }),
   ];
 
   it('builds a 3.1 doc with both security schemes, the shared error schema and per-route security', () => {
@@ -194,6 +293,8 @@ describe('openapi', () => {
     expect(doc.paths?.['/api/v1/apps']?.post?.responses?.['409']).toBeDefined();
     expect(doc.paths?.['/api/v1/apps/{slug}/me']?.get?.security).toEqual([{ connectBearer: [] }]);
     expect(doc.paths?.['/api/v1/openapi.json']?.get?.security).toEqual([]);
+    // 'none' + a scheme = optional auth, not public.
+    expect(doc.paths?.['/api/v1/catalog']?.get?.security).toEqual([{}, { apiKey: [] }]);
   });
 
   it('validates requests from the same schemas (422 envelope on failure)', () => {
@@ -214,6 +315,7 @@ describe('openapi', () => {
       { method: 'POST', path: '/api/v1/apps' },
       { method: 'GET', path: nextRoutePathToOpenApi('/api/v1/apps/[slug]/me') },
       { method: 'GET', path: '/api/v1/openapi.json' },
+      { method: 'GET', path: '/api/v1/catalog' },
     ];
     expect(() => assertRoutesDocumented(actual, doc)).not.toThrow();
     const drift = [...actual.slice(1), { method: 'GET', path: '/api/v1/people/{sub}/apps' }];
@@ -234,5 +336,7 @@ describe('keys', () => {
     expect(timingSafeEqualString('abc', 'abc')).toBe(true);
     expect(timingSafeEqualString('abc', 'abd')).toBe(false);
     expect(timingSafeEqualString('abc', 'abcd')).toBe(false);
+    expect(timingSafeEqualString('', '')).toBe(true);
+    expect(timingSafeEqualString('é', 'e\u0301')).toBe(false);
   });
 });

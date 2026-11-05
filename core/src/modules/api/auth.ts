@@ -60,12 +60,16 @@ export type ApiKeyResolution<TCtx> =
   | { ok: false; reason: 'invalid' | 'expired' | 'revoked' }
   | null;
 
+/**
+ * Limiter verdict. Times are epoch MILLISECONDS, same unit as
+ * `@jetdevs/framework/rate-limit` (map its `resetAt` to `resetAtMs`).
+ */
 export interface RateLimitResult {
   allowed: boolean;
   limit: number;
   remaining: number;
-  /** Unix seconds when the window resets. */
-  resetAt: number;
+  /** Epoch ms when the window resets. */
+  resetAtMs: number;
 }
 
 export interface ApiAuthConfig<TCtx extends ApiContext<string | number>> {
@@ -80,6 +84,10 @@ export interface ApiAuthConfig<TCtx extends ApiContext<string | number>> {
   keyPrefixes?: string[];
   revalidate?: (context: TCtx) => Promise<boolean>;
   withOrgContext?: <T>(context: TCtx, fn: () => Promise<T>) => Promise<T>;
+  /**
+   * Optional per-key limiter, e.g. with `@jetdevs/framework/rate-limit`:
+   * `async (ctx) => { const r = await limiter.check(String(ctx.apiKeyId)); return { ...r, resetAtMs: r.resetAt }; }`
+   */
   checkRateLimit?: (context: TCtx) => Promise<RateLimitResult>;
   /** Cache of resolved API key contexts (keyed by key hash). */
   cache?: ApiContextCache<TCtx>;
@@ -123,7 +131,8 @@ export function getRateLimitHeaders(status: RateLimitResult): Record<string, str
   return {
     'X-RateLimit-Limit': String(status.limit),
     'X-RateLimit-Remaining': String(Math.max(0, status.remaining)),
-    'X-RateLimit-Reset': String(status.resetAt),
+    // Header carries unix seconds (framework `rateLimitHeaders` does the same).
+    'X-RateLimit-Reset': String(Math.ceil(status.resetAtMs / 1000)),
   };
 }
 
@@ -225,7 +234,7 @@ export async function authenticateApiRequest<TCtx extends ApiContext<string | nu
   if (config.checkRateLimit) {
     const status = await config.checkRateLimit(context);
     if (!status.allowed) {
-      const retryAfter = Math.max(0, status.resetAt - Math.floor(Date.now() / 1000));
+      const retryAfter = Math.max(1, Math.ceil((status.resetAtMs - Date.now()) / 1000));
       return { ok: false, error: rateLimited(retryAfter, status.limit), rateLimit: status };
     }
     return { ok: true, context, rateLimit: status };

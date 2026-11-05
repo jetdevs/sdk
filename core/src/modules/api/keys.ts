@@ -8,7 +8,7 @@
  * @module @jetdevs/core/api
  */
 
-import { timingSafeEqual } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 
 export {
   generateApiKey,
@@ -17,16 +17,16 @@ export {
   DEFAULT_KEY_PREFIX,
 } from '../api-keys/key-generation';
 
+function digest(value: string): Buffer {
+  return createHash('sha256').update(value, 'utf8').digest();
+}
+
 /**
  * Constant-time string compare for static secrets (e.g. an internal service
- * key). Length mismatch returns false without an early content compare.
+ * key). Both sides are sha256-hashed first so the compare always runs on two
+ * 32-byte buffers: no length leak, no early return (same as framework
+ * `internal-auth` `safeEqual`).
  */
 export function timingSafeEqualString(a: string, b: string): boolean {
-  const ab = Buffer.from(a, 'utf8');
-  const bb = Buffer.from(b, 'utf8');
-  if (ab.length !== bb.length) {
-    timingSafeEqual(ab, ab);
-    return false;
-  }
-  return timingSafeEqual(ab, bb);
+  return timingSafeEqual(digest(a), digest(b));
 }

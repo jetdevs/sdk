@@ -29,8 +29,6 @@ export default defineConfig({
       'trpc/index': 'src/trpc/index.ts',
       'rate-limit/index': 'src/rate-limit/index.ts',
       'internal-auth/index': 'src/internal-auth/index.ts',
-    'rate-limit/index': 'src/rate-limit/index.ts',
-    'internal-auth/index': 'src/internal-auth/index.ts',
       // Tenant module for custom domain support (server-safe)
       'tenant/index': 'src/tenant/index.ts',
       // Tenant client module for React hooks (client-only)
