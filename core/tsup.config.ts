@@ -51,6 +51,7 @@ const serverEntries = {
   'cli/index': 'src/cli/index.ts',
   'cli/db': 'src/cli/db.ts',
   'config/index': 'src/config/index.ts',
+  'api/index': 'src/modules/api/index.ts',
   'api-keys/index': 'src/modules/api-keys/index.ts',
   'access/index': 'src/modules/access/index.ts',
   'invites/index': 'src/modules/invites/index.ts',
