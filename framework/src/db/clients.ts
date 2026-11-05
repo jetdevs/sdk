@@ -33,9 +33,17 @@ export interface SqlExecutor {
   execute(query: SQL): PromiseLike<unknown>;
 }
 
-/** A client that can open a transaction (drizzle `PgDatabase` fits). */
+/**
+ * A client that can open a transaction (drizzle `PgDatabase`, so both
+ * `PostgresJsDatabase` and `NodePgDatabase`, fit with no cast).
+ *
+ * The callback takes `unknown`, not `never`: a driver's `transaction` accepts
+ * a callback over its own transaction type, and a callback over `unknown`
+ * is assignable to that. `never` made every real drizzle db fail the
+ * constraint. The concrete handle type comes from `TxOf<TDb>`, not from here.
+ */
 export interface TransactionalDb {
-  transaction<T>(fn: (tx: never) => Promise<T>): Promise<T>;
+  transaction<T>(fn: (tx: unknown) => Promise<T>): Promise<T>;
 }
 
 /** The transaction handle type a client passes to its `transaction` callback. */
