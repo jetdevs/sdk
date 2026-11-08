@@ -6,9 +6,10 @@
  *   raise('billing.credits_short', { params: { needed: 120, available: 40 } })
  */
 export { ERROR_CATALOG, FORWARD_FALLBACK_LABELS, type ErrorCode } from './catalog';
-export { CatalogError, catalogError, fromUnknown, isCatalogError, lookup, raise, type CatalogErrorOptions } from './error';
+export { CatalogError, catalogError, fromHttpStatus, fromUnknown, isCatalogError, lookup, raise, type CatalogErrorOptions } from './error';
 export {
   ALREADY_TOLD,
+  boundaryFields,
   copyKeyOf,
   forwardCopyKey,
   forwardFallbackLabel,
@@ -19,6 +20,7 @@ export {
   toHttpBody,
   toOutcome,
   toToolResult,
+  type BoundaryCatalogFields,
   type ClientCatalogError,
   type CopyResolver,
   type ErrorOutcome,

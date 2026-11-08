@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALREADY_TOLD,
+  boundaryFields,
+  fromHttpStatus,
   CatalogError,
   catalogError,
   forwardFor,
@@ -187,5 +189,30 @@ describe('wire shapes', () => {
     expect(readCatalogError({ data: { catalog: { code: 'billing.credits_short' } } })?.forward).toEqual(['top_up']);
     expect(readCatalogError(toHttpBody(catalogError('common.not_found')).body)?.code).toBe('common.not_found');
     expect(readCatalogError(new Error('random'))).toBeUndefined();
+  });
+});
+
+describe('boundary helpers', () => {
+  it('fromHttpStatus maps a status; a whole code in the message wins', () => {
+    expect(fromHttpStatus(404, 'Remix not found').code).toBe('common.not_found');
+    expect(fromHttpStatus(402).code).toBe('billing.credits_short');
+    expect(fromHttpStatus(418).code).toBe('common.invalid_input');
+    expect(fromHttpStatus(500, 'boom').code).toBe('common.internal');
+    expect(fromHttpStatus(400, 'remix.route_blocked').code).toBe('remix.route_blocked');
+  });
+  it('boundaryFields is compact and additive', () => {
+    expect(boundaryFields(fromHttpStatus(409))).toEqual({ code: 'common.conflict', ref: 'E1005', kind: 'retryable', forward: ['try_again'], fix: expect.any(String), retry: true, said: false });
+    expect(boundaryFields(fromHttpStatus(409), { said: true }).fix.startsWith(ALREADY_TOLD)).toBe(true);
+  });
+  it('agent.confirm_required is a one-time choice: confirm + change, never try_again', () => {
+    expect(forwardFor(catalogError('agent.confirm_required'))).toEqual(['confirm', 'change']);
+  });
+});
+
+describe('ads image size is its own code (lead-12)', () => {
+  it('ads callers raise ads.image_too_large by code; a bare too_large is the video entry', () => {
+    expect(catalogError('ads.image_too_large').code).toBe('ads.image_too_large');
+    expect(lookup('E3607')?.code).toBe('ads.image_too_large');
+    expect(lookup('too_large')?.code).toBe('video.too_large');
   });
 });

@@ -4,9 +4,16 @@ import { BILLING } from './billing';
 import { COMMON } from './common';
 import { REMIX } from './remix';
 import { VIDEO } from './video';
+import { ADS } from './ads';
+import { AGENT } from './agent';
+import { CAMPAIGN } from './campaign';
+import { COMMERCE } from './commerce';
+import { CONNECTOR } from './connector';
+import { MESSAGING } from './messaging';
+import { ONBOARDING } from './onboarding';
 
 /** Every domain file, merged. A new domain is one new file + one line here. */
-const DEFS = { ...COMMON, ...AUTH, ...BILLING, ...VIDEO, ...REMIX } as const;
+const DEFS = { ...COMMON, ...AUTH, ...BILLING, ...VIDEO, ...REMIX, ...AGENT, ...CAMPAIGN, ...MESSAGING, ...CONNECTOR, ...COMMERCE, ...ONBOARDING, ...ADS } as const;
 
 /** Every catalog code, as a type: `raise('billing.credits_short')` is checked at compile time. */
 export type ErrorCode = keyof typeof DEFS;
@@ -25,6 +32,7 @@ export const ERROR_CATALOG: Readonly<Record<ErrorCode, ErrorEntry>> = build(DEFS
 /** Fallback (English) labels for forward buttons; managed copy key is `error.forward.<key>`. ≤ 20 chars (WhatsApp). */
 export const FORWARD_FALLBACK_LABELS = {
   try_again: 'Try again',
+  confirm: 'Yes, go ahead',
   top_up: 'Top up credits',
   upgrade: 'Upgrade',
   change: 'Change more',

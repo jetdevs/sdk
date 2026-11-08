@@ -158,6 +158,24 @@ function candidates(e: unknown): Array<{ value: string; exact: boolean }> {
   ];
 }
 
+/** HTTP status → catalog code, for a boundary that only knows a status (e.g. `internalApiError(msg, status)`). */
+const HTTP_TO_CODE: Readonly<Record<number, ErrorCode>> = {
+  400: 'common.invalid_input', 401: 'common.unauthorized', 402: 'billing.credits_short', 403: 'common.forbidden',
+  404: 'common.not_found', 409: 'common.conflict', 422: 'common.invalid_input', 429: 'common.rate_limited',
+  502: 'common.unavailable', 503: 'common.unavailable', 504: 'common.timeout',
+};
+
+/**
+ * Status (+ optional message) → CatalogError. A message that is a whole catalog code or ref wins; otherwise the status
+ * maps (other 4xx → invalid_input, other 5xx → internal).
+ */
+export function fromHttpStatus(status: number, message?: string, opts: Omit<CatalogErrorOptions, 'cause'> = {}): CatalogError {
+  const byText = typeof message === 'string' ? codeOrRef(message.trim()) : undefined;
+  if (byText) return new CatalogError(byText.code as ErrorCode, { ...opts, source: message });
+  const code = HTTP_TO_CODE[status] ?? (status >= 500 ? 'common.internal' : 'common.invalid_input');
+  return new CatalogError(code, { ...opts, source: String(status), ...(message ? { detail: opts.detail ?? message } : {}) });
+}
+
 /**
  * Anything → CatalogError. CatalogError passes through; a value whose code/alias/cause matches the
  * catalog becomes that entry; a TRPCError-like `{code:'NOT_FOUND'}` maps by tRPC code; everything

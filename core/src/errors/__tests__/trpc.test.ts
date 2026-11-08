@@ -21,5 +21,6 @@ describe('errors/trpc', () => {
       code: 'remix.route_blocked', ref: 'E2107', kind: 'blocked', forward: ['pick_other', 'change'],
     });
     expect(catalogDataOf(new TRPCError({ code: 'NOT_FOUND' }))).toBeUndefined();
+    expect(catalogDataOf(new TRPCError({ code: 'NOT_FOUND' }), { all: true })?.code).toBe('common.not_found');
   });
 });
