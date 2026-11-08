@@ -178,6 +178,22 @@ export function toOutcome(e: unknown, opts: ToolResultOptions = {}): ErrorOutcom
   };
 }
 
+/** The compact, additive catalog fields a boundary adds beside its existing error body (no message, no stack). */
+export interface BoundaryCatalogFields {
+  code: string;
+  ref: string;
+  kind: ErrorKind;
+  forward: ForwardKey[];
+  fix: string;
+  retry: boolean;
+}
+
+/** Catalog fields for any error, to add beside an existing body (`{ success:false, error, catalog }`). */
+export function boundaryFields(e: unknown): BoundaryCatalogFields {
+  const err = fromUnknown(e);
+  return { code: err.code, ref: err.ref, kind: err.kind, forward: forwardFor(err), fix: err.entry.agent.fix, retry: err.entry.agent.retry };
+}
+
 /** What a client (web) needs to render an error: read from a tRPC client error or a REST body. */
 export interface ClientCatalogError {
   code: ErrorCode;

@@ -25,8 +25,9 @@ export interface TRPCCatalogData {
  * Catalog data for a tRPC `errorFormatter`: `data: { ...shape.data, catalog: catalogDataOf(error) }`.
  * Returns undefined for errors not raised from the catalog, so existing shapes stay byte-identical.
  */
-export function catalogDataOf(error: unknown): TRPCCatalogData | undefined {
+export function catalogDataOf(error: unknown, opts: { all?: boolean } = {}): TRPCCatalogData | undefined {
   const cause = error instanceof TRPCError ? error.cause : error;
-  if (!isCatalogError(cause)) return undefined;
-  return { code: cause.code, ref: cause.ref, kind: cause.kind, forward: forwardFor(cause) };
+  const err = isCatalogError(cause) ? cause : opts.all ? fromUnknown(error) : undefined;
+  if (!err) return undefined;
+  return { code: err.code, ref: err.ref, kind: err.kind, forward: forwardFor(err) };
 }
