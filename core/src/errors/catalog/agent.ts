@@ -51,10 +51,11 @@ export const AGENT = {
     owner: 'agent-tools', aliases: ['role_not_grantable', 'role_unavailable'],
   },
   'agent.confirm_required': {
-    ref: 'E3007', kind: 'retryable', http: 412, trpc: 'PRECONDITION_FAILED',
-    fallback: 'Please check the preview and confirm to go on.',
-    forward: ['try_again'], resumes: false,
-    agent: { reason: 'An outward action needs the merchant to see a preview and agree first.', fix: 'Show the preview. Call again with the new confirm code only after the merchant agrees.', ask: null, retry: true },
+    // agents-lead-5 (2026-11-08): a one-time choice, never a prose either/or and never [Try again]
+    ref: 'E3007', kind: 'needs_merchant', http: 409, trpc: 'PRECONDITION_FAILED',
+    fallback: 'Shall I go ahead with this?',
+    forward: ['confirm', 'change'], resumes: false,
+    agent: { reason: 'This action needs the merchant to confirm it first.', fix: 'Ask once; on yes call again with the confirmation; never ask twice.', ask: 'Go ahead with this action?', retry: false },
     owner: 'mcp', aliases: ['confirm_required'],
   },
   'agent.precondition_failed': {

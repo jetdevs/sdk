@@ -201,6 +201,18 @@ describe('boundary helpers', () => {
     expect(fromHttpStatus(400, 'remix.route_blocked').code).toBe('remix.route_blocked');
   });
   it('boundaryFields is compact and additive', () => {
-    expect(boundaryFields(fromHttpStatus(409))).toEqual({ code: 'common.conflict', ref: 'E1005', kind: 'retryable', forward: ['try_again'], fix: expect.any(String), retry: true });
+    expect(boundaryFields(fromHttpStatus(409))).toEqual({ code: 'common.conflict', ref: 'E1005', kind: 'retryable', forward: ['try_again'], fix: expect.any(String), retry: true, said: false });
+    expect(boundaryFields(fromHttpStatus(409), { said: true }).fix.startsWith(ALREADY_TOLD)).toBe(true);
+  });
+  it('agent.confirm_required is a one-time choice: confirm + change, never try_again', () => {
+    expect(forwardFor(catalogError('agent.confirm_required'))).toEqual(['confirm', 'change']);
+  });
+});
+
+describe('ads image size is its own code (lead-12)', () => {
+  it('ads callers raise ads.image_too_large by code; a bare too_large is the video entry', () => {
+    expect(catalogError('ads.image_too_large').code).toBe('ads.image_too_large');
+    expect(lookup('E3607')?.code).toBe('ads.image_too_large');
+    expect(lookup('too_large')?.code).toBe('video.too_large');
   });
 });

@@ -17,6 +17,8 @@ export type ErrorKind = 'retryable' | 'blocked' | 'needs_merchant' | 'internal';
 /** The closed set of next actions a surface can draw (D5). Max 3 per entry (WhatsApp cap). */
 export type ForwardKey =
   | 'try_again'
+  /** A one-time yes to a confirm ask: the same call again WITH the confirmation (agents-lead-5, P0). */
+  | 'confirm'
   | 'top_up'
   | 'upgrade'
   | 'change'
