@@ -11,6 +11,13 @@ const BLOCKS: Record<string, [number, number]> = {
   billing: [1200, 1299],
   video: [2000, 2099],
   remix: [2100, 2199],
+  agent: [3000, 3099],
+  campaign: [3100, 3199],
+  messaging: [3200, 3299],
+  connector: [3300, 3399],
+  commerce: [3400, 3499],
+  onboarding: [3500, 3599],
+  ads: [3600, 3699],
 };
 
 describe('error catalog rules', () => {
