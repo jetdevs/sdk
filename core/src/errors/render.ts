@@ -186,12 +186,18 @@ export interface BoundaryCatalogFields {
   forward: ForwardKey[];
   fix: string;
   retry: boolean;
+  /** True when the route already messaged the merchant: the agent sends nothing more. */
+  said: boolean;
 }
 
-/** Catalog fields for any error, to add beside an existing body (`{ success:false, error, catalog }`). */
-export function boundaryFields(e: unknown): BoundaryCatalogFields {
+/**
+ * Catalog fields for any error, to add beside an existing body (`{ success:false, error, catalog }`). `said: true` when
+ * that route already messaged the merchant: `fix` then starts with ALREADY_TOLD so the model never repeats the line.
+ */
+export function boundaryFields(e: unknown, o: { said?: boolean } = {}): BoundaryCatalogFields {
   const err = fromUnknown(e);
-  return { code: err.code, ref: err.ref, kind: err.kind, forward: forwardFor(err), fix: err.entry.agent.fix, retry: err.entry.agent.retry };
+  const said = o.said ?? false;
+  return { code: err.code, ref: err.ref, kind: err.kind, forward: forwardFor(err), fix: said ? `${ALREADY_TOLD} ${err.entry.agent.fix}` : err.entry.agent.fix, retry: err.entry.agent.retry, said };
 }
 
 /** What a client (web) needs to render an error: read from a tRPC client error or a REST body. */

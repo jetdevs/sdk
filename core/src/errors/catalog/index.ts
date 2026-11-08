@@ -32,6 +32,7 @@ export const ERROR_CATALOG: Readonly<Record<ErrorCode, ErrorEntry>> = build(DEFS
 /** Fallback (English) labels for forward buttons; managed copy key is `error.forward.<key>`. ≤ 20 chars (WhatsApp). */
 export const FORWARD_FALLBACK_LABELS = {
   try_again: 'Try again',
+  confirm: 'Yes, go ahead',
   top_up: 'Top up credits',
   upgrade: 'Upgrade',
   change: 'Change more',
