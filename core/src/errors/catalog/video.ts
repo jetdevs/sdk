@@ -78,7 +78,7 @@ export const VIDEO = {
   },
   'video.signature_rejected': {
     ref: 'E2011', kind: 'internal', http: 401, trpc: 'UNAUTHORIZED',
-    fallback: "Something went wrong on our side. We've been told and are looking at it.",
+    fallback: 'Something went wrong on our side.',
     forward: [], resumes: false,
     agent: { reason: 'A service-to-service signature was rejected (bug or clock drift).', fix: 'Stop. Do not retry.', ask: null, retry: false },
     owner: 'video', aliases: ['bad_signature', 'stale_timestamp', 'replayed'],

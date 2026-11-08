@@ -18,7 +18,7 @@ export const REMIX = {
     ref: 'E2102', kind: 'retryable', http: 409, trpc: 'PRECONDITION_FAILED',
     fallback: 'The ad has not been read yet. Try again in a minute.',
     forward: ['try_again', 'change'], resumes: false,
-    agent: { reason: 'The ad reading has not finished.', fix: 'Wait for the reading, then retry once.', ask: null, retry: true },
+    agent: { reason: 'The ad reading has not finished.', fix: "Do not retry now; retry once when the tool reports it ready or on the merchant's next message.", ask: null, retry: true },
     owner: 'remix-storyboard', aliases: ['not_read'],
   },
   'remix.no_product': {
@@ -32,7 +32,7 @@ export const REMIX = {
     ref: 'E2104', kind: 'retryable', http: 409, trpc: 'PRECONDITION_FAILED',
     fallback: 'This remix is still being set up. Try again in a minute.',
     forward: ['try_again', 'change'], resumes: false,
-    agent: { reason: 'The remix project row does not exist yet.', fix: 'Wait, then retry once.', ask: null, retry: true },
+    agent: { reason: 'The remix project row does not exist yet.', fix: "Do not retry now; retry once when the tool reports it ready or on the merchant's next message.", ask: null, retry: true },
     owner: 'remix-storyboard', aliases: ['no_project'],
   },
   'remix.sheet_not_ready': {
@@ -86,9 +86,9 @@ export const REMIX = {
   },
   'remix.step_failed': {
     ref: 'E2112', kind: 'internal', http: 500, trpc: 'INTERNAL_SERVER_ERROR',
-    fallback: "That step didn't work on your remix. We've been told and are looking at it.",
+    fallback: "That step didn't work on your remix. Something went wrong on our side.",
     forward: [], resumes: false,
-    agent: { reason: 'A remix job died, threw, or its record was lost (a bug or provider crash).', fix: 'Do not retry. Tell the merchant we are looking at it.', ask: null, retry: false },
+    agent: { reason: 'A remix job died, threw, or its record was lost (a bug or provider crash).', fix: 'Do not retry. Say only that something went wrong on our side.', ask: null, retry: false },
     owner: 'remix-generation',
     aliases: ['job_failed', 'job_dead', 'start_threw', 'start_failed', 'enqueue_failed', 'record_lost', 'failed', 'threw', 'not_consumed'],
   },

@@ -129,6 +129,9 @@ export interface ToolResultOptions {
   said?: boolean;
 }
 
+/** Fixed first line of `fix` when code already posted the merchant line (agents-lead-5, 2026-11-08). */
+export const ALREADY_TOLD = 'The merchant was already told; send nothing more.';
+
 /**
  * Agent tool result (p152 refusal shape). Passes cadra-api `isFailureOutput` (`success === false`).
  * `said` stops the double-line bug: when code already posted the line, the agent must stay quiet.
@@ -142,7 +145,7 @@ export function toToolResult(e: unknown, opts: ToolResultOptions = {}): ToolErro
     error: {
       ...core(err),
       reason: a.reason,
-      fix: a.fix,
+      fix: opts.said ? `${ALREADY_TOLD} ${a.fix}` : a.fix,
       ask: a.ask,
       retry: a.retry,
       resumes: err.entry.resumes,
@@ -170,7 +173,7 @@ export function toOutcome(e: unknown, opts: ToolResultOptions = {}): ErrorOutcom
   return {
     status: 'refused',
     say: opts.said ? null : (opts.say ?? err.entry.fallback),
-    next: err.entry.agent.fix,
+    next: opts.said ? `${ALREADY_TOLD} ${err.entry.agent.fix}` : err.entry.agent.fix,
     ...core(err),
   };
 }
