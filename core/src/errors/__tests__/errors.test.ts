@@ -42,6 +42,17 @@ describe('lookup — every legacy spelling resolves to one entry', () => {
     expect(lookup(input)?.code).toBe(code);
   });
 
+  it('every yobo/slides VideoErrorCode resolves (p129 contract, yobo src/server/services/video/contract.ts)', () => {
+    const codes = ['video_unpriced', 'credits_short', 'org_not_enabled', 'price_changed', 'timed_out', 'too_large', 'provider_failed',
+      'invalid_request', 'bad_signature', 'stale_timestamp', 'replayed', 'not_found', 'not_on_approved_cut', 'quote_stale', 'forbidden',
+      'unsupported_duration', 'version_conflict', 'storyboard_required', 'unsupported_source', 'unsupported', 'remix_stopped', 'rate_limited',
+      'remix_conflict', 'conflict'];
+    for (const c of codes) {
+      expect(lookup(c), c).toBeDefined();
+      expect(lookup(`part:${c}`), `part:${c}`).toBeDefined();
+    }
+  });
+
   it('unknown spellings resolve to nothing', () => {
     expect(lookup('totally_new_reason')).toBeUndefined();
     expect(lookup('')).toBeUndefined();

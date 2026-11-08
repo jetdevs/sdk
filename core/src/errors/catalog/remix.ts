@@ -12,14 +12,14 @@ export const REMIX = {
     fallback: "I couldn't check this ad right now. Tap Try again.",
     forward: ['try_again', 'change'], resumes: false,
     agent: { reason: 'The ad or its route could not be read just now.', fix: 'Retry once on a new go.', ask: null, retry: true },
-    owner: 'remix-storyboard', aliases: ['template_unreadable', 'route_unreadable'],
+    owner: 'remix-storyboard', aliases: ['template_unreadable', 'route_unreadable', 'route_missing'],
   },
   'remix.ad_not_read': {
     ref: 'E2102', kind: 'retryable', http: 409, trpc: 'PRECONDITION_FAILED',
     fallback: 'The ad has not been read yet. Try again in a minute.',
     forward: ['try_again', 'change'], resumes: false,
     agent: { reason: 'The ad reading has not finished.', fix: "Do not retry now; retry once when the tool reports it ready or on the merchant's next message.", ask: null, retry: true },
-    owner: 'remix-storyboard', aliases: ['not_read'],
+    owner: 'remix-storyboard', aliases: ['not_read', 'no_blueprint'],
   },
   'remix.no_product': {
     ref: 'E2103', kind: 'retryable', http: 409, trpc: 'PRECONDITION_FAILED',
@@ -33,7 +33,7 @@ export const REMIX = {
     fallback: 'This remix is still being set up. Try again in a minute.',
     forward: ['try_again', 'change'], resumes: false,
     agent: { reason: 'The remix project row does not exist yet.', fix: "Do not retry now; retry once when the tool reports it ready or on the merchant's next message.", ask: null, retry: true },
-    owner: 'remix-storyboard', aliases: ['no_project'],
+    owner: 'remix-storyboard', aliases: ['no_project', 'brief:missing'],
   },
   'remix.sheet_not_ready': {
     ref: 'E2105', kind: 'retryable', http: 409, trpc: 'PRECONDITION_FAILED',
@@ -61,7 +61,7 @@ export const REMIX = {
     fallback: "I don't have a copy of this ad. Please pick a ready ad.",
     forward: ['pick_other', 'change'], resumes: false,
     agent: { reason: 'No stored copy of the source video exists.', fix: 'Do not retry. Show ready ads to pick from.', ask: null, retry: false },
-    owner: 'remix-storyboard', aliases: ['no_source_copy'],
+    owner: 'remix-storyboard', aliases: ['no_source_copy', 'no_source_frame'],
   },
   'remix.storyboard_drift': {
     ref: 'E2109', kind: 'blocked', http: 409, trpc: 'CONFLICT',
@@ -82,7 +82,7 @@ export const REMIX = {
     fallback: "That step can't go on as it is. Please change something.",
     forward: ['change', 'pick_other'], resumes: false,
     agent: { reason: 'A step check refused to go on.', fix: 'Do not retry. Ask what to change.', ask: null, retry: false },
-    owner: 'remix-generation', aliases: ['refused'],
+    owner: 'remix-generation', aliases: ['refused', 'same_plan', 'go_no_step', 'no_step_start', 'no_part', 'no_part_named', 'not_in_plan', 'storyboard_check_not_passed'],
   },
   'remix.step_failed': {
     ref: 'E2112', kind: 'internal', http: 500, trpc: 'INTERNAL_SERVER_ERROR',
@@ -90,6 +90,20 @@ export const REMIX = {
     forward: [], resumes: false,
     agent: { reason: 'A remix job died, threw, or its record was lost (a bug or provider crash).', fix: 'Do not retry. Say only that something went wrong on our side.', ask: null, retry: false },
     owner: 'remix-generation',
-    aliases: ['job_failed', 'job_dead', 'start_threw', 'start_failed', 'enqueue_failed', 'record_lost', 'failed', 'threw', 'not_consumed'],
+    aliases: ['job_failed', 'job_dead', 'start_threw', 'start_failed', 'enqueue_failed', 'record_lost', 'failed', 'threw', 'not_consumed', 'inputs_failed', 'video_unshown', 'qa_hold_video_unshown', 'storyboard_check_failed', 'drift_ask_not_posted'],
+  },
+  'remix.parts_running': {
+    ref: 'E2113', kind: 'retryable', http: 409, trpc: 'CONFLICT',
+    fallback: 'Some parts are still being made. Tap Try again when they are ready.',
+    forward: ['try_again', 'change'], resumes: false,
+    agent: { reason: 'Other video parts of this remix are still rendering.', fix: "Do not retry now; retry once when the tool reports it ready or on the merchant's next message.", ask: null, retry: true },
+    owner: 'remix-generation', aliases: ['parts_still_running'],
+  },
+  'remix.product_review_failed': {
+    ref: 'E2114', kind: 'blocked', http: 422, trpc: 'UNPROCESSABLE_CONTENT',
+    fallback: "The product picture still doesn't match your product. Please send another photo or pick a ready ad.",
+    forward: ['change', 'pick_other'], resumes: false,
+    agent: { reason: 'The product picture failed its review a second time.', fix: 'Do not remake it again. Ask for another product photo or offer a ready ad.', ask: null, retry: false },
+    owner: 'remix-storyboard', aliases: ['product_review_failed_again'],
   },
 } as const satisfies Record<string, ErrorEntryDef>;
