@@ -24,11 +24,12 @@ export const ADS = {
     owner: 'ads', aliases: ['font_coverage'],
   },
   'ads.text_no_fit': {
-    // P6 (lead-12): the system shrinks / wraps once; only if it still does not fit, ONE ask
+    // P6 (lead-12) + P0 (agents-lead-5): the system shrinks / wraps once; if it still does not fit, the agent uses ONE
+    // shorter line that keeps the meaning, applies it, and offers Change — it never asks first
     ref: 'E3603', kind: 'needs_merchant', http: 422, trpc: 'UNPROCESSABLE_CONTENT',
-    fallback: 'This line is too long for the ad. Shall I shorten it?',
+    fallback: 'That line was too long for the ad, so I used a shorter one. Tap Change to edit it.',
     forward: ['change'], resumes: false,
-    agent: { reason: 'The copy still does not fit the empty zone after one shrink and wrap.', fix: 'Offer one shorter line and apply what the merchant picks. Do not retry the same text.', ask: 'Shorten this line?', retry: false },
+    agent: { reason: 'The copy still does not fit the empty zone after one shrink and wrap.', fix: 'Use one shorter line that keeps the meaning, apply it, and offer Change. Do not retry the same text.', ask: null, retry: false },
     owner: 'ads', aliases: ['no_fit'],
   },
   'ads.image_link_invalid': {
