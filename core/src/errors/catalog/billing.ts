@@ -47,6 +47,6 @@ export const BILLING = {
     fallback: 'The price changed. Please check it and try again.',
     forward: ['try_again'], resumes: false,
     agent: { reason: 'The quote is stale or the price changed since it was shown.', fix: 'Get a fresh quote, show it, then retry once.', ask: null, retry: true },
-    owner: 'billing', aliases: ['price_changed', 'quote_stale'],
+    owner: 'billing', aliases: ['price_changed', 'quote_stale', 'closure_requote'],
   },
 } as const satisfies Record<string, ErrorEntryDef>;
