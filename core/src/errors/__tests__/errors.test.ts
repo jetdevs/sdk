@@ -159,7 +159,7 @@ describe('wire shapes', () => {
     const r = toToolResult('part:credits_short', { say: 'Top up to go on.' });
     expect(r.success).toBe(false);
     expect(r.isError).toBe(true);
-    expect(r.error).toMatchObject({ code: 'billing.credits_short', ref: 'E1201', kind: 'needs_merchant', retry: false, resumes: true, said: false, forward: ['top_up'], say: 'Top up to go on.' });
+    expect(r.error).toMatchObject({ code: 'billing.credits_short', ref: 'E1201', kind: 'needs_merchant', retry: false, resumes: false, said: false, forward: ['top_up'], say: 'Top up to go on.' });
     expect(r.error.fix).toMatch(/Do not retry/);
     expect(JSON.stringify(r)).not.toMatch(/stack/);
   });

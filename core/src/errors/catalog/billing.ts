@@ -4,11 +4,12 @@ import type { ErrorEntryDef } from '../types';
 export const BILLING = {
   'billing.credits_short': {
     ref: 'E1201', kind: 'needs_merchant', http: 402, trpc: 'PAYMENT_REQUIRED',
-    fallback: 'There are not enough credits for this yet. It starts by itself as soon as credits are added.',
-    forward: ['top_up'], resumes: true,
+    fallback: 'There are not enough credits for this yet. Top up, then tell me to carry on.',
+    // resumes stays false until an app's auto-resume after payment ships (remix: astra funding; lead-12 2026-11-08)
+    forward: ['top_up'], resumes: false,
     agent: {
       reason: 'The account has fewer credits than this step costs.',
-      fix: 'Do not retry. The work resumes by itself once credits are added; start nothing else for it.',
+      fix: "Do not retry now. Continue the same step once on the merchant's next message after they add credits; start nothing else for it.",
       ask: null, retry: false,
     },
     owner: 'billing',
