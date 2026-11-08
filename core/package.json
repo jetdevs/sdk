@@ -224,6 +224,16 @@
       "import": "./dist/invites/ui/index.js",
       "require": "./dist/invites/ui/index.js"
     },
+    "./errors": {
+      "types": "./dist/errors/index.d.ts",
+      "import": "./dist/errors/index.js",
+      "require": "./dist/errors/index.js"
+    },
+    "./errors/trpc": {
+      "types": "./dist/errors/trpc.d.ts",
+      "import": "./dist/errors/trpc.js",
+      "require": "./dist/errors/trpc.js"
+    },
     "./system-config": {
       "types": "./dist/system-config/index.d.ts",
       "import": "./dist/system-config/index.js",
