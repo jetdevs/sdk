@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALREADY_TOLD,
+  boundaryFields,
+  fromHttpStatus,
   CatalogError,
   catalogError,
   forwardFor,
@@ -187,5 +189,18 @@ describe('wire shapes', () => {
     expect(readCatalogError({ data: { catalog: { code: 'billing.credits_short' } } })?.forward).toEqual(['top_up']);
     expect(readCatalogError(toHttpBody(catalogError('common.not_found')).body)?.code).toBe('common.not_found');
     expect(readCatalogError(new Error('random'))).toBeUndefined();
+  });
+});
+
+describe('boundary helpers', () => {
+  it('fromHttpStatus maps a status; a whole code in the message wins', () => {
+    expect(fromHttpStatus(404, 'Remix not found').code).toBe('common.not_found');
+    expect(fromHttpStatus(402).code).toBe('billing.credits_short');
+    expect(fromHttpStatus(418).code).toBe('common.invalid_input');
+    expect(fromHttpStatus(500, 'boom').code).toBe('common.internal');
+    expect(fromHttpStatus(400, 'remix.route_blocked').code).toBe('remix.route_blocked');
+  });
+  it('boundaryFields is compact and additive', () => {
+    expect(boundaryFields(fromHttpStatus(409))).toEqual({ code: 'common.conflict', ref: 'E1005', kind: 'retryable', forward: ['try_again'], fix: expect.any(String), retry: true });
   });
 });
