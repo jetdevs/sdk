@@ -4,9 +4,16 @@ import { BILLING } from './billing';
 import { COMMON } from './common';
 import { REMIX } from './remix';
 import { VIDEO } from './video';
+import { ADS } from './ads';
+import { AGENT } from './agent';
+import { CAMPAIGN } from './campaign';
+import { COMMERCE } from './commerce';
+import { CONNECTOR } from './connector';
+import { MESSAGING } from './messaging';
+import { ONBOARDING } from './onboarding';
 
 /** Every domain file, merged. A new domain is one new file + one line here. */
-const DEFS = { ...COMMON, ...AUTH, ...BILLING, ...VIDEO, ...REMIX } as const;
+const DEFS = { ...COMMON, ...AUTH, ...BILLING, ...VIDEO, ...REMIX, ...AGENT, ...CAMPAIGN, ...MESSAGING, ...CONNECTOR, ...COMMERCE, ...ONBOARDING, ...ADS } as const;
 
 /** Every catalog code, as a type: `raise('billing.credits_short')` is checked at compile time. */
 export type ErrorCode = keyof typeof DEFS;
