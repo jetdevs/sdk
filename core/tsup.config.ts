@@ -48,6 +48,8 @@ const serverEntries = {
   'rbac/session/index': 'src/modules/rbac/session/index.ts',
   'themes/index': 'src/modules/themes/index.ts',
   'lib/index': 'src/lib/index.ts',
+  'errors/index': 'src/errors/index.ts',
+  'errors/trpc': 'src/errors/trpc.ts',
   'rls/index': 'src/rls/index.ts',
   'cli/index': 'src/cli/index.ts',
   'cli/db': 'src/cli/db.ts',
