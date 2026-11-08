@@ -149,4 +149,12 @@ export const AGENT = {
     agent: { reason: 'A reply or tap arrived but no recent reminder or brief was sent to answer.', fix: 'Do not retry. Tell the merchant there is nothing recent to answer and point to the app.', ask: null, retry: false },
     owner: 'agent-tasks', aliases: ['no_recent_reminder'],
   },
+  'agent.step_not_open': {
+    // agents-lead-6 (2026-11-08): nothing is off; the tool's step is just not open yet. Never send the merchant to the app.
+    ref: 'E3021', kind: 'internal', http: 403, trpc: 'FORBIDDEN',
+    fallback: "That comes right after this step. Let's finish this one first.",
+    forward: [], resumes: false,
+    agent: { reason: "The tool's step is not open yet (an onboarding step that comes later). Nothing is switched off.", fix: 'Do not retry and do not tell the merchant it is off. Carry on with the current step; after it, offer what they asked for.', ask: null, retry: false },
+    owner: 'agent-tools', aliases: ['onboarding_out_of_belt', 'step_not_open'],
+  },
 } as const satisfies Record<string, ErrorEntryDef>;

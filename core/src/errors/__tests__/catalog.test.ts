@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ERROR_CATALOG, FORWARD_FALLBACK_LABELS } from '../catalog';
+import { lookup } from '../error';
 import type { ErrorEntry } from '../types';
 
 const entries = Object.values(ERROR_CATALOG) as ErrorEntry[];
@@ -81,5 +82,13 @@ describe('error catalog rules', () => {
 
   it('forward fallback labels fit a WhatsApp button (20 chars)', () => {
     for (const label of Object.values(FORWARD_FALLBACK_LABELS)) expect(label.length).toBeLessThanOrEqual(20);
+  });
+
+  it('agent.step_not_open: an out-of-belt tool is not "switched off" and never sends the merchant away', () => {
+    const hit = lookup('onboarding_out_of_belt');
+    expect(hit?.code).toBe('agent.step_not_open');
+    expect(hit?.forward).toEqual([]);
+    expect(hit?.agent.retry).toBe(false);
+    expect(`${hit?.fallback} ${hit?.agent.fix}`).not.toMatch(/switched off|Yobo app/i);
   });
 });
