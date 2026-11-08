@@ -216,3 +216,13 @@ describe('ads image size is its own code (lead-12)', () => {
     expect(lookup('too_large')?.code).toBe('video.too_large');
   });
 });
+
+describe('machine-caller auth failures are ours (dev proof 2026-11-08)', () => {
+  it('INVALID_API_KEY is auth.service_key_rejected (internal), never sign_in', () => {
+    const e = fromUnknown({ error: { code: 'INVALID_API_KEY' } });
+    expect(e.code).toBe('auth.service_key_rejected');
+    expect(e.kind).toBe('internal');
+    expect(forwardFor(e)).toEqual([]);
+    expect(e.entry.agent.fix).not.toMatch(/sign in again/);
+  });
+});

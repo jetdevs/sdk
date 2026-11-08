@@ -14,7 +14,7 @@ export const COMMON = {
     fallback: 'Please sign in again to go on.',
     forward: ['sign_in'], resumes: false,
     agent: { reason: 'The caller is not signed in or the key is invalid.', fix: 'Stop. Do not retry. Tell the merchant to sign in again.', ask: null, retry: false },
-    owner: 'core-auth', aliases: ['UNAUTHORIZED', 'INVALID_API_KEY', 'unauthorized'],
+    owner: 'core-auth', aliases: ['UNAUTHORIZED', 'unauthorized'],
   },
   'common.forbidden': {
     ref: 'E1003', kind: 'blocked', http: 403, trpc: 'FORBIDDEN',
