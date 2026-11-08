@@ -8,6 +8,7 @@
 export { ERROR_CATALOG, FORWARD_FALLBACK_LABELS, type ErrorCode } from './catalog';
 export { CatalogError, catalogError, fromUnknown, isCatalogError, lookup, raise, type CatalogErrorOptions } from './error';
 export {
+  ALREADY_TOLD,
   copyKeyOf,
   forwardCopyKey,
   forwardFallbackLabel,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ALREADY_TOLD,
   CatalogError,
   catalogError,
   forwardFor,
@@ -152,8 +153,12 @@ describe('wire shapes', () => {
     expect(JSON.stringify(r)).not.toMatch(/stack/);
   });
 
-  it('toToolResult said=true tells the agent the line is already posted', () => {
-    expect(toToolResult('remix.route_blocked', { said: true }).error.said).toBe(true);
+  it('toToolResult said=true tells the agent the line is already posted, first in fix', () => {
+    const r = toToolResult('auth.session_expired', { said: true });
+    expect(r.error.said).toBe(true);
+    expect(r.error.fix.startsWith(ALREADY_TOLD)).toBe(true);
+    expect(toToolResult('auth.session_expired').error.fix.startsWith(ALREADY_TOLD)).toBe(false);
+    expect(toOutcome('auth.session_expired', { said: true }).next.startsWith(ALREADY_TOLD)).toBe(true);
   });
 
   it('toOutcome gives remix {status, say, next}; said → say null', () => {

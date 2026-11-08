@@ -41,7 +41,7 @@ export const COMMON = {
     ref: 'E1006', kind: 'retryable', http: 429, trpc: 'TOO_MANY_REQUESTS',
     fallback: 'Too many requests right now. Please try again in a minute.',
     forward: ['try_again'], resumes: false,
-    agent: { reason: 'A rate limit answered 429.', fix: 'Wait, then retry once. Do not loop.', ask: null, retry: true },
+    agent: { reason: 'A rate limit answered 429.', fix: "Do not retry now; retry once when the tool reports it ready or on the merchant's next message.", ask: null, retry: true },
     owner: 'core', aliases: ['TOO_MANY_REQUESTS', 'RATE_LIMITED', 'rate_limited'],
   },
   'common.unavailable': {
@@ -60,9 +60,9 @@ export const COMMON = {
   },
   'common.internal': {
     ref: 'E1009', kind: 'internal', http: 500, trpc: 'INTERNAL_SERVER_ERROR',
-    fallback: "Something went wrong on our side. We've been told and are looking at it.",
+    fallback: 'Something went wrong on our side.',
     forward: [], resumes: false,
-    agent: { reason: 'An unexpected error (a bug on our side).', fix: 'Stop. Do not retry. Tell the merchant we are looking at it.', ask: null, retry: false },
+    agent: { reason: 'An unexpected error (a bug on our side).', fix: 'Stop. Do not retry. Say only that something went wrong on our side.', ask: null, retry: false },
     owner: 'core', aliases: ['INTERNAL_SERVER_ERROR', 'INTERNAL_ERROR', 'DATABASE_ERROR', 'UNKNOWN_ERROR', 'internal_error'],
   },
 } as const satisfies Record<string, ErrorEntryDef>;

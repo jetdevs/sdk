@@ -59,6 +59,11 @@ describe('error catalog rules', () => {
     expect(e.agent.fix.trim()).not.toBe('');
     expect(e.agent.reason.length + e.agent.fix.length + (e.agent.ask?.length ?? 0)).toBeLessThanOrEqual(300);
     if (e.kind !== 'retryable') expect(e.agent.retry).toBe(false);
+    if (e.agent.retry) expect(e.kind).toBe('retryable');
+    // the agent cannot wait: code owns any backoff (agents-lead-5)
+    expect(e.agent.fix).not.toMatch(/\bwait\b/i);
+    // internal kind makes no promise that someone is looking (no alert fires from the catalog)
+    if (e.kind === 'internal') expect(`${e.fallback} ${e.agent.fix}`).not.toMatch(/looking at it|been told/i);
   });
 
   it.each(entries.map((e) => [e.code, e] as const))('%s: fallback is one plain sentence block with no placeholder', (_c, e) => {
