@@ -36,6 +36,9 @@ describe('lookup — every legacy spelling resolves to one entry', () => {
     ['brief:no_project', 'remix.not_set_up'],
     ['storyboard:drift_blocked', 'remix.storyboard_drift'],
     ['fix:not_a_part', 'remix.fix_not_applicable'],
+    ['part:part_not_started', 'remix.part_not_started'], // yobo dev 186: [Keep it] left a part never started
+    // yobo's cause carries the old alias last, so an SDK without this entry still reads it as retryable (parts_running)
+    ['part:part_not_started:parts_still_running', 'remix.part_not_started'],
     ['join:job_dead:3dc16981-0000-4000-8000-000000000000', 'remix.step_failed'],
     ['job:3dc16981-0000-4000-8000-000000000000:timed_out', 'common.timeout'],
     ['400:invalid_request', 'common.invalid_input'],
@@ -120,6 +123,15 @@ describe('fromUnknown', () => {
 describe('forwardFor — the remix [Try again] loop cannot come back', () => {
   it('credits_short offers top_up only', () => {
     expect(forwardFor(fromUnknown('part:credits_short'))).toEqual(['top_up']);
+  });
+
+  it('remix.part_not_started: retryable [Try again], not ours, and the agent hint says the part has not started (never "still rendering")', () => {
+    const e = lookup('part:part_not_started');
+    expect(e).toMatchObject({ code: 'remix.part_not_started', kind: 'retryable' });
+    expect(forwardFor(catalogError('remix.part_not_started'))).toContain('try_again');
+    expect(e!.agent.reason).toMatch(/not started/);
+    expect(e!.agent.fix).toMatch(/\[Try again\] starts it/);
+    expect(`${e!.agent.reason} ${e!.agent.fix} ${e!.fallback}`).not.toMatch(/still (rendering|being made)/);
   });
 
   it('retryable keeps try_again', () => {
