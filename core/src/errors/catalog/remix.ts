@@ -106,4 +106,13 @@ export const REMIX = {
     agent: { reason: 'The product picture failed its review a second time.', fix: 'Do not remake it again. Ask for another product photo or offer a ready ad.', ask: null, retry: false },
     owner: 'remix-storyboard', aliases: ['product_review_failed_again'],
   },
+  // yobo dev 186 (lead-24): [Keep it] on a parked remix left a part that never started; its fresh [Try again] starts it.
+  // Not parts_running (that hint says "still rendering", a false line here) and not our fault (no team alert).
+  'remix.part_not_started': {
+    ref: 'E2115', kind: 'retryable', http: 409, trpc: 'PRECONDITION_FAILED',
+    fallback: "This part of your video hasn't started yet. Tap Try again to start it.",
+    forward: ['try_again', 'change'], resumes: false,
+    agent: { reason: "A video part of this remix has not started yet; nothing is rendering for it.", fix: 'Tell the merchant the part has not started and that [Try again] starts it. Do not start it yourself.', ask: null, retry: true },
+    owner: 'remix-generation', aliases: ['part_not_started'],
+  },
 } as const satisfies Record<string, ErrorEntryDef>;
