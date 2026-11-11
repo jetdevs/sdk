@@ -40,7 +40,9 @@ export const REMIX = {
     fallback: 'The product picture is not ready yet. Tap Try again.',
     forward: ['try_again', 'change'], resumes: false,
     agent: { reason: 'The product sheet is not done, failed, or its start was refused.', fix: 'Retry the sheet once; never use the raw photo instead.', ask: null, retry: true },
-    owner: 'remix-storyboard', aliases: ['no_sheet', 'sheet_failed', 'sheet_refused'],
+    // YMS-875 F4a: a moving scene with no keyframe sheet (`storyboard:no_keyframe_sheet:<scene>`) is the same retryable
+    // missing-sheet refusal, so the merchant keeps [Try again] instead of the unknown-cause path
+    owner: 'remix-storyboard', aliases: ['no_sheet', 'sheet_failed', 'sheet_refused', 'no_keyframe_sheet'],
   },
   'remix.not_template': {
     ref: 'E2106', kind: 'blocked', http: 422, trpc: 'UNPROCESSABLE_CONTENT',
