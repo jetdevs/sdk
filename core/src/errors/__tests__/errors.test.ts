@@ -32,6 +32,8 @@ describe('lookup — every legacy spelling resolves to one entry', () => {
     ['storyboard:video_unpriced', 'billing.unpriced'],
     ['409:version_conflict', 'common.conflict'],
     ['start:no_sheet', 'remix.sheet_not_ready'],
+    ['storyboard:no_keyframe_sheet:s2', 'remix.sheet_not_ready'], // yobo YMS-875 F4a
+    ['start:storyboard:no_keyframe_sheet:p:g:template:1', 'remix.sheet_not_ready'],
     ['sheet:no_photo', 'remix.no_product'],
     ['brief:no_project', 'remix.not_set_up'],
     ['storyboard:drift_blocked', 'remix.storyboard_drift'],
