@@ -164,7 +164,7 @@ describe('wire shapes', () => {
     expect(r.success).toBe(false);
     expect(r.isError).toBe(true);
     expect(r.error).toMatchObject({ code: 'billing.credits_short', ref: 'E1201', kind: 'needs_merchant', retry: false, resumes: false, said: false, forward: ['top_up'], say: 'Top up to go on.' });
-    expect(r.error.fix).toMatch(/Do not retry/);
+    expect(r.error.fix).toMatch(/same call now gets the same answer/);
     expect(JSON.stringify(r)).not.toMatch(/stack/);
   });
 
