@@ -80,14 +80,14 @@ export const VIDEO = {
     ref: 'E2011', kind: 'internal', http: 401, trpc: 'UNAUTHORIZED',
     fallback: 'Something went wrong on our side.',
     forward: [], resumes: false,
-    agent: { reason: 'A service-to-service signature was rejected (bug or clock drift).', fix: 'Stop. Do not retry.', ask: null, retry: false },
+    agent: { reason: 'A service-to-service signature was rejected (bug or clock drift).', fix: 'Nothing ran: a service signature was rejected on our side. The same call gets the same answer until it is fixed.', ask: null, retry: false },
     owner: 'video', aliases: ['bad_signature', 'stale_timestamp', 'replayed'],
   },
   'video.dispatch_unknown': {
     ref: 'E2012', kind: 'internal', http: 500, trpc: 'INTERNAL_SERVER_ERROR',
     fallback: "Something went wrong on our side. Nothing was charged.",
     forward: [], resumes: false,
-    agent: { reason: 'The provider outcome is unknown; the job was failed and credits released.', fix: 'Stop. Do not resubmit.', ask: null, retry: false },
+    agent: { reason: 'The provider outcome is unknown; the job was failed and credits released.', fix: 'Nothing is owed for this job. Sending it again starts a new paid job, so it runs only when the merchant says yes.', ask: null, retry: false },
     owner: 'video', aliases: ['dispatch_unknown'],
   },
 } as const satisfies Record<string, ErrorEntryDef>;

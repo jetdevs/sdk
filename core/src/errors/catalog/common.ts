@@ -13,14 +13,14 @@ export const COMMON = {
     ref: 'E1002', kind: 'needs_merchant', http: 401, trpc: 'UNAUTHORIZED',
     fallback: 'Please sign in again to go on.',
     forward: ['sign_in'], resumes: false,
-    agent: { reason: 'The caller is not signed in or the key is invalid.', fix: 'Stop. Do not retry. Tell the merchant to sign in again.', ask: null, retry: false },
+    agent: { reason: 'The caller is not signed in or the key is invalid.', fix: 'Nothing ran. The same call gets the same answer until the merchant signs in again or the key is fixed.', ask: null, retry: false },
     owner: 'core-auth', aliases: ['UNAUTHORIZED', 'unauthorized'],
   },
   'common.forbidden': {
     ref: 'E1003', kind: 'blocked', http: 403, trpc: 'FORBIDDEN',
     fallback: "Your account doesn't have access to this.",
     forward: ['contact_support'], resumes: false,
-    agent: { reason: 'The caller lacks permission for this action.', fix: 'Stop. Do not retry. Do not try another tool to get around it.', ask: null, retry: false },
+    agent: { reason: 'The caller lacks permission for this action.', fix: 'Nothing ran: this caller has no permission for this action, and a different tool for the same action needs the same permission. Offer what you can do instead.', ask: null, retry: false },
     owner: 'core-auth', aliases: ['FORBIDDEN', 'INSUFFICIENT_PERMISSIONS', 'PERMISSION_DENIED', 'forbidden', 'permission_denied', 'not_allowed', 'correction_unauthorized', 'org_not_found'],
   },
   'common.not_found': {
@@ -62,7 +62,7 @@ export const COMMON = {
     ref: 'E1009', kind: 'internal', http: 500, trpc: 'INTERNAL_SERVER_ERROR',
     fallback: 'Something went wrong on our side.',
     forward: [], resumes: false,
-    agent: { reason: 'An unexpected error (a bug on our side).', fix: 'Stop. Do not retry. Say only that something went wrong on our side.', ask: null, retry: false },
+    agent: { reason: 'An unexpected error (a bug on our side).', fix: 'Nothing ran because of a fault on our side. The same call gets the same answer until it is fixed. Tell the merchant it is on our side and offer what else you can do now.', ask: null, retry: false },
     owner: 'core', aliases: ['INTERNAL_SERVER_ERROR', 'INTERNAL_ERROR', 'DATABASE_ERROR', 'UNKNOWN_ERROR', 'internal_error', 'adapter_error', 'push_error'],
   },
 } as const satisfies Record<string, ErrorEntryDef>;
