@@ -114,7 +114,7 @@ export const REMIX = {
     ref: 'E2115', kind: 'retryable', http: 409, trpc: 'PRECONDITION_FAILED',
     fallback: "This part of your video hasn't started yet. Tap Try again to start it.",
     forward: ['try_again', 'change'], resumes: false,
-    agent: { reason: "A video part of this remix has not started yet; nothing is rendering for it.", fix: 'Tell the merchant the part has not started and that [Try again] starts it. Do not start it yourself.', ask: null, retry: true },
+    agent: { reason: "A video part of this remix has not started yet; nothing is rendering for it.", fix: 'The part has not started and nothing is rendering. [Try again] starts it, on the merchant\'s own tap; tell them that.', ask: null, retry: true },
     owner: 'remix-generation', aliases: ['part_not_started'],
   },
 } as const satisfies Record<string, ErrorEntryDef>;

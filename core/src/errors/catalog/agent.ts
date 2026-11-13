@@ -154,7 +154,7 @@ export const AGENT = {
     ref: 'E3021', kind: 'internal', http: 403, trpc: 'FORBIDDEN',
     fallback: "That comes right after this step. Let's finish this one first.",
     forward: [], resumes: false,
-    agent: { reason: "The tool's step is not open yet (an onboarding step that comes later). Nothing is switched off.", fix: 'Do not retry and do not tell the merchant it is off. Carry on with the current step; after it, offer what they asked for.', ask: null, retry: false },
+    agent: { reason: "The tool's step is not open yet (an onboarding step that comes later). Nothing is switched off.", fix: 'The step opens after the current one, so the same call now gets the same answer. Carry on with the current step; after it, offer what they asked for.', ask: null, retry: false },
     owner: 'agent-tools', aliases: ['onboarding_out_of_belt', 'step_not_open'],
   },
 } as const satisfies Record<string, ErrorEntryDef>;
