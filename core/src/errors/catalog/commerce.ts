@@ -149,7 +149,7 @@ export const COMMERCE = {
     ref: 'E3420', kind: 'internal', http: 500, trpc: 'INTERNAL_SERVER_ERROR',
     fallback: 'Something went wrong on our side.',
     forward: [], resumes: false,
-    agent: { reason: 'A commerce engine bug or misconfiguration (engine guard missed, shopper link failed, media or engine not configured).', fix: 'Stop. Do not retry. Say only that something went wrong on our side.', ask: null, retry: false },
+    agent: { reason: 'A commerce engine bug or misconfiguration (engine guard missed, shopper link failed, media or engine not configured).', fix: 'Nothing ran because of a fault on our side. The same call gets the same answer until it is fixed. Tell the merchant it is on our side and offer what else you can do now.', ask: null, retry: false },
     owner: 'commerce',
     aliases: ['customer_link_failed', 'checkout_create_failed', 'media_not_configured', 'engine_not_configured', 'TRANSACTION_NOT_FOUND', 'API_VALIDATION_ERROR', 'XENDIT_API_ERROR'],
   },
