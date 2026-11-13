@@ -103,7 +103,7 @@ export const ONBOARDING = {
     ref: 'E3599', kind: 'internal', http: 500, trpc: 'INTERNAL_SERVER_ERROR',
     fallback: 'Something went wrong on our side.',
     forward: [], resumes: false,
-    agent: { reason: 'Onboarding hit an error in our own code (org row, login token or role setup).', fix: 'Stop. Do not retry. Say only that something went wrong on our side.', ask: null, retry: false },
+    agent: { reason: 'Onboarding hit an error in our own code (org row, login token or role setup).', fix: 'Nothing ran because of a fault on our side. The same call gets the same answer until it is fixed. Tell the merchant it is on our side and offer what else you can do now.', ask: null, retry: false },
     owner: 'onboarding', aliases: ['ROLE_TEMPLATE_FAILED', 'INTERNAL'],
   },
 } as const satisfies Record<string, ErrorEntryDef>;

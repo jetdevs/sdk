@@ -126,7 +126,7 @@ export const CONNECTOR = {
     ref: 'E3399', kind: 'internal', http: 500, trpc: 'INTERNAL_SERVER_ERROR',
     fallback: 'Something went wrong on our side.',
     forward: [], resumes: false,
-    agent: { reason: 'The connector hit an error in our own code or database.', fix: 'Stop. Do not retry. Say only that something went wrong on our side.', ask: null, retry: false },
+    agent: { reason: 'The connector hit an error in our own code or database.', fix: 'Nothing ran because of a fault on our side. The same call gets the same answer until it is fixed. Tell the merchant it is on our side and offer what else you can do now.', ask: null, retry: false },
     owner: 'connectors', aliases: ['DB_LOOKUP_FAILED', 'DB_INSERT_FAILED', 'DB_UPDATE_FAILED', 'GRAPHQL_ERROR', 'UNEXPECTED', 'UnexpectedError', 'UNKNOWN'],
   },
 } as const satisfies Record<string, ErrorEntryDef>;
