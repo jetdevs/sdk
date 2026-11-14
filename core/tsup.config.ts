@@ -131,7 +131,7 @@ const allEntries: Record<string, string> = {
 const combinedConfig: Options = {
   entry: allEntries,
   format: ['esm'],
-  dts: true,
+  dts: false,
   clean: true,
   splitting: false,
   external: externalDeps,
