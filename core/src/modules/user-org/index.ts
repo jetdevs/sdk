@@ -30,7 +30,7 @@
 
 // Types
 export type {
-    AssignableOrganization, AssignableRole, CreateRoleAssignmentInput, OrgUser, OrganizationInfo, RoleAssignmentData, RoleInfo, RoleAssignmentResult as TypesRoleAssignmentResult, UserOrgContext, UserOrgData, UserOrgMembership,
+    AssignableOrganization, AssignableRole, CreateRoleAssignmentInput, OrgUser, OrganizationInfo, RoleHolder, RoleAssignmentData, RoleInfo, RoleAssignmentResult as TypesRoleAssignmentResult, UserOrgContext, UserOrgData, UserOrgMembership,
     UserOrgPermission, UserRoleAllOrgs, UserRoleData
 } from './types';
 

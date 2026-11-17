@@ -56,12 +56,15 @@ export function createPermissionRouterConfig(
 ): RouterConfig {
   const { Repository } = deps;
 
+  // Every read needs role:read: the catalog and the per-role grants belong to
+  // the role admin screens, never to an ordinary member.
   return {
     // -------------------------------------------------------------------------
     // GET ALL PERMISSIONS
     // -------------------------------------------------------------------------
     getAll: {
       type: "query" as const,
+      permission: "role:read",
       cache: { ttl: 300, tags: ["permissions"] },
       repository: Repository,
       handler: async ({ repo }) => {
@@ -74,6 +77,7 @@ export function createPermissionRouterConfig(
     // -------------------------------------------------------------------------
     getAllWithUsage: {
       type: "query" as const,
+      permission: "role:read",
       cache: { ttl: 300, tags: ["permissions"] },
       repository: Repository,
       handler: async ({ repo }) => {
@@ -86,6 +90,7 @@ export function createPermissionRouterConfig(
     // -------------------------------------------------------------------------
     getByCategory: {
       type: "query" as const,
+      permission: "role:read",
       input: z.string(),
       cache: { ttl: 300, tags: ["permissions"] },
       repository: Repository,
@@ -99,6 +104,7 @@ export function createPermissionRouterConfig(
     // -------------------------------------------------------------------------
     getCategoriesWithCounts: {
       type: "query" as const,
+      permission: "role:read",
       cache: { ttl: 300, tags: ["permissions"] },
       repository: Repository,
       handler: async ({ repo }) => {
@@ -111,6 +117,7 @@ export function createPermissionRouterConfig(
     // -------------------------------------------------------------------------
     getCategories: {
       type: "query" as const,
+      permission: "role:read",
       cache: { ttl: 300, tags: ["permissions"] },
       repository: Repository,
       handler: async ({ repo }) => {
@@ -123,6 +130,7 @@ export function createPermissionRouterConfig(
     // -------------------------------------------------------------------------
     getByRoleId: {
       type: "query" as const,
+      permission: "role:read",
       input: z.number(),
       cache: { ttl: 60, tags: ["permissions", "roles"] },
       repository: Repository,
@@ -136,6 +144,7 @@ export function createPermissionRouterConfig(
     // -------------------------------------------------------------------------
     getBySlug: {
       type: "query" as const,
+      permission: "role:read",
       input: z.string(),
       cache: { ttl: 300, tags: ["permissions"] },
       repository: Repository,
@@ -153,6 +162,7 @@ export function createPermissionRouterConfig(
     // -------------------------------------------------------------------------
     getStats: {
       type: "query" as const,
+      permission: "role:read",
       cache: { ttl: 60, tags: ["permissions"] },
       repository: Repository,
       handler: async ({ repo }) => {

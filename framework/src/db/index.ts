@@ -36,3 +36,10 @@ export type {
 } from './rls-context';
 
 // Internal implementation details remain hidden
+
+// RLS + privileged db clients factory (p1 lane C)
+export { createDbClients, isValidRlsId } from './clients';
+export type {
+    CreateDbClientsOptions, DbClientRole, DbClients, DbWithRlsOptions, PrivilegedAccessEvent,
+    RlsContextValues, SqlExecutor, TransactionalDb, TxOf
+} from './clients';

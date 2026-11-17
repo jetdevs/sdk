@@ -1,6 +1,6 @@
 {
   "name": "@jetdevs/core",
-  "version": "0.1.57-dev",
+  "version": "0.1.59-dev",
   "description": "Core SDK components, UI primitives, and utilities for Core SaaS",
   "type": "module",
   "publishConfig": {
@@ -68,6 +68,11 @@
       "types": "./dist/rbac/index.d.ts",
       "import": "./dist/rbac/index.js",
       "require": "./dist/rbac/index.js"
+    },
+    "./rbac/session": {
+      "types": "./dist/rbac/session/index.d.ts",
+      "import": "./dist/rbac/session/index.js",
+      "require": "./dist/rbac/session/index.js"
     },
     "./themes": {
       "types": "./dist/themes/index.d.ts",
@@ -194,6 +199,11 @@
       "import": "./dist/config/index.js",
       "require": "./dist/config/index.js"
     },
+    "./api": {
+      "types": "./dist/api/index.d.ts",
+      "import": "./dist/api/index.js",
+      "require": "./dist/api/index.js"
+    },
     "./api-keys": {
       "types": "./dist/api-keys/index.d.ts",
       "import": "./dist/api-keys/index.js",
@@ -213,6 +223,16 @@
       "types": "./dist/invites/ui/index.d.ts",
       "import": "./dist/invites/ui/index.js",
       "require": "./dist/invites/ui/index.js"
+    },
+    "./errors": {
+      "types": "./dist/errors/index.d.ts",
+      "import": "./dist/errors/index.js",
+      "require": "./dist/errors/index.js"
+    },
+    "./errors/trpc": {
+      "types": "./dist/errors/trpc.d.ts",
+      "import": "./dist/errors/trpc.js",
+      "require": "./dist/errors/trpc.js"
     },
     "./system-config": {
       "types": "./dist/system-config/index.d.ts",
@@ -343,9 +363,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
     "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.0",
-    "zod": "^3.22.4"
+    "tailwind-merge": "^2.2.0"
   },
   "peerDependencies": {
     "@jetdevs/framework": "^0.2.4-dev",
@@ -376,7 +396,8 @@
     "postgres": "^3.4.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-hook-form": "^7.0.0",
-    "zustand": "^4.4.0 || ^5.0.0"
+    "zustand": "^4.4.0 || ^5.0.0",
+    "zod": "^3.22.4"
   },
   "peerDependenciesMeta": {
     "@jetdevs/framework": {
@@ -497,6 +518,7 @@
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",
     "vitest": "^1.0.0",
-    "zustand": "^5.0.9"
+    "zustand": "^5.0.9",
+    "zod": "^3.25.76"
   }
 }

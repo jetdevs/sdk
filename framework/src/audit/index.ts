@@ -154,3 +154,22 @@ export function calculateChanges<T extends Record<string, any>>(
 
   return changes;
 }
+// =============================================================================
+// Persistent, scoped audit writer (org + platform events, actor kinds, PII policy)
+// Merged from app copies: yobo org-audit/audit-log, crm platform-audit, engage-audit.
+// =============================================================================
+export type {
+  AuditActor, AuditActorKind, AuditEvent, AuditRequestMeta, AuditSeverity,
+  AuditWriter, OrgAuditEvent, PlatformAuditEvent,
+} from './types';
+export {
+  AuditPiiError, DEFAULT_NEVER_LOG_FIELDS, createAuditPolicy,
+  type AuditPolicy, type AuditPolicyOptions,
+} from './pii';
+export { auditRequestMeta, resolveRequestId, canonicalJson, hashAuditArgs } from './request';
+export {
+  createAuditWriter, createDrizzleAuditWriter, actorColumns,
+  type AuditInsertDb, type CreateAuditWriterOptions, type DrizzleAuditWriterOptions,
+  type OrgAuditRow, type OrgAuditSink, type PlatformAuditRow, type PlatformAuditSink,
+} from './writer';
+export { inferAuditAction, extractAuditEntityId, extractAuditEntityName } from './procedures';

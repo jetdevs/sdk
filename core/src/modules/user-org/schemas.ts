@@ -36,7 +36,8 @@ export const validateOrgAccessSchema = z.object({
  */
 export const assignRoleSchema = z.object({
   userId: z.number().int().positive(),
-  orgId: z.number().int().positive(),
+  // null = the platform-wide assignment of a system role (platform staff only)
+  orgId: z.number().int().positive().nullable(),
   roleId: z.number().int().positive(),
 });
 
@@ -45,7 +46,8 @@ export const assignRoleSchema = z.object({
  */
 export const removeRoleSchema = z.object({
   userId: z.number().int().positive(),
-  orgId: z.number().int().positive(),
+  // null = the platform-wide assignment of a system role (platform staff only)
+  orgId: z.number().int().positive().nullable(),
   roleId: z.number().int().positive(),
 });
 
