@@ -84,6 +84,12 @@ describe('getDbContext — org scope (YMS-292)', () => {
     expect(rlsOrgs).toEqual([String(SESSION_ORG)]);
   });
 
+  it('accepts targetOrgId null (same type the actor adapter allows) and keeps an ordinary member in the session org', async () => {
+    const { context, rlsOrgs } = await rlsOrgFor(actor(), { targetOrgId: null });
+    expect(context.effectiveOrgId).toBe(SESSION_ORG);
+    expect(rlsOrgs).toEqual([String(SESSION_ORG)]);
+  });
+
   it('lets a platform system user run in the named org', async () => {
     const { context, rlsOrgs } = await rlsOrgFor(actor({ isSystemUser: true }), { targetOrgId: FOREIGN_ORG });
     expect(context.effectiveOrgId).toBe(FOREIGN_ORG);
