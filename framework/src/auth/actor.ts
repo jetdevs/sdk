@@ -96,7 +96,9 @@ export interface DbAccessOptions {
   // The specific org context to use (defaults to actor's orgId).
   // Honoured for a platform system user, or when `targetOrgVerified` is set;
   // any other actor stays in its own session org.
-  targetOrgId?: number;
+  // `null` is allowed so it matches `ActorContextAdapter.getDbContext`; it is
+  // treated like any other named org (never widens a non-system actor).
+  targetOrgId?: number | null;
 
   // Set ONLY by server code that has itself established the actor may run in
   // `targetOrgId` (an org locked by a custom domain, a verified membership).
