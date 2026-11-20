@@ -55,7 +55,14 @@
  * re-read.
  *
  * FAIL CLOSED, WITH ONE DELIBERATE SPLIT. A Connect-bound credential is
- * refused when its version cannot be read — the store, the issuer, anything.
+ * refused when the ISSUER cannot vouch for it — no answer, an indeterminate
+ * answer, or no store configured at all. A local-store read that THROWS (the
+ * version mirror or the ledger: a database blip) does not refuse it on its
+ * own: the check asks Connect, and admits with a warning (`facts.localStore =
+ * 'unreadable'`) only when Connect answers live and current; Connect saying
+ * inactive / stale / grant gone, or not answering, still refuses (p77 a1,
+ * Sean 2026-11-20: "Definitely not log out"). A ledger that reads and matches
+ * a revocation refuses whatever Connect says.
  * A local (phone-only, Google-only) credential is admitted with a warning when
  * the local read throws, because a database blip signing out the whole product
  * is a larger outage than the one it prevents, and because a local user's
@@ -169,6 +176,11 @@ export interface FreshnessFacts {
   revokedAfter: number | null
   /** `nowMs` of the check. */
   checkedAt: number
+  /**
+   * p77 a1 — set when the local store (version mirror or ledger) threw and a
+   * Connect-bound credential was judged on the issuer's live answer alone.
+   */
+  localStore?: 'unreadable'
 }
 
 export type FreshnessVerdict =
@@ -431,12 +443,16 @@ export async function assertCredentialFresh(epoch: CredentialEpoch, deps: Freshn
 
   let mirror: MirrorRow | null = null
   let mirrorUnreadable = false
+  // A store that is configured but THREW (a database blip) — as opposed to no
+  // store at all. Only this one can be stood in for by the issuer (p77 a1).
+  let storeThrew = false
   if (epoch.localUserId != null) {
     try {
       mirror = execute ? await readMirror(execute, epoch.localUserId, nowMs, maxAgeMs) : null
       if (!execute) mirrorUnreadable = true
     } catch (err) {
       mirrorUnreadable = true
+      storeThrew = true
       logger.error('[connect-freshness] users read failed:', err)
     }
   }
@@ -528,18 +544,76 @@ export async function assertCredentialFresh(epoch: CredentialEpoch, deps: Freshn
   // absence is never the reason. An oidc lineage without one was minted
   // before the epoch existed.
   if (cv == null || (lineage === 'oidc' && !aeid)) return refuse('no_epoch')
-  if (mirrorUnreadable) return refuse('unreadable')
+  // p77 a1 (Sean 2026-11-20: "Definitely not log out"). A THROWN local read
+  // no longer refuses a Connect-bound credential on its own: the check goes
+  // on, and admits only on the issuer's own live, current answer (step 2, or
+  // the lookup below when step 2 asked nobody). No store configured at all
+  // still refuses — that is a deployment fault, not a blip.
+  if (mirrorUnreadable && !storeThrew) return refuse('unreadable')
 
-  // 1. Revocation. The ledger refuses on an unreadable store for a bound
-  //    credential, which is the rule here too.
+  // 1. Revocation. A ledger that cannot be read no longer refuses here; it
+  //    marks the check so the issuer must vouch (p77 a1). A ledger that reads
+  //    and matches still refuses.
   const identity = { issuer, sub, sid: epoch.sid ?? null, localUserId: epoch.localUserId, issuedAtSeconds: epoch.issuedAtSeconds }
-  if (await isSessionRevokedForToken(execute, identity, nowMs, { maxAgeMs, logger })) {
+  const ledgerRead = { unreadable: false }
+  if (
+    await isSessionRevokedForToken(execute, identity, nowMs, {
+      maxAgeMs,
+      logger,
+      onUnreadable: execute ? 'admit' : 'refuse',
+      report: ledgerRead,
+    })
+  ) {
     try {
       if (execute) f.revokedAfter = (await readConnectSessionRevocation(execute, identity)).revokedAfter
     } catch {
       // The fact is decoration; the refusal stands.
     }
     return refuse('revoked')
+  }
+
+  // The lineage-aware lookup (D24), never a token: the canonical read for
+  // app_local and derived, and the issuer's word for an oidc credential with
+  // no token when the local store could not be read (p77 a1). Null = fresh.
+  // Narrowed above; a closure does not keep `let` narrowing.
+  const boundIssuer: string = issuer
+  const boundSub: string = sub
+  const carried: number = cv
+  const askLookup = async (): Promise<FreshnessVerdict | null> => {
+    const cfg = deps.lookup ?? null
+    if (!cfg) return refuse('unreadable')
+    const sourceUserRef = epoch.sourceUserRef ?? epoch.localUserId
+    if (sourceUserRef == null) return refuse('unreadable')
+    const q = { sub: boundSub, sourceUserRef, aeid, grantId }
+    let a: AccountVersionAnswer
+    try {
+      a = await cachedLookup(q, cfg, nowMs, maxAgeMs)
+    } catch (err) {
+      logTransport(logger, err)
+      return refuse('unreadable')
+    }
+    f.epoch = a.epoch
+    f.grant = a.grant
+    f.active = a.active
+    f.version = a.cv
+    if (!a.found || a.cv == null) return refuse('unreadable')
+    if (a.active === false) return refuse('inactive')
+    if (a.epoch === 'stale') return refuse('stale')
+    if (lineage === 'oidc') {
+      // An oidc lineage supplied an aeid and a grant; Connect must be able to
+      // place both. `unknown` is never an admission.
+      if (a.epoch === 'unknown') return refuse('unreadable')
+      if (a.grant === 'gone') return refuse('grant_gone')
+      if (a.grant !== 'live') return refuse('grant_unknown')
+    } else if (grantId && a.grant === 'gone') {
+      return refuse('grant_gone')
+    }
+    if (a.cv > carried) {
+      await observeCredentialVersion(execute, { userId: epoch.localUserId, issuer: boundIssuer, sub: boundSub, cv: a.cv }, nowMs, logger)
+      return refuse('stale')
+    }
+    source = 'lookup'
+    return null
   }
 
   // 2. The canonical read.
@@ -578,40 +652,22 @@ export async function assertCredentialFresh(epoch: CredentialEpoch, deps: Freshn
       source = 'introspection'
     }
   } else {
-    // app_local and derived: the lineage-aware lookup (D24), never a token.
-    const cfg = deps.lookup ?? null
-    if (!cfg) return refuse('unreadable')
-    const sourceUserRef = epoch.sourceUserRef ?? epoch.localUserId
-    if (sourceUserRef == null) return refuse('unreadable')
-    const q = { sub, sourceUserRef, aeid, grantId }
-    let a: AccountVersionAnswer
-    try {
-      a = await cachedLookup(q, cfg, nowMs, maxAgeMs)
-    } catch (err) {
-      logTransport(logger, err)
-      return refuse('unreadable')
+    const refused = await askLookup()
+    if (refused) return refused
+  }
+  const localBlip = storeThrew || ledgerRead.unreadable
+  if (localBlip) {
+    f.localStore = 'unreadable'
+    if (source === 'mirror') {
+      // Nothing above asked the issuer (an oidc credential with no token).
+      const refused = await askLookup()
+      if (refused) return refused
     }
-    f.epoch = a.epoch
-    f.grant = a.grant
-    f.active = a.active
-    f.version = a.cv
-    if (!a.found || a.cv == null) return refuse('unreadable')
-    if (a.active === false) return refuse('inactive')
-    if (a.epoch === 'stale') return refuse('stale')
-    if (lineage === 'oidc') {
-      // An oidc lineage supplied an aeid and a grant; Connect must be able to
-      // place both. `unknown` is never an admission.
-      if (a.epoch === 'unknown') return refuse('unreadable')
-      if (a.grant === 'gone') return refuse('grant_gone')
-      if (a.grant !== 'live') return refuse('grant_unknown')
-    } else if (grantId && a.grant === 'gone') {
-      return refuse('grant_gone')
-    }
-    if (a.cv > cv) {
-      await observeCredentialVersion(execute, { userId: epoch.localUserId, issuer, sub, cv: a.cv }, nowMs, logger)
-      return refuse('stale')
-    }
-    source = 'lookup'
+    if (source === 'mirror') return refuse('unreadable')
+    logger.warn('[connect-freshness] local store unreadable — admitted on the issuer\'s live answer', {
+      userId: epoch.localUserId,
+      source,
+    })
   }
   if (source !== 'mirror') {
     await observeCredentialVersion(execute, { userId: epoch.localUserId, issuer, sub, cv }, nowMs, logger)
