@@ -327,6 +327,12 @@ export async function isSessionRevokedForToken(
      * the split is on the credential's binding, not on the identity asked.
      */
     onUnreadable?: 'refuse' | 'admit'
+    /**
+     * Set to `{ unreadable: true }` when the store could not be read, so a
+     * caller that admitted on an unreadable store can tell that apart from
+     * "not revoked" and ask the issuer instead (p77 a1, Sean 2026-11-20).
+     */
+    report?: { unreadable: boolean }
   } = {},
 ): Promise<boolean> {
   const refuseOnUnreadable =
@@ -334,7 +340,10 @@ export async function isSessionRevokedForToken(
   const logger = opts.logger ?? console
   const maxAgeMs = Math.min(CACHE_TTL_MS, Math.max(0, opts.maxAgeMs ?? CACHE_TTL_MS))
 
-  if (!execute) return refuseOnUnreadable
+  if (!execute) {
+    if (opts.report) opts.report.unreadable = true
+    return refuseOnUnreadable
+  }
 
   const cacheKey = [
     identity.issuer ?? '',
@@ -357,6 +366,7 @@ export async function isSessionRevokedForToken(
     return revoked
   } catch (err) {
     logger.error('[connect-revocation] revocation check failed:', err)
+    if (opts.report) opts.report.unreadable = true
     // Not cached — an unreadable store must be re-asked on the next request,
     // not remembered for a minute.
     return refuseOnUnreadable

@@ -19,6 +19,10 @@ import { __resetRevocationCacheForTests, applyLogoutToken } from '../ledger.js'
 import { BACKCHANNEL_LOGOUT_EVENT, __resetJwksCacheForTests, verifyLogoutToken } from '../logout-token.js'
 import { closedPort, signJwt, startFakeIdp, type FakeIdp } from './support/fake-idp.js'
 import { openLocalLedgerDb, type LocalLedgerDb } from './support/local-db.js'
+import { sqlClientFromPostgresJs } from '../sql-client.js'
+import { createRequire } from 'node:module'
+
+const requireFromCore = createRequire(new URL('../../../../../core/package.json', import.meta.url))
 import { WOULD_REFUSE_PREFIX, withEpochEnforcement } from '../../../next-auth/epoch-enforcement.js'
 
 const db: LocalLedgerDb | null = await openLocalLedgerDb()
@@ -161,10 +165,82 @@ describe.skipIf(!db)('assertCredentialFresh (real IdP + real Postgres)', () => {
     const throwing = async () => {
       throw new Error('store down')
     }
-    it('a Connect-bound credential with an unreadable version → refuse (unreadable)', async () => {
+    it('no store configured at all still refuses a Connect-bound credential (unreadable)', async () => {
       idp.state.introspect.set('AT-1', { active: true, sub: '42', cv: 1, aeid: 'E1' })
-      expect(await assertCredentialFresh(oidc(), deps({ execute: throwing }))).toMatchObject({ ok: false, reason: 'unreadable' })
       expect(await assertCredentialFresh(oidc(), deps({ execute: null }))).toMatchObject({ ok: false, reason: 'unreadable' })
+    })
+
+    // p77 a1 (Sean 2026-11-20: "Definitely not log out"): a local-store blip on a
+    // Connect-bound credential asks Connect; Connect live + current → admit with a
+    // warning; Connect revoked/inactive/stale or unreachable → refuse. The store here
+    // is a REAL postgres client pointed at a closed port, so the error is the
+    // driver's own ECONNREFUSED, not a hand-thrown one.
+    describe('a Connect-bound credential on a local-store blip (p77 a1)', () => {
+      let downStore: { execute: FreshnessDeps['execute']; end: () => Promise<void> }
+      beforeAll(async () => {
+        const port = new URL(await closedPort()).port
+        const postgres = requireFromCore('postgres') as (url: string, opts: Record<string, unknown>) => any
+        // A fresh client per statement: postgres-js backs off between reconnects to a
+        // dead host, which would turn later calls into multi-second waits.
+        const execute: FreshnessDeps['execute'] = async (text, params) => {
+          const raw = postgres(`postgres://127.0.0.1:${port}/down`, { max: 1, connect_timeout: 2, onnotice: () => {} })
+          try {
+            return await sqlClientFromPostgresJs(raw).execute(text, params)
+          } finally {
+            await raw.end({ timeout: 1 }).catch(() => {})
+          }
+        }
+        downStore = { execute, end: async () => {} }
+      })
+      afterAll(async () => downStore.end())
+
+      it('the down store throws a real transient driver error', async () => {
+        await expect(downStore.execute!('SELECT 1', [])).rejects.toMatchObject({ code: 'ECONNREFUSED' })
+      })
+
+      it('oidc with a token: Connect active + same cv/aeid → admitted on introspection, warned, localStore marked', async () => {
+        idp.state.introspect.set('AT-1', { active: true, sub: '42', cv: 1, aeid: 'E1', grant_id: 'G1' })
+        const logger = silent()
+        const v = await assertCredentialFresh(oidc(), deps({ execute: downStore.execute, logger }))
+        expect(v).toMatchObject({ ok: true, cv: 1, source: 'introspection', facts: { localStore: 'unreadable', active: true } })
+        expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('local store unreadable'), expect.objectContaining({ userId: 1 }))
+      })
+
+      it('oidc with a token: Connect says inactive → inactive; newer cv → stale; Connect unreachable → unreadable', async () => {
+        idp.state.introspect.set('AT-2', { active: false })
+        expect(await assertCredentialFresh(oidc({ accessToken: 'AT-2' }), deps({ execute: downStore.execute }))).toMatchObject({ ok: false, reason: 'inactive' })
+        idp.state.introspect.set('AT-3', { active: true, sub: '42', cv: 2, aeid: 'E1' })
+        expect(await assertCredentialFresh(oidc({ accessToken: 'AT-3' }), deps({ execute: downStore.execute }))).toMatchObject({ ok: false, reason: 'stale' })
+        expect(
+          await assertCredentialFresh(
+            oidc({ accessToken: 'AT-4', issuer: dead }),
+            deps({ execute: downStore.execute, connect: { issuer: dead, clientId: 'crm', clientSecret: 'crm-secret' }, lookup: null }),
+          ),
+        ).toMatchObject({ ok: false, reason: 'unreadable' })
+      })
+
+      it('oidc with no token: asks the lookup — epoch fresh + grant live → admitted; grant gone → grant_gone; no lookup → unreadable', async () => {
+        const noToken = oidc({ accessToken: undefined, grantId: 'G1' })
+        idp.state.accountVersion.set('42|1', { found: true, active: true, cv: 1, epoch: 'fresh', grant: 'live' })
+        expect(await assertCredentialFresh(noToken, deps({ execute: downStore.execute }))).toMatchObject({
+          ok: true,
+          source: 'lookup',
+          facts: { localStore: 'unreadable' },
+        })
+        __resetFreshnessCachesForTests()
+        idp.state.accountVersion.set('42|1', { found: true, active: true, cv: 1, epoch: 'fresh', grant: 'gone' })
+        expect(await assertCredentialFresh(noToken, deps({ execute: downStore.execute }))).toMatchObject({ ok: false, reason: 'grant_gone' })
+        expect(await assertCredentialFresh(noToken, deps({ execute: downStore.execute, lookup: null }))).toMatchObject({ ok: false, reason: 'unreadable' })
+      })
+
+      it('app_local: lookup live + same cv → admitted; inactive → inactive', async () => {
+        const appLocal: CredentialEpoch = { kind: 'app_local', localUserId: 7, issuer: idp.issuer, sub: '77', cv: 2, issuedAtSeconds: nowS() }
+        idp.state.accountVersion.set('77|7', { found: true, active: true, cv: 2, epoch: 'fresh', grant: 'unknown' })
+        expect(await assertCredentialFresh(appLocal, deps({ execute: downStore.execute }))).toMatchObject({ ok: true, source: 'lookup', facts: { localStore: 'unreadable' } })
+        __resetFreshnessCachesForTests()
+        idp.state.accountVersion.set('77|7', { found: true, active: false, cv: 2, epoch: 'fresh', grant: 'unknown' })
+        expect(await assertCredentialFresh(appLocal, deps({ execute: downStore.execute }))).toMatchObject({ ok: false, reason: 'inactive' })
+      })
     })
     it('a local credential with a thrown local read → admit with a warning (unverified_local)', async () => {
       const logger = silent()
