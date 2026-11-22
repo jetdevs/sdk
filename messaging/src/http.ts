@@ -16,7 +16,6 @@ export class HttpClient {
     this.maxRetries = config.maxRetries ?? 3;
 
     this.headers = {
-      'Content-Type': 'application/json',
       Accept: 'application/json',
     };
 
@@ -80,8 +79,8 @@ export class HttpClient {
 
         const response = await fetch(url, {
           method,
-          headers: this.headers,
-          body: body ? JSON.stringify(body) : undefined,
+          headers: body !== undefined ? { 'Content-Type': 'application/json', ...this.headers } : this.headers,
+          body: body !== undefined ? JSON.stringify(body) : undefined,
           signal: controller.signal,
         });
 

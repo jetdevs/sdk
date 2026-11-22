@@ -40,6 +40,17 @@ export class ConnectionsResource {
     return this.http.put(`/api/v1/connections/${uuid}/identity-gate`, { identityGate });
   }
 
+  /**
+   * Pause (responder suppressed, inbound still persisted) or resume a connection.
+   * msg-api refuses DELETE unless the connection is PAUSED.
+   */
+  async setStatus(
+    uuid: string,
+    status: 'PAUSED' | 'ACTIVE',
+  ): Promise<ApiResponse<{ connectionUuid: string; status: string }>> {
+    return this.http.put(`/api/v1/connections/${uuid}/status`, { status });
+  }
+
   async delete(uuid: string): Promise<void> {
     await this.http.delete(`/api/v1/connections/${uuid}`);
   }
