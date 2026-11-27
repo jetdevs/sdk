@@ -158,3 +158,33 @@ describe('apiKeys — platform permissions on a key (YMS-297)', () => {
     await expect(call(cfg, 'create', base, orgAdmin)).resolves.toMatchObject({ key: expect.any(String) });
   });
 });
+
+// CAD-1126 (CAD-1105 row #34): no SDK-chosen rate limit. An omitted rateLimit
+// reaches the repository as undefined, so each app's own DB column default
+// decides (cadra-web: NULL = no limit; crm/core-saas/yobo: 1000).
+describe('apiKeys create handler — rateLimit default (CAD-1126)', () => {
+  beforeEach(() => {
+    listMock.mockReset();
+    listMock.mockResolvedValue({ roles: [] });
+  });
+
+  it('passes no rateLimit when the caller sends none', async () => {
+    const repo = makeRepo();
+    const config = createApiKeysRouterConfig({ defaultPermissions: ['*'] });
+    await config.create.handler({ input: baseInput, service, repo, db: {} } as any);
+    expect(repo.create.mock.calls[0][0].rateLimit).toBeUndefined();
+  });
+
+  it('keeps a rateLimit the caller sends', async () => {
+    const repo = makeRepo();
+    const config = createApiKeysRouterConfig({ defaultPermissions: ['*'] });
+    await config.create.handler({ input: { ...baseInput, rateLimit: 500 }, service, repo, db: {} } as any);
+    expect(repo.create.mock.calls[0][0].rateLimit).toBe(500);
+  });
+
+  it('createApiKeySchema adds no default rateLimit', async () => {
+    const { createApiKeySchema } = await import('./schemas');
+    const parsed = createApiKeySchema.parse({ name: 'k' });
+    expect(parsed.rateLimit).toBeUndefined();
+  });
+});

@@ -51,7 +51,8 @@ export interface ApiKeyCreateData {
   permissionMode?: PermissionMode;
   /** When permissions were synced from role */
   permissionsSyncedAt?: Date | null;
-  rateLimit: number;
+  /** CAD-1126: omit for no SDK default; the app's DB column default decides (NULL = no limit in cadra-web). */
+  rateLimit?: number;
   expiresAt?: Date;
   createdBy: number;
 }
