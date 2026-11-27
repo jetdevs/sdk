@@ -376,7 +376,7 @@ export function createApiKeysRouterConfig(
           permissions,
           permissionMode,
           permissionsSyncedAt: roleId ? new Date() : null, // Set sync time if role-based
-          rateLimit: input.rateLimit ?? 1000,
+          rateLimit: input.rateLimit, // CAD-1126: no default; undefined lets the app DB column default decide
           expiresAt: input.expiresAt,
           createdBy: parseInt(service.userId),
         });
