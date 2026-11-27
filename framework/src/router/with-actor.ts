@@ -206,31 +206,6 @@ export interface RouteConfig<TInput = any, TOutput = any, TDb = any> {
     errorCode?: 'INTERNAL_SERVER_ERROR' | 'NOT_FOUND' | 'BAD_REQUEST';
     message?: string;
   } | boolean;  // true = use defaults
-
-  /**
-   * Whether the framework wraps the handler in the adapter's DB transaction.
-   *
-   * Omitted (the default): the handler runs inside `getDbContext(...).dbFunction`,
-   * the RLS transaction, and receives its transaction client as `db`.
-   *
-   * `'none'`: for a handler that opens its own transaction (for example one that
-   * needs `repeatable read, read only` or session settings that cannot be set on
-   * an already-open transaction). The actor is still created, and the permission,
-   * locked-org and foreign-org checks run exactly as on a default route. The
-   * handler still runs inside `withRLSContext` (AsyncLocalStorage org/user), but
-   * `dbFunction` is NOT called, so the route holds no pooled connection of its
-   * own while the handler opens one. The handler receives `db` (and
-   * `service.db`) = `ctx.db`, the plain client from the tRPC context, the same
-   * client public routes get; it is `undefined` when the context has none. That
-   * client carries NO RLS org setting: the handler must open its own transaction
-   * and set its own context before it reads or writes org data.
-   * `afterCommit` callbacks run right after the handler resolves (there is no
-   * framework transaction to wait for), with the same error handling.
-   * Cannot be combined with `repository`: `createRouterWithActor` throws when the
-   * router is built, because a repository on a client without RLS context would
-   * silently lose its org scoping.
-   */
-  transaction?: 'none';
 }
 
 /**
@@ -575,22 +550,6 @@ export function createRouterWithActor<TDb = any>(
   const procedures: Record<string, any> = {};
 
   for (const [name, route] of Object.entries(config)) {
-    if (route.transaction !== undefined) {
-      if (route.transaction !== 'none') {
-        throw new Error(
-          `[createRouterWithActor] Route "${name}": unknown transaction option ${JSON.stringify(route.transaction)}. ` +
-          `The only supported value is 'none'; omit the option for the default transaction.`
-        );
-      }
-      if (route.repository) {
-        throw new Error(
-          `[createRouterWithActor] Route "${name}": transaction 'none' cannot be combined with repository. ` +
-          `Without the framework transaction the repository would get a client with no RLS context. ` +
-          `Instantiate the repository inside the handler's own transaction instead.`
-        );
-      }
-    }
-
     // 1. Start with the appropriate procedure type (public or protected)
     // For crossOrg routes, use a procedure without org-locking checks
     let procedure = adapter.getProcedure(route.permission, route.public, route.crossOrg);
@@ -875,17 +834,9 @@ export function createRouterWithActor<TDb = any>(
       // Also expose on the raw ctx for the `ctx.afterCommit(...)` convention.
       (ctx as any).afterCommit = afterCommit;
 
-      // transaction: 'none' runs the same callback on the context's plain
-      // client instead of inside dbFunction. Default routes use dbFunction.
-      const runWithDb: (callback: (db: TDb) => Promise<unknown>) => Promise<unknown> =
-        route.transaction === 'none'
-          ? (callback: (db: TDb) => Promise<unknown>) =>
-              callback((ctx as { db?: TDb } | null | undefined)?.db as TDb)
-          : dbFunction;
-
       // Execute within RLS context (both AsyncLocalStorage and database session)
       const result = await withRLSContext(rlsContext, async () => {
-        return runWithDb(async (db: TDb) => {
+        return dbFunction(async (db: TDb) => {
           const serviceContext = adapter.createServiceContext(db, actor, effectiveOrgId);
 
           // Add userId to service context
